@@ -14,7 +14,7 @@
 # charters still use a single `{TASK}` charter fill. Firstmate may adjust other
 # sections when the task genuinely deviates (e.g. working an existing external
 # PR instead of shipping a new one).
-# Usage: fm-brief.sh <task-id> <repo-name> --mode <no-mistakes|direct-PR|local-only> [--branch-prefix <prefix>] [--forge <none|gerrit> [--shape squash]] [--herdr-lab]
+# Usage: fm-brief.sh <task-id> <repo-name> --mode <no-mistakes|direct-PR|local-only> [--branch-prefix <prefix>] [--forge <none|gerrit> [--shape squash]] [--target <forge|crux-cr>] [--herdr-lab]
 #        fm-brief.sh <task-id> <repo-name> --scout [--herdr-lab]
 #        fm-brief.sh <task-id> --secondmate {<project>...|--no-projects}
 #   --scout writes the scout contract instead: the deliverable is a report at
@@ -72,6 +72,15 @@
 # membership pinned when its watch is armed, because the merge watch follows one
 # change.
 # It defaults to squash on gerrit and is refused without it.
+# --target selects the delivery rail and defaults to forge (the project's PR or
+# change flow named by --forge).
+# --target crux-cr routes the brief onto the Amazon CRUX code-review flow: the
+# worker builds and validates with the package's Brazil build, drives a DRAFT
+# code review to a green dry-run build, and stops at the human publish gate
+# (publishing a CR is human-only). Derive the rail from the project's origin
+# with bin/fm-delivery-target.sh. crux-cr pairs with --mode direct-PR; the
+# GitHub-specific no-mistakes pipeline and the review-less local-only mode do
+# not apply to it, and it does not combine with --forge.
 # The generated ship brief records the chosen mode as a fixed machine-readable
 # "Delivery contract: mode=<mode>" line, followed by " forge=gerrit shape=squash"
 # on that forge. bin/fm-spawn.sh reads that line and refuses to launch a ship task
@@ -191,6 +200,8 @@ FORGE=none
 FORGE_SET=0
 SHAPE=
 SHAPE_SET=0
+TARGET=forge
+TARGET_SET=0
 POS=()
 want_value=
 for a in "$@"; do
@@ -203,6 +214,7 @@ for a in "$@"; do
       branch-prefix) BRANCH_PREFIX=$a; BRANCH_PREFIX_SET=1 ;;
       forge) FORGE=$a; FORGE_SET=1 ;;
       shape) SHAPE=$a; SHAPE_SET=1 ;;
+      target) TARGET=$a; TARGET_SET=1 ;;
       *) echo "error: internal parser state for --$want_value" >&2; exit 1 ;;
     esac
     want_value=
@@ -221,6 +233,8 @@ for a in "$@"; do
     --forge=*) FORGE=${a#--forge=}; FORGE_SET=1 ;;
     --shape) want_value=shape ;;
     --shape=*) SHAPE=${a#--shape=}; SHAPE_SET=1 ;;
+    --target) want_value=target ;;
+    --target=*) TARGET=${a#--target=}; TARGET_SET=1 ;;
     # yolo never reaches the worker: it is firstmate's merge authority, not a
     # brief input. Refuse it loudly so it is never silently dropped here and then
     # believed to have been recorded.
@@ -278,6 +292,30 @@ if [ "$KIND" = ship ]; then
   fi
 elif [ "$FORGE_SET" -eq 1 ] || [ "$SHAPE_SET" -eq 1 ]; then
   echo "error: --forge and --shape apply only to ship briefs; a scout delivers a report and a secondmate charter is not a delivery contract" >&2
+  exit 1
+fi
+# Delivery target (rail) is ship-only and defaults to forge. crux-cr routes the
+# brief onto the CRUX code-review flow and pairs only with direct-PR: the
+# GitHub-specific no-mistakes pipeline and the review-less local-only mode do
+# not apply on the CR rail (bin/fm-dod-lib.sh owns the rail's worker contract).
+if [ "$KIND" = ship ]; then
+  case "$TARGET" in
+    forge|crux-cr) ;;
+    *) echo "error: --target must be forge or crux-cr (got '$TARGET')" >&2; exit 1 ;;
+  esac
+  if [ "$TARGET" = crux-cr ]; then
+    if [ "$FORGE" != none ]; then
+      echo "error: --target crux-cr is its own review rail and does not combine with --forge $FORGE" >&2
+      exit 1
+    fi
+    case "$MODE" in
+      direct-PR) ;;
+      no-mistakes) echo "error: the no-mistakes pipeline is GitHub-PR-specific; on the CRUX code-review rail use --mode direct-PR (the worker drives the package's CR audit workflow and dry-run builds to green, then stops at the human publish gate)" >&2; exit 1 ;;
+      local-only) echo "error: --target crux-cr does not apply to --mode local-only, which produces no review" >&2; exit 1 ;;
+    esac
+  fi
+elif [ "$TARGET_SET" -eq 1 ]; then
+  echo "error: --target applies only to ship briefs" >&2
   exit 1
 fi
 ID=${POS[0]}
@@ -643,6 +681,43 @@ esac
 RULE1=$(fm_ship_rule_one "$MODE" "$ID" "$BRANCH" "$FORGE") || exit 1
 DOD=$(fm_dod_block "$MODE" "$ID" "$BRANCH" "$FORGE") || exit 1
 
+# The delivery block carries a machine-readable "Delivery target:" line and the
+# definition of done. On the forge rail (default) that is the mode's own DoD. On
+# the CRUX code-review rail it is a CR-specific DoD that keeps the same
+# "Delivery contract: mode=" line bin/fm-spawn.sh checks, but drives a draft
+# code review to a green dry-run build and stops at the human publish gate
+# instead of opening a PR. The CR rail overrides the forge Rule 1 and setup step
+# so the worker never pushes a PR and sets the CR destination upstream.
+if [ "$TARGET" = crux-cr ]; then
+  RULE1='1. Never publish or merge the code review. Publishing a CR is human-only; firstmate escalates the ready review to the captain. Push only your `'"$BRANCH"'` branch.'
+  SETUP2="
+2. Set your branch's upstream to the package's destination branch so CRUX can derive the CR destination: \`git branch -u origin/mainline $BRANCH\` (confirm the package's real default branch first; without an upstream the dry-run build faults with no log)."
+  IFS= read -r -d '' DOD <<EOF || true
+# Definition of done
+Delivery contract: mode=$MODE
+
+This ships through an Amazon CRUX code review (CR) on a Brazil package, not a forge PR.
+Build and test with the package's Brazil build (\`brazil-build\`); follow the package README for the exact commands.
+Create the code review as a DRAFT and drive it to a green dry-run build:
+- If the package ships a CR audit workflow (look under \`.agents/workflows/\`), run it - it composes AutoSDE and the Critic analyzers - and address the blockers it reports.
+- Otherwise create the review with the \`cr\` CLI and drive its dry-run builds and analyzers to green.
+NEVER publish the CR. Publishing a code review is a human action; firstmate relays the ready review to the captain, who publishes it.
+Write the CR title and description in plain English for a reviewer who lacks your context, and never put "captain" or any direct address in the CR.
+When the review is a DRAFT with a green dry-run build, append \`done: CR <url> dry-run green\` to the status file - with the full \`https://code.amazon.com/reviews/CR-<n>\` URL exactly as \`cr\` printed it - and stop.
+EOF
+  DOD=${DOD%$'\n'}
+fi
+
+if [ "$TARGET" = crux-cr ]; then
+  DELIVERY_BLOCK="Delivery target: crux-cr
+
+$DOD"
+else
+  DELIVERY_BLOCK="Delivery target: forge
+
+$DOD"
+fi
+
 cat > "$BRIEF" <<EOF
 You are a crewmate: an autonomous worker agent managed by firstmate. Work on your own; do not wait for a human.
 
@@ -691,10 +766,12 @@ $WAIT_BLOCK$INBOX_SECTION
 A project's \`AGENTS.md\` or \`CLAUDE.md\` is loaded into every agent session in that project, so edit it only to correct information that is factually wrong - including information your own change made wrong - and never to add knowledge because it is missing.
 A correction edits only the wrong text: do not run \`$FM_ROOT/bin/fm-ensure-agents-md.sh\`, create either file, or add sections, headings, or pointers alongside it.
 
-$DOD
+$DELIVERY_BLOCK
 EOF
 append_brief_include
-if [ "$FORGE" = none ]; then
+if [ "$TARGET" = crux-cr ]; then
+  echo "scaffolded: $BRIEF (ship, mode=$MODE, target=crux-cr; replace {TASK} and {FIRSTMATE_SPEC})"
+elif [ "$FORGE" = none ]; then
   echo "scaffolded: $BRIEF (ship, mode=$MODE; replace {TASK} and {FIRSTMATE_SPEC})"
 else
   echo "scaffolded: $BRIEF (ship, mode=$MODE forge=$FORGE shape=$SHAPE; replace {TASK} and {FIRSTMATE_SPEC})"
