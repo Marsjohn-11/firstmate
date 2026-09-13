@@ -331,8 +331,12 @@ fm_composer_strip_ghost() {
 # tmux agy endpoint reaches the submit core with no recorded harness, and its
 # bare `>` composer verdict is `unknown`, so the busy footer is the only
 # turn-started acknowledgement that path can read. kiro's `Kiro is working` is
-# in the union for that same reason: its bare `›` composer verdict is `empty`,
-# so without the footer a kiro submit that landed would read pending or unknown.
+# in the union for two reasons of its own: the footer renders ON the composer
+# row, so a mid-turn composer read is `pending` and only a busy read lets
+# fm_composer_queued_enter_verdict convert that to `empty`; and the submit core
+# takes its pre-typing baseline with no harness, so without the literal an
+# already-busy kiro pane reads `idle` and wrongly arms the idle-to-busy
+# confirmation.
 FM_DELIVERY_BUSY_REGEX_DEFAULT='esc (to )?interrupt|Working(\.\.\.|…)|Ctrl\+c:cancel|ctrl\+c to stop|esc[[:space:]]+to[[:space:]]+cancel|Kiro is working'
 FM_DELIVERY_CLAUDE_BUSY_REGEX_DEFAULT='esc to interrupt|…[[:space:]]+\([0-9]+[smh]'
 FM_DELIVERY_CODEX_BUSY_REGEX_DEFAULT='esc to interrupt'

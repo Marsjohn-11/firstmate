@@ -76,11 +76,13 @@ capture() {
 }
 
 # The real consumer of kiro's footer: the delivery guard the submit-ack and
-# away-mode paths read. Consumes a screen on stdin.
+# pending-reply observation paths read. Consumes a screen on stdin and folds it
+# the way those callers do - blank lines dropped, last 12 kept - so a footer
+# left behind in the 200-line scrollback cannot satisfy the match.
 kiro_footer_busy() {
-  local screen
-  screen=$(cat)
-  printf '%s\0' "$screen" | fm_busy_lines_match kiro
+  local visible
+  visible=$(grep -v '^[[:space:]]*$' | tail -12)
+  printf '%s\0' "$visible" | fm_busy_lines_match kiro
 }
 
 # The launch prompt asks for a computed answer (12345+67890=80235) so the awaited

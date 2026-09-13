@@ -70,8 +70,9 @@
 # live-verified per-turn userPromptSubmit/stop pair, references/harness/kiro.md),
 # and it has no rendered-tail arm here. Its `Kiro is working` footer is matched
 # only by the delivery guards in bin/fm-composer-lib.sh, for submit
-# acknowledgement and away-mode supervisor injection; neither is a recorded
-# worker state source. So a kiro task with no record classifies unknown
+# acknowledgement and the pending-reply delivery observation, which reads the
+# harness from the task's meta record; neither is a recorded worker state
+# source. So a kiro task with no record classifies unknown
 # missing, and an abnormal turn end (no StopFailure/SessionEnd equivalent
 # exists on kiro V2) leaves the record busy until the next userPromptSubmit
 # re-opens it - docs/verification/kiro.md owns that disclosure.

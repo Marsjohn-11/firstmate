@@ -77,7 +77,8 @@ Seeding that setting into the per-task `KIRO_HOME` suppresses the modal, and a p
 
 - Composer glyph: `›` (U+203A), the same glyph codex draws.
 - Idle placeholder: `ask a question or describe a task` (followed by a de-emphasised `↵`).
-- Busy footer: `› Kiro is working · Type to steer · Ctrl+S to queue`. The delivery guard matches the harness-named `Kiro is working` literal, not the bare `esc to cancel` token kiro also renders in its tool region and shares with agy. It acknowledges a submit and gates away-mode injection; it is never a recorded worker state.
+- Busy footer: `› Kiro is working · Type to steer · Ctrl+S to queue`. The delivery guard matches the harness-named `Kiro is working` literal, not the bare `esc to cancel` token kiro also renders in its tool region and shares with agy. It acknowledges a submit and gates the pending-reply delivery observation, which reads `harness=` from `state/<id>.meta`; it is never a recorded worker state.
+Away-mode injection reads the PRIMARY harness instead, so it never selects kiro's signature.
 
 ## Control
 
@@ -98,6 +99,8 @@ Seeding that setting into the per-task `KIRO_HOME` suppresses the modal, and a p
 ## Live guard result
 
 `FM_KIRO_SIGNALS_LIVE=1 tests/fm-kiro-signals-live-e2e.test.sh` passed on 2026-09-13 against kiro-cli 2.21.4: the busy footer matched in flight, the launch prompt was answered, both V2 hooks fired per turn, a single Escape cancelled a long turn, and `/quit` stopped the process and printed its resume-id line.
+The guard's footer matcher changed after that run - it now folds the captured screen and calls the delivery guard `fm_busy_lines_match kiro` instead of a classifier helper the adapter no longer has - so that pass is evidence for the vendor facts above, not for the matcher the guard runs today.
+Re-running the guard on the Linux desk where the real tool lives is what would prove the current matcher.
 
 ## What is NOT verified
 
