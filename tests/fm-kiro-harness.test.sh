@@ -49,11 +49,98 @@ unset CLAUDECODE PI_CODING_AGENT FM_PI_HARNESS GROK_AGENT CURSOR_AGENT CURSOR_IN
 . "$ROOT/bin/fm-composer-lib.sh"
 # shellcheck source=/dev/null
 . "$ROOT/bin/fm-agent-process-lib.sh"
+# shellcheck source=tests/kiro-signals-helpers.sh disable=SC1091
+. "$(dirname "${BASH_SOURCE[0]}")/kiro-signals-helpers.sh"
 
 HARNESS="$ROOT/bin/fm-harness.sh"
 SPAWN="$ROOT/bin/fm-spawn.sh"
 TEARDOWN="$ROOT/bin/fm-teardown.sh"
 TMP_ROOT=$(fm_test_tmproot fm-kiro-harness)
+
+# --- Live-guard predicates --------------------------------------------------
+
+# The live guard (tests/fm-kiro-signals-live-e2e.test.sh) runs only where the
+# real tool lives, and every assertion it makes is a predicate in
+# tests/kiro-signals-helpers.sh. These cases drive those same predicates with
+# DRIFTED samples the live tool is not producing today, so each guard assertion
+# is proven able to fail rather than merely observed passing.
+test_kiro_live_guard_predicates_reject_drifted_surfaces() {
+  local settled busy_pane stale_tool_row scrollback i
+
+  # Foreground command name: both detection arms anchor on the exact word, so a
+  # rename must redden the guard rather than read as a stopped process.
+  fm_kiro_comm_is_anchored kiro-cli \
+    || fail "the anchored kiro-cli foreground name must satisfy the guard"
+  fm_kiro_comm_is_anchored kiro \
+    && fail "a renamed 'kiro' foreground command must fail the guard" || true
+  fm_kiro_comm_is_anchored aim \
+    && fail "the aim-sandbox wrapper name must fail the guard" || true
+  fm_kiro_comm_is_anchored bash \
+    && fail "a bare shell name must fail the guard" || true
+  fm_kiro_comm_is_anchored '' \
+    && fail "an unreadable foreground command must fail the guard" || true
+
+  # Resume line: a release that drops it must redden the guard.
+  printf '%s\n' 'Session ended.' 'Resume with: kiro-cli --resume-id abc123' \
+    | fm_kiro_capture_has_resume_line \
+    || fail "the recorded resume line must satisfy the guard"
+  printf '%s\n' 'Session ended.' 'Resume with: kiro-cli --session abc123' \
+    | fm_kiro_capture_has_resume_line \
+    && fail "a capture without --resume-id must fail the guard" || true
+
+  # Composer glyph: a drift off FM_COMPOSER_AGENT_PROMPT_GLYPHS flips every
+  # bare-row read from empty to unknown, so the guard must catch the character.
+  fm_kiro_composer_row_glyph_ok '›  ask a question or describe a task ↵' \
+    || fail "kiro's real idle composer row must satisfy the glyph guard"
+  fm_kiro_composer_row_glyph_ok '   ›  ask a question or describe a task' \
+    || fail "leading whitespace must not defeat the glyph guard"
+  fm_kiro_composer_row_glyph_ok '>  ask a question or describe a task' \
+    && fail "a shell-class > glyph must fail the glyph guard" || true
+  fm_kiro_composer_row_glyph_ok '❯  ask a question or describe a task' \
+    && fail "another harness's glyph must fail the kiro glyph guard" || true
+  fm_kiro_composer_row_glyph_ok '' \
+    && fail "an empty composer row must fail the glyph guard" || true
+
+  # Settled-pane negative: the guard asserts it against BOTH the scoped
+  # signature and the harness-less union the submit core reads. A settled pane
+  # carrying a stale `esc to cancel` row from a finished tool call passes the
+  # scoped check and fails the union one, which is the verdict that decides a
+  # steer - so the union assertion must be the one that catches it.
+  settled=$'the answer is 80235\n›  ask a question or describe a task ↵'
+  printf '%s' "$settled" | fm_kiro_footer_busy kiro \
+    && fail "a settled kiro pane must not match the scoped signature" || true
+  printf '%s' "$settled" | fm_kiro_footer_busy \
+    && fail "a settled kiro pane must not match the harness-less union" || true
+  stale_tool_row=$'ran a tool\n  esc to cancel                model\nthe answer is 80235\n›  ask a question or describe a task ↵'
+  printf '%s' "$stale_tool_row" | fm_kiro_footer_busy kiro \
+    || true
+  printf '%s' "$stale_tool_row" | fm_kiro_footer_busy \
+    || fail "a stale esc-to-cancel row must match the harness-less union, or the guard's union assertion cannot fail"
+
+  # The guard captures 200 rows of scrollback, so the fold to the last 12
+  # non-blank rows is what stops a footer from a FINISHED turn satisfying the
+  # match. Without the fold the settled negatives above would pass vacuously.
+  scrollback='› Kiro is working · Type to steer · Ctrl+S to queue'
+  i=0
+  while [ "$i" -lt 30 ]; do
+    scrollback="$scrollback"$'\n'"output row $i"
+    i=$((i + 1))
+  done
+  scrollback="$scrollback"$'\n›  ask a question or describe a task ↵'
+  printf '%s' "$scrollback" | fm_kiro_footer_busy kiro \
+    && fail "a footer left in scrollback must not match the scoped signature" || true
+  printf '%s' "$scrollback" | fm_kiro_footer_busy \
+    && fail "a footer left in scrollback must not match the harness-less union" || true
+
+  # And a genuinely busy pane must match both, so the negatives above are not
+  # passing because the matcher is inert.
+  busy_pane=$'work\n› Kiro is working · Type to steer · Ctrl+S to queue'
+  printf '%s' "$busy_pane" | fm_kiro_footer_busy kiro \
+    || fail "a real kiro busy footer must match the scoped signature"
+  printf '%s' "$busy_pane" | fm_kiro_footer_busy \
+    || fail "a real kiro busy footer must match the harness-less union"
+  pass "kiro live-guard predicates reject drifted comm names, resume lines, glyphs, and stale busy rows"
+}
 
 # --- Detection --------------------------------------------------------------
 
@@ -557,6 +644,7 @@ test_kiro_teardown_removes_the_per_task_home() {
   pass "fm-teardown: kiro's per-task home is removed on teardown"
 }
 
+test_kiro_live_guard_predicates_reject_drifted_surfaces
 test_kiro_ancestry_detects_the_native_command_name
 test_kiro_ancestry_rejects_unrelated_mentions
 test_kiro_ancestry_outranks_inherited_claude_marker
