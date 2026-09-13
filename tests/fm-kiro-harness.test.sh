@@ -209,18 +209,42 @@ test_kiro_record_is_the_only_state_source() {
 # --- Composer ---------------------------------------------------------------
 
 test_kiro_composer_glyph_and_placeholder() {
-  local caps state
+  local esc caps caps_plain row screen plain state stripped
+  esc=$(printf '\033')
   caps=$'styled=1\ncursor=1\nrows=6'
+  caps_plain=$'styled=0\nrows=6'
   # kiro's bare `›` composer (shared glyph with codex) is a genuine empty
-  # composer; its idle placeholder reads empty rather than pending under styling.
+  # composer.
   state=$(fm_composer_classify_screen "$caps" $'transcript line\n›  ' 1)
   [ "$state" = empty ] || fail "a bare kiro › composer must read empty, got '$state'"
-  # The dim idle placeholder, when styling strips it, leaves the bare glyph;
-  # simulate the styled placeholder collapsing to empty by feeding the glyph row.
-  printf '%s' 'ask a question or describe a task' \
-    | grep -qiE "$FM_COMPOSER_IDLE_RE_DEFAULT" \
-    || fail "kiro's idle placeholder must be a recognized idle-composer string"
-  pass "fm-composer-lib: kiro's › composer is empty and its idle placeholder is recognized"
+
+  # kiro's REAL idle composer row: a bright `›` glyph, then the placeholder and
+  # a de-emphasised `↵` submit hint, both dim (kiro-cli 2.21.4).
+  row="› ${esc}[2mask a question or describe a task ↵${esc}[0m"
+  screen=$'transcript line\n'"$row"
+  plain=$'transcript line\n›  ask a question or describe a task ↵'
+
+  # NON-VACUOUSNESS: on a styled capture the dim placeholder is ghost text, so
+  # the row reduces to the bare glyph and the idle set is not what decides it.
+  stripped=$(printf '%s' "$row" | fm_composer_strip_ghost)
+  fm_composer_normalize_trim_var stripped
+  [ "$stripped" = '›' ] \
+    || fail "kiro's dim placeholder must strip to the bare glyph, got '$stripped'"
+  state=$(fm_composer_classify_screen "$caps" "$screen" 1)
+  [ "$state" = empty ] || fail "kiro's styled idle row must read empty, got '$state'"
+
+  # An UNSTYLED capture cannot ghost-strip, so the fleet-wide idle set is the
+  # only thing keeping this row off `pending` - a false pending defers every
+  # steer to a genuinely idle kiro worker.
+  state=$(fm_composer_classify_screen "$caps_plain" "$plain")
+  [ "$state" = unknown ] \
+    || fail "kiro's unstyled idle row must read unknown, never pending, got '$state'"
+  # The trailing hint is why the entry is unanchored at the tail; assert that
+  # through the library predicate the classifier itself calls.
+  fm_composer_idle_matches 'ask a question or describe a task ↵' \
+    "$FM_COMPOSER_IDLE_RE_DEFAULT" insensitive \
+    || fail "kiro's idle row with its trailing hint must match the fleet-wide idle set"
+  pass "fm-composer-lib: kiro's › composer is empty and its real idle row is empty styled, unknown plain"
 }
 
 test_kiro_delivery_footer_matches_and_is_scoped() {

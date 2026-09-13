@@ -33,6 +33,7 @@ Hi
 ```
 
 `stop` does NOT fire on a manual Escape interrupt (the claude behaviour), and no StopFailure/SessionEnd equivalent was found among the accepted triggers.
+Those bare commands carry no shell metacharacter, so this run establishes nothing about whether kiro shell-interprets a command string - which the spawn's compound hook commands depend on, and which the live guard now asserts.
 
 ## Out-of-tree config via KIRO_HOME; `--agent` is name-only
 
@@ -99,8 +100,10 @@ Away-mode injection reads the PRIMARY harness instead, so it never selects kiro'
 ## Live guard result
 
 `FM_KIRO_SIGNALS_LIVE=1 tests/fm-kiro-signals-live-e2e.test.sh` passed on 2026-09-13 against kiro-cli 2.21.4: the busy footer matched in flight, the launch prompt was answered, both V2 hooks fired per turn, a single Escape cancelled a long turn, and `/quit` stopped the process and printed its resume-id line.
-The guard's footer matcher changed after that run - it now folds the captured screen and calls the delivery guard `fm_busy_lines_match kiro` instead of a classifier helper the adapter no longer has - so that pass is evidence for the vendor facts above, not for the matcher the guard runs today.
-Re-running the guard on the Linux desk where the real tool lives is what would prove the current matcher.
+Two parts of the guard changed after that run, so its recorded pass is evidence for the vendor facts above and not for what the guard checks today.
+Its footer matcher now folds the captured screen and calls the delivery guard `fm_busy_lines_match kiro` instead of a classifier helper the adapter no longer has.
+Its hook commands now carry the shell constructs the spawn emits - a `;`-joined pair with a `2>/dev/null || true` tail whose awaited marker comes from a redirect - where the recorded run used bare `touch` commands, so whether kiro shell-interprets a hook command string is asserted but not yet observed.
+Re-running the guard on the Linux desk where the real tool lives is what would prove both.
 
 ## What is NOT verified
 
