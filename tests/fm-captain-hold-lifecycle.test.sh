@@ -3917,8 +3917,78 @@ PM
   pass "both body-decoding paths work without the allow_nonref default"
 }
 
+# Cleanup rewrites a captain-held row's body to append the finished work's
+# deliverable, so every byte of that body has to survive the decode. The
+# assertions below are on bytes, not characters: a decoder that prints a
+# character string to a stream with no :raw layer emits a codepoint at or below
+# U+00FF as one latin-1 byte, which is not valid UTF-8, and the comparison of
+# decoded strings would not notice.
+#
+# The two characters go in separate rows on purpose. A string that holds any
+# character above U+00FF is printed as UTF-8 whatever the layer, so mixing them
+# in one body hides the latin-1 case entirely.
+
+# Take one captain-held row carrying <body> all the way through cleanup, which
+# is the path that reads the body back to append the deliverable.
+retain_row_with_body() {  # <home> <id> <body>
+  local home=$1 id=$2 body=$3
+  mkdir -p "$home/data/$id"
+  tasks_in "$home" add "$id" "Investigate the sample body bytes" --kind scout \
+    --repo sample --start >/dev/null || fail "could not create the fixture for $id"
+  write_origin_meta "$home" "$id"
+  printf 'done: report complete\n' > "$home/state/$id.status"
+  printf '# Sample body bytes\n\nOne captain choice remains.\n' > "$home/data/$id/report.md"
+  tasks_in "$home" update "$id" --body "$body" >/dev/null \
+    || fail "could not give $id a body carrying non-ASCII characters"
+  run_captain "$home" hold "$id" --reason "captain must choose" >/dev/null \
+    || fail "could not hold $id for the captain"
+  run_captain "$home" complete "$id" "$id" >/dev/null \
+    || fail "the completion gate failed for $id"
+  run_teardown "$home" "$id" > "$home/$id.out" 2> "$home/$id.err" \
+    || fail "cleanup of captain-held $id failed: $(cat "$home/$id.err")"
+}
+
+test_retained_body_keeps_its_utf8_bytes() {
+  local home accented wide narrow_id wide_id stored
+  home=$(make_home retain-utf8)
+  # Built from escapes so this file stays ASCII and the intended bytes are
+  # explicit: U+00E9 is the latin-1-representable case, U+2014 the wider one.
+  accented=$(printf 'caf\xc3\xa9')
+  wide=$(printf '\xe2\x80\x94')
+  stored="$home/data/backlog.md"
+
+  # A body whose characters are all at or below U+00FF.
+  narrow_id=sample-utf8-narrow
+  retain_row_with_body "$home" "$narrow_id" "Serve the $accented black, no sugar."
+  # data/backlog.md is the markdown backend's own persisted artifact, read here
+  # for its bytes because the shown field re-encodes them.
+  assert_grep "Deliverable of the finished work: report data/$narrow_id/report.md" "$stored" \
+    "cleanup did not rewrite the retained body, so nothing decoded it"
+  LC_ALL=C grep -qF "$accented" "$stored" \
+    || fail "the retained body lost the UTF-8 bytes of a character at or below U+00FF"
+  ! LC_ALL=C grep -q "$(printf '[\xe9]')" "$stored" \
+    || fail "the retained body holds a lone latin-1 byte, so it is no longer valid UTF-8"
+
+  # A body carrying a character above U+00FF keeps its bytes and stays quiet.
+  wide_id=sample-utf8-wide
+  retain_row_with_body "$home" "$wide_id" "Serve it $wide black, no sugar."
+  LC_ALL=C grep -qF "$wide" "$stored" \
+    || fail "the retained body lost the UTF-8 bytes of a character above U+00FF"
+  assert_no_grep "Wide character" "$home/$wide_id.err" \
+    "cleanup warned about a wide character instead of writing raw bytes"
+
+  LC_ALL=C perl -MEncode -e '
+    local $/;
+    open my $fh, "<:raw", $ARGV[0] or die "cannot read $ARGV[0]: $!";
+    my $bytes = <$fh>;
+    Encode::decode("UTF-8", $bytes, Encode::FB_CROAK());
+  ' "$stored" || fail "cleanup left the backlog file holding invalid UTF-8"
+  pass "cleanup preserves every byte of a retained body's non-ASCII characters"
+}
+
 test_uninventoried_report_decision_refuses_completion
 test_hold_decodes_a_bare_scalar_body_without_the_nonref_default
+test_retained_body_keeps_its_utf8_bytes
 test_completion_gate_attests_and_transfers
 test_answer_records_and_closes
 test_release_frees_held_work
