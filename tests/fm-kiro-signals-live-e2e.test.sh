@@ -46,8 +46,19 @@ fm_live_gate opt-in FM_KIRO_SIGNALS_LIVE kiro-cli tmux
 
 LAB=$(mktemp -d "${TMPDIR:-/tmp}/fm-kiro-signals.XXXXXX") || fail "could not create the isolated kiro lab"
 trap cleanup EXIT
-mkdir -p "$LAB/workspace" "$LAB/home/agents" "$LAB/home/settings"
+mkdir -p "$LAB/workspace" "$LAB/home/agents" "$LAB/home/settings" "$LAB/shim"
 WORKSPACE=$(cd "$LAB/workspace" && pwd -P) || fail "could not resolve the isolated kiro workspace"
+
+# The liveness probe below runs a bare `tmux`, so the private socket is bound by
+# a shim on PATH. That lets the guard drive the shipped reads rather than a
+# transcription of them, which would go stale exactly when the probe changes.
+cat > "$LAB/shim/tmux" <<SH
+#!/usr/bin/env bash
+exec "$REAL_TMUX" -L "$SOCKET" "\$@"
+SH
+chmod +x "$LAB/shim/tmux"
+PATH="$LAB/shim:$PATH"
+export PATH
 
 # The per-guard KIRO_HOME carries the trust setting (so --trust-all-tools does
 # not block on its modal) and a per-task agent config whose hooks write marker
@@ -74,6 +85,9 @@ EOF
 . "$ROOT/bin/fm-busy-lib.sh"
 # shellcheck source=/dev/null
 . "$ROOT/bin/fm-composer-lib.sh"
+# shellcheck source=/dev/null
+. "$ROOT/bin/fm-backend.sh"
+fm_backend_source tmux || fail "could not source the tmux backend"
 
 # Create the session/window without -c (unsupported on older tmux) and cd into
 # the workspace on the launch line instead, so the guard runs on every tmux the
@@ -122,10 +136,16 @@ done
 # matcher has live text to prove. Turns can take a while on cold start.
 busy_live=
 KIRO_COMM=
+KIRO_FG_NAMES=
+KIRO_FG_PIDS=
+KIRO_STATE=
 for _ in $(seq 1 240); do
   screen=$(capture)
   if printf '%s' "$screen" | kiro_footer_busy; then
     busy_live=1
+    KIRO_FG_NAMES=$(fm_backend_tmux_foreground_comms "$TARGET"; fm_backend_tmux_foreground_argv0s "$TARGET")
+    KIRO_FG_PIDS=$(fm_backend_tmux_foreground_pids "$TARGET")
+    KIRO_STATE=$(fm_backend_agent_state tmux "$TARGET")
     KIRO_COMM=$("$REAL_TMUX" -L "$SOCKET" display-message -p -t "$TARGET" '#{pane_current_command}' 2>/dev/null || true)
     break
   fi
@@ -135,14 +155,53 @@ done
 [ -n "$busy_live" ] || fail "the kiro delivery guard never matched the real kiro turn in flight"
 pass "the real kiro busy footer matches the kiro delivery guard in flight"
 
-# The foreground process name captured above, while the turn was provably in
-# flight, is the whole of kiro's detection surface: bin/fm-harness.sh and
-# bin/fm-agent-process-lib.sh both anchor on the exact word `kiro-cli`. A rename
-# turns harness detection into `unknown` and pane liveness into `other`, so the
-# name is asserted here rather than merely used.
-[ "$KIRO_COMM" = kiro-cli ] \
-  || fail "the live kiro foreground command must be the anchored 'kiro-cli', got '$KIRO_COMM'"
-pass "the real kiro foreground process name is the anchored 'kiro-cli'"
+# The anchored `kiro-cli` name, read while the turn was provably in flight, is
+# the whole of kiro's detection surface: bin/fm-harness.sh and
+# bin/fm-agent-process-lib.sh both key on that exact word. A rename turns harness
+# detection into `unknown` and pane liveness into `other`, so the name is
+# asserted here rather than merely used.
+#
+# It is read from the pane's foreground process group - the comm and argv[0]
+# fields the liveness probe consults - and NOT from #{pane_current_command},
+# which carries the launcher's kernel process name wherever kiro-cli is installed
+# behind a wrapper (a Builder Toolbox install on macOS reports `toolbox-exec`
+# there while comm still reads .../.toolbox/bin/kiro-cli). Asserting the tmux
+# field fails on a host whose adapter works and never drives the probe.
+KIRO_FG_NAMED=
+while IFS= read -r fg_name; do
+  [ "${fg_name##*/}" = kiro-cli ] || continue
+  KIRO_FG_NAMED=$fg_name
+  break
+done <<EOF
+$KIRO_FG_NAMES
+EOF
+[ -n "$KIRO_FG_NAMED" ] \
+  || fail "no foreground process of the live kiro pane carries the anchored 'kiro-cli' name; group was: $(printf '%s' "$KIRO_FG_NAMES" | tr '\n' ';')"
+
+# The probe's own verdict over that group. It is what recovery and supervision
+# read, so a name the classifier stops owning shows up here as `dead`,
+# `ambiguous`, or `other` rather than as a cosmetic difference.
+[ "$KIRO_STATE" = alive ] \
+  || fail "the liveness probe must read the live kiro pane as 'alive', got '$KIRO_STATE' over foreground group: $(printf '%s' "$KIRO_FG_NAMES" | tr '\n' ';')"
+pass "the real kiro foreground group carries the anchored 'kiro-cli' name and the liveness probe reads it alive"
+
+# The same live group through the ancestry walk a kiro crewmate's own harness
+# resolution runs. `comm kiro` is the verdict the adapter's fm-harness.sh arm
+# exists to produce; anything else means a kiro worker would be read as another
+# harness or as unknown.
+KIRO_ANCESTRY=
+while IFS= read -r fg_pid; do
+  [ -n "$fg_pid" ] || continue
+  verdict=$("$ROOT/bin/fm-harness.sh" ancestry "$fg_pid" 2>/dev/null || true)
+  [ "$verdict" = "comm kiro" ] || continue
+  KIRO_ANCESTRY=$verdict
+  break
+done <<EOF
+$KIRO_FG_PIDS
+EOF
+[ "$KIRO_ANCESTRY" = "comm kiro" ] \
+  || fail "the ancestry walk must read some live kiro foreground process as 'comm kiro'; got nothing over pids: $(printf '%s' "$KIRO_FG_PIDS" | tr '\n' ' ')"
+pass "the ancestry walk reads the live kiro process as 'comm kiro'"
 
 # The launch turn must complete and its reply land.
 for _ in $(seq 1 480); do
