@@ -225,7 +225,7 @@ test_kiro_composer_glyph_and_placeholder() {
   plain=$'transcript line\n›  ask a question or describe a task ↵'
 
   # NON-VACUOUSNESS: on a styled capture the dim placeholder is ghost text, so
-  # the row reduces to the bare glyph and the idle set is not what decides it.
+  # the row reduces to the bare glyph, which is what decides the verdict.
   stripped=$(printf '%s' "$row" | fm_composer_strip_ghost)
   fm_composer_normalize_trim_var stripped
   [ "$stripped" = '›' ] \
@@ -233,17 +233,11 @@ test_kiro_composer_glyph_and_placeholder() {
   state=$(fm_composer_classify_screen "$caps" "$screen" 1)
   [ "$state" = empty ] || fail "kiro's styled idle row must read empty, got '$state'"
 
-  # An UNSTYLED capture cannot ghost-strip, so the fleet-wide idle set is the
-  # only thing keeping this row off `pending` - a false pending defers every
-  # steer to a genuinely idle kiro worker.
+  # An UNSTYLED capture cannot ghost-strip, so the bare-row path degrades any
+  # trailing text to `unknown` rather than a false `pending`.
   state=$(fm_composer_classify_screen "$caps_plain" "$plain")
   [ "$state" = unknown ] \
     || fail "kiro's unstyled idle row must read unknown, never pending, got '$state'"
-  # The trailing hint is why the entry is unanchored at the tail; assert that
-  # through the library predicate the classifier itself calls.
-  fm_composer_idle_matches 'ask a question or describe a task ↵' \
-    "$FM_COMPOSER_IDLE_RE_DEFAULT" insensitive \
-    || fail "kiro's idle row with its trailing hint must match the fleet-wide idle set"
   pass "fm-composer-lib: kiro's › composer is empty and its real idle row is empty styled, unknown plain"
 }
 

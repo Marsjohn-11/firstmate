@@ -467,6 +467,20 @@ test_kiro_hooks_stale_incarnation_harmless() {
   pass "kiro hook events from a superseded incarnation are rejected without breaking the hook"
 }
 
+test_raw_kiro_launch_has_no_semantic_wiring() {
+  local rec id=busy-ki-raw out state
+  rec=$(make_spawn_case kiro-raw kiro "$id")
+  read_case_record "$rec"
+  out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR" 'kiro chat --agent-engine v2')
+  expect_code 0 $? "raw kiro spawn should succeed: $out"
+  state="$HOME_DIR/state"
+  assert_absent "$state/$id.busy-gen" "raw kiro launch must not arm a busy generation"
+  assert_absent "$state/$id.kiro-home" "raw kiro launch must not write a per-task hook config"
+  out=$(classify kiro "$id" "$state")
+  [ "$out" = "unknown missing" ] || fail "raw kiro launch must classify unknown, got '$out'"
+  pass "raw kiro launch remains unwired and classifies unknown"
+}
+
 test_kimi_and_grok_install_no_unverified_wiring() {
   local state out
   state="$TMP_ROOT/gates/state"
@@ -495,6 +509,7 @@ test_raw_gemini_launch_has_no_semantic_wiring
 test_gemini_is_refused_as_a_secondmate
 test_kiro_hooks_semantic_lifecycle
 test_kiro_hooks_stale_incarnation_harmless
+test_raw_kiro_launch_has_no_semantic_wiring
 test_codex_unverified_until_a_semantic_source_exists
 
 echo "all fm-busy-adapter-wiring tests passed"

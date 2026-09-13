@@ -432,11 +432,13 @@ FM_COMPOSER_SHELL_PROMPT_GLYPHS=$(printf '%s\n' '>' '$' '%' '#')
 # hence the unanchored tail). cursor-agent renders
 # two, both anchored: `Plan, search, build anything` in a fresh session and
 # `Add a follow-up` once a turn has completed (verified live on cursor-agent
-# 2026.08.11-e8db854). kiro renders `ask a question or describe a task` followed
-# by a de-emphasised `↵` submit hint, hence the unanchored tail (verified live on
-# kiro-cli 2.21.4). FM_COMPOSER_IDLE_RE overrides for an unverified harness;
+# 2026.08.11-e8db854). An entry earns its place only when it changes a verdict:
+# the set can yield `empty` only on a bordered or left-bar composer whose
+# placeholder sits at placeholder_position=1, so a harness whose composer is a
+# bare agent-glyph row - kiro's `›` - is already handled by the bare-row path
+# and needs no entry. FM_COMPOSER_IDLE_RE overrides for an unverified harness;
 # matching is case-insensitive.
-FM_COMPOSER_IDLE_RE_DEFAULT='^Type a message\.\.\.$|^Ask anything(\.\.\.|…)|^Plan, search, build anything$|^Add a follow-up$|^ask a question or describe a task'
+FM_COMPOSER_IDLE_RE_DEFAULT='^Type a message\.\.\.$|^Ask anything(\.\.\.|…)|^Plan, search, build anything$|^Add a follow-up$'
 
 # Opencode draws a mode/model footer line INSIDE its left-bar composer
 # ("Build · GPT-5.5 Fast OpenAI · high"). It is composer furniture, not typed

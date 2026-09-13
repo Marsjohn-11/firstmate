@@ -69,10 +69,12 @@
 # Kiro is different: its kiro-hook record above is its ONLY state source (a
 # live-verified per-turn userPromptSubmit/stop pair, references/harness/kiro.md),
 # and it has no rendered-tail arm here. Its `Kiro is working` footer is matched
-# only by the delivery guards in bin/fm-composer-lib.sh, for submit
-# acknowledgement and the pending-reply delivery observation, which reads the
-# harness from the task's meta record; neither is a recorded worker state
-# source. So a kiro task with no record classifies unknown
+# only by the delivery guards in bin/fm-composer-lib.sh, never as a recorded
+# worker state. The one reachable consumer today is the harness-less union entry
+# in FM_DELIVERY_BUSY_REGEX_DEFAULT, which the tmux submit core reads for submit
+# acknowledgement; FM_DELIVERY_KIRO_BUSY_REGEX_DEFAULT is registered per the
+# fleet convention that every verified harness declares its own signature, and
+# has no caller today. So a kiro task with no record classifies unknown
 # missing, and an abnormal turn end (no StopFailure/SessionEnd equivalent
 # exists on kiro V2) leaves the record busy until the next userPromptSubmit
 # re-opens it - docs/verification/kiro.md owns that disclosure.

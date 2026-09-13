@@ -3931,14 +3931,14 @@ if [ "$KIND" != secondmate ]; then
     ;;
   esac
   case "$HARNESS" in
-  claude* | opencode* | pi | pi-signed | omp | kiro)
+  claude* | opencode* | pi | pi-signed | omp)
     BUSY_GEN=$("$FM_ROOT/bin/fm-busy-event.sh" arm "$STATE_REAL" "$ID") || {
       echo "error: failed to arm the busy-state contract for $ID" >&2
       exit 1
     }
     [ "$RELAUNCH" -ne 1 ] || RELAUNCH_REPLACEMENT_BUSY_GEN=$BUSY_GEN
     ;;
-  gemini)
+  kiro | gemini)
     if [ "$RAW_LAUNCH" -eq 0 ]; then
       BUSY_GEN=$("$FM_ROOT/bin/fm-busy-event.sh" arm "$STATE_REAL" "$ID") || {
         echo "error: failed to arm the busy-state contract for $ID" >&2
@@ -4016,41 +4016,49 @@ EOF
     fi
     ;;
   kiro)
-    # Semantic busy-state hooks (bin/fm-busy-lib.sh): the V2 agent-config
-    # userPromptSubmit hook opens a turn and the stop hook closes it, with the
-    # stop hook also keeping the turn-ended NOTIFICATION touch for the watcher.
-    # Verified live on kiro-cli 2.21.4 as a clean per-turn pair in both the
-    # non-interactive run and the interactive TUI (userPromptSubmit fired on
-    # submit, stop fired at turn end). Like Claude's Stop hook, kiro's stop
-    # does NOT fire on a manual Escape interrupt, so fm-control preserves the
-    # adapter-owned record there (fm_control_interrupt_ack_source is none). kiro
-    # V2 exposes no verified StopFailure/SessionEnd equivalent, so an abnormal
-    # turn end leaves the record busy until the next userPromptSubmit re-opens
-    # it, and the supervisor reads that record as provably working. Nothing
-    # rescues it: the rendered `Kiro is working` footer is a delivery guard
-    # only (bin/fm-composer-lib.sh), never a worker state source.
-    #
-    # These are written into a FIRSTMATE-OWNED per-task agent config under
-    # state/<id>.kiro-home/agents/, reached by relocating KIRO_HOME onto that
-    # home on the launch command, never into the worktree's own .kiro/ - that
-    # dir belongs to the project, and --agent is name-only so a config path is
-    # not an option. The same per-task home carries a settings/cli.json seeding
-    # chat.disableTrustAllConfirmation, which suppresses --trust-all-tools's
-    # otherwise blocking confirmation modal (verified: the modal is the only
-    # blocker; auth stays in the XDG data dir and is unaffected by KIRO_HOME).
-    # Each hook command tolerates a refused event (|| true) so a stale-gen
-    # writer can never break kiro's own lifecycle; no stdout contract applies
-    # (kiro ran bare touch hooks cleanly).
-    KIRO_HOME_DIR="$STATE_REAL/$ID.kiro-home"
-    mkdir -p "$KIRO_HOME_DIR/agents" "$KIRO_HOME_DIR/settings"
-    printf '{"chat.disableTrustAllConfirmation":true}\n' >"$KIRO_HOME_DIR/settings/cli.json"
-    busy_cmd_prefix="$(shell_quote "$FM_ROOT/bin/fm-busy-event.sh") apply $(shell_quote "$STATE_REAL") $(shell_quote "$ID")"
-    busy_suffix="--gen $(shell_quote "$BUSY_GEN") --source kiro-hook"
-    k_submit=$(json_escape "$busy_cmd_prefix busy $busy_suffix --event user-prompt-submit 2>/dev/null || true")
-    k_stop=$(json_escape "touch $(shell_quote "$TURNEND"); $busy_cmd_prefix idle $busy_suffix --event stop 2>/dev/null || true")
-    cat >"$KIRO_HOME_DIR/agents/firstmate.json" <<EOF
+    if [ "$RAW_LAUNCH" -eq 0 ]; then
+      # Semantic busy-state hooks (bin/fm-busy-lib.sh): the V2 agent-config
+      # userPromptSubmit hook opens a turn and the stop hook closes it, with the
+      # stop hook also keeping the turn-ended NOTIFICATION touch for the watcher.
+      # Verified live on kiro-cli 2.21.4 as a clean per-turn pair in both the
+      # non-interactive run and the interactive TUI (userPromptSubmit fired on
+      # submit, stop fired at turn end). Like Claude's Stop hook, kiro's stop
+      # does NOT fire on a manual Escape interrupt, so fm-control preserves the
+      # adapter-owned record there (fm_control_interrupt_ack_source is none). kiro
+      # V2 exposes no verified StopFailure/SessionEnd equivalent, so an abnormal
+      # turn end leaves the record busy until the next userPromptSubmit re-opens
+      # it, and the supervisor reads that record as provably working. Nothing
+      # rescues it: the rendered `Kiro is working` footer is a delivery guard
+      # only (bin/fm-composer-lib.sh), never a worker state source.
+      #
+      # These are written into a FIRSTMATE-OWNED per-task agent config under
+      # state/<id>.kiro-home/agents/, reached by relocating KIRO_HOME onto that
+      # home on the launch command, never into the worktree's own .kiro/ - that
+      # dir belongs to the project, and --agent is name-only so a config path is
+      # not an option. The same per-task home carries a settings/cli.json seeding
+      # chat.disableTrustAllConfirmation, which suppresses --trust-all-tools's
+      # otherwise blocking confirmation modal (verified: the modal is the only
+      # blocker; auth stays in the XDG data dir and is unaffected by KIRO_HOME).
+      # Each hook command tolerates a refused event (|| true) so a stale-gen
+      # writer can never break kiro's own lifecycle; no stdout contract applies
+      # (kiro ran bare touch hooks cleanly).
+      #
+      # A raw launch command carries no KIRO_HOME and no --agent, so neither hook
+      # could ever fire; arming and writing the config anyway would seed a busy
+      # record nothing can clear. The gemini arm above skips both for the same
+      # reason, and for the same reason claude does not: its hooks land in the
+      # worktree, which a raw claude launch still reads.
+      KIRO_HOME_DIR="$STATE_REAL/$ID.kiro-home"
+      mkdir -p "$KIRO_HOME_DIR/agents" "$KIRO_HOME_DIR/settings"
+      printf '{"chat.disableTrustAllConfirmation":true}\n' >"$KIRO_HOME_DIR/settings/cli.json"
+      busy_cmd_prefix="$(shell_quote "$FM_ROOT/bin/fm-busy-event.sh") apply $(shell_quote "$STATE_REAL") $(shell_quote "$ID")"
+      busy_suffix="--gen $(shell_quote "$BUSY_GEN") --source kiro-hook"
+      k_submit=$(json_escape "$busy_cmd_prefix busy $busy_suffix --event user-prompt-submit 2>/dev/null || true")
+      k_stop=$(json_escape "touch $(shell_quote "$TURNEND"); $busy_cmd_prefix idle $busy_suffix --event stop 2>/dev/null || true")
+      cat >"$KIRO_HOME_DIR/agents/firstmate.json" <<EOF
 {"name":"firstmate","description":"Firstmate per-task crewmate agent (busy-state and turn-end hooks)","tools":["*"],"allowedTools":["*"],"hooks":{"userPromptSubmit":[{"command":"$k_submit"}],"stop":[{"command":"$k_stop"}]}}
 EOF
+    fi
     ;;
   opencode*)
     mkdir -p "$WT/.opencode/plugins"
