@@ -331,9 +331,8 @@
 # unaffected. --agent is name-only (a path is rejected), and --trust-all-tools
 # would otherwise block on a modal, so the spawn seeds
 # chat.disableTrustAllConfirmation into that per-task home's settings. kiro is
-# crewmate/scout only and refused for --secondmate. Its busy state has two
-# independent signals (the kiro-hook record plus the rendered `Kiro is working`
-# footer, bin/fm-busy-lib.sh).
+# crewmate/scout only and refused for --secondmate. The kiro-hook record is its
+# only busy-state source (bin/fm-busy-lib.sh).
 # cursor installs no per-task hook either: it writes state/<id>.cursor-session to
 # bind the pane to cursor's own conversation transcript (projects root, the exact
 # workspace path cursor records in .workspace-trusted, and the conversations that
@@ -1725,7 +1724,9 @@ agy_model_validate() {  # <agy-bin> <model>
 # prompt can never block the spawn before any pane exists. model_ids are read
 # with grep/sed rather than jq so the check has no extra dependency. An
 # unreachable listing establishes nothing (harness-adapters model-and-effort.md)
-# and launches unvalidated with a notice.
+# and launches unvalidated with a notice. The field pattern tolerates whitespace
+# around the JSON colon so a pretty-printed listing still yields model ids
+# instead of refusing every requested model.
 kiro_model_validate() {  # <kiro-bin> <model>
   local bin=$1 model=$2 listing rc=0 bound=${FM_KIRO_MODELS_TIMEOUT:-15}
   case "$bound" in ''|*[!0-9]*|0*) bound=15 ;; esac
@@ -1739,7 +1740,8 @@ kiro_model_validate() {  # <kiro-bin> <model>
     fi
     return 0
   fi
-  if printf '%s' "$listing" | grep -oE '"model_id":"[^"]+"' | sed 's/.*:"//;s/"$//' | grep -qxF -- "$model"; then
+  if printf '%s' "$listing" | grep -oE '"model_id"[[:space:]]*:[[:space:]]*"[^"]+"' \
+    | sed 's/.*:[[:space:]]*"//;s/"$//' | grep -qxF -- "$model"; then
     return 0
   fi
   echo "error: kiro model '$model' is not listed by 'kiro-cli --list-models'; choose a listed model_id or omit --model" >&2
@@ -4023,9 +4025,10 @@ EOF
     # does NOT fire on a manual Escape interrupt, so fm-control preserves the
     # adapter-owned record there (fm_control_interrupt_ack_source is none). kiro
     # V2 exposes no verified StopFailure/SessionEnd equivalent, so an abnormal
-    # turn end can leave the record busy until the next userPromptSubmit
-    # re-opens it; the rendered `Kiro is working` fallback is the second signal
-    # that keeps a hook gap from blinding the supervisor.
+    # turn end leaves the record busy until the next userPromptSubmit re-opens
+    # it, and the supervisor reads that record as provably working. Nothing
+    # rescues it: the rendered `Kiro is working` footer is a delivery guard
+    # only (bin/fm-composer-lib.sh), never a worker state source.
     #
     # These are written into a FIRSTMATE-OWNED per-task agent config under
     # state/<id>.kiro-home/agents/, reached by relocating KIRO_HOME onto that

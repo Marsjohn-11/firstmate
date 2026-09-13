@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Live drift guard for the Kiro CLI adapter's vendor-controlled surface (V2
-# engine only): the per-turn agent-config hooks (the PRIMARY busy/turn-end
-# signal), the rendered `Kiro is working` footer (the SECOND signal), the
+# engine only): the per-turn agent-config hooks (the busy/turn-end state
+# signal), the rendered `Kiro is working` footer the DELIVERY guard matches, the
 # composer glyph and idle placeholder, Escape interrupt, and /quit exit with its
 # resume line. Opt-in because it submits real prompts (no echo provider exists
 # for kiro). v3/KAS is explicitly out of scope and never exercised here.
@@ -75,6 +75,14 @@ capture() {
   "$REAL_TMUX" -L "$SOCKET" capture-pane -p -t "$TARGET" -S -200 2>/dev/null || true
 }
 
+# The real consumer of kiro's footer: the delivery guard the submit-ack and
+# away-mode paths read. Consumes a screen on stdin.
+kiro_footer_busy() {
+  local screen
+  screen=$(cat)
+  printf '%s\0' "$screen" | fm_busy_lines_match kiro
+}
+
 # The launch prompt asks for a computed answer (12345+67890=80235) so the awaited
 # token never appears in the echoed launch line itself.
 "$REAL_TMUX" -L "$SOCKET" send-keys -t "$TARGET" -l \
@@ -101,12 +109,12 @@ done
 busy_live=
 for _ in $(seq 1 240); do
   screen=$(capture)
-  if printf '%s' "$screen" | fm_busy_kiro_tail_busy; then busy_live=1; break; fi
+  if printf '%s' "$screen" | kiro_footer_busy; then busy_live=1; break; fi
   case "$screen" in *80235*|*80,235*) break ;; esac
   sleep 1
 done
-[ -n "$busy_live" ] || fail "fm_busy_kiro_tail_busy never matched the real kiro turn in flight"
-pass "the real kiro busy footer matches fm_busy_kiro_tail_busy in flight"
+[ -n "$busy_live" ] || fail "the kiro delivery guard never matched the real kiro turn in flight"
+pass "the real kiro busy footer matches the kiro delivery guard in flight"
 
 # The launch turn must complete and its reply land.
 for _ in $(seq 1 480); do
@@ -119,8 +127,8 @@ case "$(capture)" in
   *) fail "the real kiro worker never answered its launch prompt" ;;
 esac
 
-# The claude-shaped per-turn hooks (the PRIMARY signal) must both have fired:
-# userPromptSubmit on submit and stop at turn end.
+# The claude-shaped per-turn hooks (kiro's only state signal) must both have
+# fired: userPromptSubmit on submit and stop at turn end.
 [ -f "$LAB/PROMPT" ] || fail "the kiro userPromptSubmit hook never fired"
 hook_stop=
 for _ in $(seq 1 60); do
@@ -138,7 +146,7 @@ for _ in $(seq 1 120); do
   sleep 0.5
 done
 [ -n "$idle_settled" ] || fail "the kiro composer never settled to its idle placeholder after the reply"
-printf '%s' "$screen" | fm_busy_kiro_tail_busy \
+printf '%s' "$screen" | kiro_footer_busy \
   && fail "the settled kiro footer still matches the busy signature" || true
 
 # Interrupt a genuinely long turn with exactly one Escape and require the
@@ -150,10 +158,10 @@ printf '%s' "$screen" | fm_busy_kiro_tail_busy \
   || fail "could not submit the long kiro prompt"
 for _ in $(seq 1 100); do
   screen=$(capture)
-  printf '%s' "$screen" | fm_busy_kiro_tail_busy && break
+  printf '%s' "$screen" | kiro_footer_busy && break
   sleep 0.5
 done
-printf '%s' "$screen" | fm_busy_kiro_tail_busy \
+printf '%s' "$screen" | kiro_footer_busy \
   || fail "the long kiro turn never showed its busy footer"
 "$REAL_TMUX" -L "$SOCKET" send-keys -t "$TARGET" Escape \
   || fail "could not send Escape to the real kiro turn"

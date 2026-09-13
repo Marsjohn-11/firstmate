@@ -12,9 +12,9 @@ Verified as a CREWMATE and SCOUT adapter only; `../../../../../bin/fm-spawn.sh` 
 |---|---|
 | Binary | Absolute `kiro-cli` from `PATH`, refused if absent; the installed command is a toolbox/aim-sandbox wrapper whose foreground process name is exactly `kiro-cli`. |
 | Launch | `kiro-cli chat --agent-engine v2 --agent firstmate --model <id> --effort <level> --trust-all-tools "<brief>"` with the resolved absolute binary and `KIRO_HOME` relocated onto the per-task home; the positional brief auto-submits with no extra Enter. No launch-then-confirm gate: like claude, the pane just launches. |
-| Busy state | Claude-shaped V2 agent-config hooks are the PRIMARY source: `userPromptSubmit` opens a turn and `stop` closes it, written as the `kiro-hook` record in `../../../../../bin/fm-busy-lib.sh`. The rendered `Kiro is working` footer is the SECOND independent signal (`kiro-regex`), so a hook gap degrades rather than blinds. |
-| Rendered tail | Busy composer footer is `Kiro is working · Type to steer · Ctrl+S to queue`; idle shows `Trust All Tools active ... /quit to exit` or the `ask a question or describe a task` placeholder. The harness-named `Kiro is working` literal is matched, never the bare `esc to cancel` token kiro shares with agy. |
-| Turn end | The `stop` hook keeps the `state/<id>.turn-ended` notification touch. Like claude, `stop` does NOT fire on a manual Escape interrupt; kiro V2 exposes no verified StopFailure/SessionEnd equivalent, so an abnormal turn end can leave the record busy until the next `userPromptSubmit`, and the rendered footer is the backstop. |
+| Busy state | Claude-shaped V2 agent-config hooks are the ONLY source: `userPromptSubmit` opens a turn and `stop` closes it, written as the `kiro-hook` record in `../../../../../bin/fm-busy-lib.sh`. A kiro task with no record classifies `unknown missing`; the classifier never reads the pane for kiro. |
+| Rendered tail | Busy composer footer is `Kiro is working · Type to steer · Ctrl+S to queue`; idle shows `Trust All Tools active ... /quit to exit` or the `ask a question or describe a task` placeholder. The harness-named `Kiro is working` literal is matched, never the bare `esc to cancel` token kiro shares with agy. It is a DELIVERY guard in `../../../../../bin/fm-composer-lib.sh` (submit acknowledgement and away-mode injection), not a worker state source. |
+| Turn end | The `stop` hook keeps the `state/<id>.turn-ended` notification touch. Like claude, `stop` does NOT fire on a manual Escape interrupt; kiro V2 exposes no verified StopFailure/SessionEnd equivalent, so an abnormal turn end leaves the record busy until the next `userPromptSubmit`, and the supervisor reads that record as provably working. |
 | Exit | `/quit`, one Enter; the process exits and prints `Session ended.` then `Resume with: kiro-cli --resume-id <session-id>`. |
 | Interrupt | Single `Escape`, which prints a `Cancelled ...` row and leaves an idle composer with no repollution, so no clear key follows. |
 | Skill | No verified slash-skill form; use natural language. |
@@ -32,7 +32,6 @@ The workspace dir is inside the disposable worktree and must never be written, s
 That same per-task home holds `settings/cli.json` seeding `chat.disableTrustAllConfirmation`, which suppresses the `--trust-all-tools` modal (the only blocker on a fresh launch).
 Relocating `KIRO_HOME` moves the whole global config root (agents, settings, sessions) but NOT auth, which lives in the XDG data dir (`~/.local/share/kiro-cli`) and is therefore unaffected, so the worker uses the operator's real sign-in while nothing in the captain's real `~/.kiro` is touched.
 Because the relocation is wholesale rather than gemini's additive single-file layer, the per-task home does not inherit the operator's global MCP servers, skills, or agents; the per-task agent config declares `tools: ["*"]` and the crewmate relies on built-in tools.
-FOLLOW-UP (not built now): an additive `KIRO_HOME` layer that seeds the per-task home from the operator's global config, restoring the global MCP servers, skills, and agents to a kiro crewmate, is future follow-up work.
 `../../../../../bin/fm-control-lib.sh` lists the agent config file as the retirement path so a relaunch retires the incarnation's hooks; `../../../../../bin/fm-teardown.sh` removes the whole `state/<id>.kiro-home` directory.
 
 ## Credential precondition
@@ -49,7 +48,8 @@ kiro is deliberately absent from the primary-capable session-lock vocabulary in 
 ## Worker busy state and turn end
 
 `../../../../../bin/fm-spawn.sh` arms a busy generation for kiro and embeds it in the hook commands, exactly like claude and gemini.
-`fm_busy_classify` returns the `kiro-hook` record when a valid one exists (it wins over a contradicting pane), and only when no record exists does it fall back to `fm_busy_kiro_tail_busy`, which matches `Kiro is working` and reports `unknown kiro-regex` rather than idle when it is absent, because a long turn can scroll the footer out of the captured tail.
+`fm_busy_classify` returns the `kiro-hook` record when a valid one exists and `unknown missing` when none does; it has no kiro pane arm, so a rendered footer never classifies a kiro worker.
+An abnormal turn end therefore leaves the record busy until the next `userPromptSubmit` re-opens it, and the watcher reads that record as provably working.
 Teardown removes the per-task home and retires the busy generation.
 
 ## Primary integration

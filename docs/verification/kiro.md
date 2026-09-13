@@ -77,7 +77,7 @@ Seeding that setting into the per-task `KIRO_HOME` suppresses the modal, and a p
 
 - Composer glyph: `›` (U+203A), the same glyph codex draws.
 - Idle placeholder: `ask a question or describe a task` (followed by a de-emphasised `↵`).
-- Busy footer: `› Kiro is working · Type to steer · Ctrl+S to queue`. The adapter matches the harness-named `Kiro is working` literal, not the bare `esc to cancel` token kiro also renders in its tool region and shares with agy.
+- Busy footer: `› Kiro is working · Type to steer · Ctrl+S to queue`. The delivery guard matches the harness-named `Kiro is working` literal, not the bare `esc to cancel` token kiro also renders in its tool region and shares with agy. It acknowledges a submit and gates away-mode injection; it is never a recorded worker state.
 
 ## Control
 
@@ -102,6 +102,6 @@ Seeding that setting into the per-task `KIRO_HOME` suppresses the modal, and a p
 ## What is NOT verified
 
 - The v3/KAS engine (out of scope; unsupported on AL2, hooks not yet at parity).
-- Any StopFailure/SessionEnd-equivalent hook trigger (none found), so an abnormal turn end relies on the rendered footer and the next `userPromptSubmit` to re-sync busy state.
+- Any StopFailure/SessionEnd-equivalent hook trigger (none found). On an abnormal turn end (a stream or API error, a model-side abort) the `stop` hook never fires, so the busy record stays open and the supervisor reads the worker as provably working - deferring instead of surfacing or retiring the endpoint - until the next `userPromptSubmit` re-opens the record. The rendered footer does not rescue it: it is a delivery guard only and the classifier has no kiro pane arm.
 - Primary or secondmate operation: no supervision protocol exists, and `bin/fm-spawn.sh` refuses a secondmate launch.
 - Backends other than tmux for the rendered surface (the portable regression drives the signals apart with real processes; the live guard exercises tmux).

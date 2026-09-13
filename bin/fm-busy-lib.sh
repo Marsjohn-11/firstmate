@@ -35,7 +35,7 @@
 #   gemini-hook      Gemini agent hooks (BeforeAgent opens; AfterAgent and
 #                    SessionEnd close)
 #   kiro-hook        Kiro V2 agent-config hooks (userPromptSubmit opens; stop
-#                    closes) - the PRIMARY kiro source; its per-turn stop hook
+#                    closes) - kiro's ONLY state source; its per-turn stop hook
 #                    also keeps the turn-ended notification touch
 #   codex-hook, codex-appserver  reserved: Codex, gated by
 #                    fm_busy_codex_semantic_source
@@ -45,7 +45,7 @@
 #   fm-interrupt     the legacy Claude fm-send --key Escape idle event
 #   fm-recovery      a documented recovery reset after relaunch
 # Classifier-only sources (never written into a record):
-#   endpoint-gone, herdr-native, grok-regex, rovo-regex, agy-regex, kiro-regex, muse-session-log,
+#   endpoint-gone, herdr-native, grok-regex, rovo-regex, agy-regex, muse-session-log,
 #   cursor-transcript, missing, malformed, gen-mismatch, source-mismatch,
 #   kimi-unverified, codex-unverified, capture-failed, no-target
 #
@@ -57,8 +57,8 @@
 #   4. no record at all: herdr's native busy verdict is trusted as busy
 #      (generation state is sufficient for busy, not for idle), then the
 #      muse session-log and cursor transcript pull sources, then the
-#      Grok/Rovo/AGY/Kiro temporary regex fallbacks classify a grok, rovo, agy,
-#      or kiro task from its rendered tail, then unknown missing
+#      Grok/Rovo/AGY temporary regex fallbacks classify a grok, rovo, or agy
+#      task from its rendered tail, then unknown missing
 #   5. malformed, stale, or untrusted records -> unknown, never a fallback
 # Grok, Rovo, and AGY are the only harnesses whose rendered text is their SOLE
 # classification, because none of their structured lifecycles was credited-live-verified
@@ -66,15 +66,15 @@
 # path firstmate drives, see references/harness/rovo.md; agy 1.2.0 exposes no
 # hook surface at all, see references/harness/agy.md); each is scoped to
 # its own harness= and can never classify another adapter.
-# Kiro is different: its kiro-hook record above IS the primary source (a
+# Kiro is different: its kiro-hook record above is its ONLY state source (a
 # live-verified per-turn userPromptSubmit/stop pair, references/harness/kiro.md),
-# and its rendered-tail fallback below is a SECOND, independent signal so no
-# single vendor string is load-bearing - a kiro release that reworks its
-# `Kiro is working` footer must degrade to the hook record, not break. It is
-# scoped to kiro= and can never classify another adapter. The delivery
-# guards in bin/fm-composer-lib.sh match rendered footers for submit
-# acknowledgement and away-mode supervisor injection only; neither is a
-# recorded worker state source.
+# and it has no rendered-tail arm here. Its `Kiro is working` footer is matched
+# only by the delivery guards in bin/fm-composer-lib.sh, for submit
+# acknowledgement and away-mode supervisor injection; neither is a recorded
+# worker state source. So a kiro task with no record classifies unknown
+# missing, and an abnormal turn end (no StopFailure/SessionEnd equivalent
+# exists on kiro V2) leaves the record busy until the next userPromptSubmit
+# re-opens it - docs/verification/kiro.md owns that disclosure.
 #
 # The muse pull source is semantic, not rendered: it folds muse's own durable
 # session event log. It has no writer, no arm, and no gen, because
@@ -877,22 +877,6 @@ fm_busy_agy_tail_busy() {
     | grep -qiE 'esc[[:space:]]+to[[:space:]]+cancel'
 }
 
-# fm_busy_kiro_tail_busy: the Kiro rendered-tail fallback, the SECOND independent
-# busy signal behind the kiro-hook record. Consumes the tail on stdin; 0 when
-# Kiro's verified busy signature matches: the `Kiro is working` token the TUI
-# pins to its composer footer while a turn runs (verified live on kiro-cli
-# 2.21.4; the idle footer shows `Trust All Tools active ... /quit to exit` or the
-# `ask a question or describe a task` placeholder instead). Matching the
-# harness-named literal rather than the bare `esc to cancel` token it shares with
-# agy keeps ordinary worker output from faking a positive verdict. This is a
-# best-effort fallback: a long turn can scroll the footer out of the captured
-# tail, so its absence means "can't tell," never definitive idle. FM_BUSY_KIRO_REGEX
-# overrides the signature.
-fm_busy_kiro_tail_busy() {
-  grep -v '^[[:space:]]*$' | tail -12 \
-    | grep -qiE "${FM_BUSY_KIRO_REGEX:-Kiro is working}"
-}
-
 # fm_busy_classify: semantic classification for a task whose endpoint the
 # caller has already established as present. Prints "<verdict> <source>":
 # busy|idle|unknown plus the producing source (see header). Never probes
@@ -1039,31 +1023,6 @@ fm_busy_classify() {  # <backend> <target> <harness> <id> <state-dir> [tail40]
         printf 'busy agy-regex'
       else
         printf 'unknown agy-regex'
-      fi
-      return 0
-      ;;
-    kiro)
-      # Reached only when no valid kiro-hook record exists (missing gen, a
-      # not-yet-fired first turn, or a stale incarnation classified above). The
-      # rendered footer is the SECOND independent signal so a hook gap degrades
-      # rather than blinds. Best-effort like rovo/agy: a long turn can scroll the
-      # footer out of the captured tail, so its absence means "can't tell," never
-      # idle - only the hook record proves idle.
-      if [ -z "$tail40" ]; then
-        if command -v fm_backend_capture >/dev/null 2>&1; then
-          tail40=$(fm_backend_capture "$backend" "$target" 40 2>/dev/null) || {
-            printf 'unknown capture-failed'
-            return 0
-          }
-        else
-          printf 'unknown capture-failed'
-          return 0
-        fi
-      fi
-      if printf '%s' "$tail40" | fm_busy_kiro_tail_busy; then
-        printf 'busy kiro-regex'
-      else
-        printf 'unknown kiro-regex'
       fi
       return 0
       ;;

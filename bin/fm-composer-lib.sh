@@ -330,8 +330,10 @@ fm_composer_strip_ghost() {
 # agy's `esc to cancel` is part of the union for the same reason: an explicit
 # tmux agy endpoint reaches the submit core with no recorded harness, and its
 # bare `>` composer verdict is `unknown`, so the busy footer is the only
-# turn-started acknowledgement that path can read.
-FM_DELIVERY_BUSY_REGEX_DEFAULT='esc (to )?interrupt|Working(\.\.\.|…)|Ctrl\+c:cancel|ctrl\+c to stop|esc[[:space:]]+to[[:space:]]+cancel'
+# turn-started acknowledgement that path can read. kiro's `Kiro is working` is
+# in the union for that same reason: its bare `›` composer verdict is `empty`,
+# so without the footer a kiro submit that landed would read pending or unknown.
+FM_DELIVERY_BUSY_REGEX_DEFAULT='esc (to )?interrupt|Working(\.\.\.|…)|Ctrl\+c:cancel|ctrl\+c to stop|esc[[:space:]]+to[[:space:]]+cancel|Kiro is working'
 FM_DELIVERY_CLAUDE_BUSY_REGEX_DEFAULT='esc to interrupt|…[[:space:]]+\([0-9]+[smh]'
 FM_DELIVERY_CODEX_BUSY_REGEX_DEFAULT='esc to interrupt'
 FM_DELIVERY_OPENCODE_BUSY_REGEX_DEFAULT='esc interrupt'
@@ -377,8 +379,8 @@ FM_DELIVERY_AGY_BUSY_REGEX_DEFAULT='esc[[:space:]]+to[[:space:]]+cancel'
 # harness-named `Kiro is working` literal is matched rather than the bare
 # `esc to cancel` token kiro also renders in its tool-call region and shares with
 # agy, so echoed worker output cannot fake an acknowledgement. Delivery guard
-# only; recorded worker state comes from the kiro-hook record, with the
-# kiro-regex fold in bin/fm-busy-lib.sh as its second signal.
+# only; recorded worker state comes from the kiro-hook record in
+# bin/fm-busy-lib.sh, which never consults this footer.
 FM_DELIVERY_KIRO_BUSY_REGEX_DEFAULT='Kiro is working'
 FM_DELIVERY_KIMI_BUSY_REGEX_DEFAULT='^[[:space:]]*(🌑|🌒|🌓|🌔|🌕|🌖|🌗|🌘)[[:space:]]+·[[:space:]]+'
 

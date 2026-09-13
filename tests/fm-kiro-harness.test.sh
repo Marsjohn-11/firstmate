@@ -12,10 +12,11 @@
 #      silently renamed to claude; the spawn still clears the marker as defense
 #      in depth (asserted in the launch test).
 #   2. kiro is claude-shaped: its V2 agent-config hooks (userPromptSubmit opens,
-#      stop closes and keeps the turn-ended touch) are the PRIMARY busy source
-#      (kiro-hook), and the rendered `Kiro is working` footer is a SECOND
-#      independent signal (kiro-regex) so a hook gap degrades rather than blinds
-#      - and neither signal classifies another adapter.
+#      stop closes and keeps the turn-ended touch) are its ONLY busy source
+#      (kiro-hook), scoped so they classify no other adapter, and a kiro task
+#      with no record is unknown rather than pane-classified. The rendered
+#      `Kiro is working` footer is a DELIVERY guard only. The hook commands
+#      themselves are executed end to end in fm-busy-adapter-wiring.test.sh.
 #   3. The turn-end hook config must never land in the worktree's own .kiro/:
 #      the spawn writes a firstmate-owned per-task agent config under
 #      state/<id>.kiro-home/agents/firstmate.json and reaches it by relocating
@@ -159,7 +160,7 @@ test_kiro_wiring_path_is_the_out_of_tree_hook_config() {
   pass "fm-control-lib: kiro wiring path is the out-of-tree per-task hook config"
 }
 
-# --- Busy: two independent signals ------------------------------------------
+# --- Busy: the hook record is the only state source -------------------------
 
 test_kiro_hook_is_the_trusted_primary_source() {
   fm_busy_source_trusted kiro kiro-hook || fail "kiro-hook must be trusted for kiro"
@@ -168,48 +169,41 @@ test_kiro_hook_is_the_trusted_primary_source() {
   pass "fm-busy-lib: kiro-hook is kiro's trusted source and is scoped to kiro"
 }
 
-# A valid hook record wins over a contradicting pane, and the pane fallback
-# carries a verdict when no record exists: this is the two-signal survival the
-# design requires, driven apart deliberately.
-test_kiro_record_wins_and_pane_fallback_carries() {
-  local state id busy_pane rec verdict
+# The hook record is kiro's only state source: it wins over a contradicting
+# pane, and with no record the classifier reports unknown rather than reading
+# the rendered footer.
+test_kiro_record_is_the_only_state_source() {
+  local state id busy_pane verdict
   state="$TMP_ROOT/busy-state"
   mkdir -p "$state"
   id=kiro-busy-1
   busy_pane=$'some output\n› Kiro is working · Type to steer · Ctrl+S to queue'
 
-  # Signal A alone: a valid idle kiro-hook record must win even when the pane
-  # still renders the busy footer (the record survives a misleading pane).
+  # A valid idle kiro-hook record must win even when the pane still renders the
+  # busy footer (the record survives a misleading pane).
   printf 'g1\n' > "$state/$id.busy-gen"
   printf 'v1 gen=g1 seq=1 state=idle source=kiro-hook event=stop ts=1\n' > "$state/$id.busy-state"
   verdict=$(fm_busy_classify tmux fake-target kiro "$id" "$state" "$busy_pane")
   [ "$verdict" = "idle kiro-hook" ] \
     || fail "a valid idle kiro-hook record must win over a busy pane, got '$verdict'"
 
-  # Signal B alone: with the hook record gone, the rendered footer must still
-  # carry a busy verdict (the fallback covers a hook gap).
+  # With the record gone, the busy footer must NOT classify: kiro has no pane
+  # arm, so the verdict is unknown missing either way.
   rm -f "$state/$id.busy-state" "$state/$id.busy-gen"
   verdict=$(fm_busy_classify tmux fake-target kiro "$id" "$state" "$busy_pane")
-  [ "$verdict" = "busy kiro-regex" ] \
-    || fail "with no record the rendered footer must carry busy, got '$verdict'"
-
-  # And with neither signal positive, the fallback is honestly can't-tell, never
-  # a false idle.
+  [ "$verdict" = "unknown missing" ] \
+    || fail "a busy kiro footer must not classify with no record, got '$verdict'"
   verdict=$(fm_busy_classify tmux fake-target kiro "$id" "$state" $'idle chatter\n› ask a question or describe a task')
-  [ "$verdict" = "unknown kiro-regex" ] \
-    || fail "an idle pane with no record must be unknown, never idle, got '$verdict'"
-  pass "fm-busy-lib: the kiro-hook record wins and the rendered footer carries when it is absent"
-}
+  [ "$verdict" = "unknown missing" ] \
+    || fail "an idle kiro pane with no record must be unknown missing, got '$verdict'"
 
-test_kiro_busy_signature_is_harness_scoped() {
-  # kiro's footer must not classify another harness, and another harness's bare
-  # `esc to cancel` token (agy's) must not read kiro busy: only the harness-named
-  # literal counts.
-  printf '%s\n' '› Kiro is working · Type to steer' | fm_busy_kiro_tail_busy \
-    || fail "the real kiro footer must match its own signature"
-  printf '%s\n' 'esc to cancel                 model' | fm_busy_kiro_tail_busy \
-    && fail "agy's bare esc-to-cancel token must not read kiro busy" || true
-  pass "fm-busy-lib: the kiro busy signature is the harness-named literal, not a shared token"
+  # A record from a superseded incarnation is unknown, never a pane verdict.
+  printf 'g2\n' > "$state/$id.busy-gen"
+  printf 'v1 gen=g1 seq=1 state=busy source=kiro-hook event=user-prompt-submit ts=1\n' > "$state/$id.busy-state"
+  verdict=$(fm_busy_classify tmux fake-target kiro "$id" "$state" "$busy_pane")
+  [ "$verdict" = "unknown gen-mismatch" ] \
+    || fail "a stale-gen kiro record must be unknown gen-mismatch, got '$verdict'"
+  pass "fm-busy-lib: the kiro-hook record is kiro's only state source; no record is unknown"
 }
 
 # --- Composer ---------------------------------------------------------------
@@ -234,7 +228,16 @@ test_kiro_delivery_footer_matches_and_is_scoped() {
     || fail "kiro's busy footer must acknowledge a submit for harness=kiro"
   printf '%s\0' $'idle\n› ask a question or describe a task' | fm_busy_lines_match kiro \
     && fail "kiro's idle placeholder row must not read as a busy footer" || true
-  pass "fm-composer-lib: the kiro delivery footer matches busy and its idle row does not"
+  # Only the harness-named literal counts: agy's bare `esc to cancel` token,
+  # which kiro also renders in its tool region, must not acknowledge a submit.
+  printf '%s\0' $'work\nesc to cancel                 model' | fm_busy_lines_match kiro \
+    && fail "agy's bare esc-to-cancel token must not acknowledge a kiro submit" || true
+  # The harness-less union the tmux submit core reads must see the footer too:
+  # fm_tmux_submit_core classifies with no harness, so without the kiro literal
+  # a landed kiro submit would read pending or unknown.
+  printf '%s\0' $'work\n› Kiro is working · Type to steer' | fm_busy_lines_match \
+    || fail "the harness-less delivery union must see a kiro busy footer"
+  pass "fm-composer-lib: the kiro delivery footer matches busy, its idle row does not, and the union sees it"
 }
 
 # --- Spawn (real fm-spawn driven by a fake tmux) ----------------------------
@@ -281,6 +284,20 @@ case "$*" in
   *"--list-models"*)
     if [ "${FM_FAKE_KIRO_MODELS_FAIL:-0}" = 1 ]; then exit 3; fi
     if [ "${FM_FAKE_KIRO_MODELS_HANG:-0}" = 1 ]; then cat > /dev/null; sleep 30; exit 0; fi
+    # -f json is free to pretty-print, so both shapes must yield model ids.
+    if [ "${FM_FAKE_KIRO_MODELS_PRETTY:-0}" = 1 ]; then
+      cat <<'JSON'
+{
+  "models": [
+    { "model_id": "auto" },
+    { "model_id": "claude-opus-5" },
+    { "model_id": "claude-sonnet-5" }
+  ],
+  "default_model": "auto"
+}
+JSON
+      exit 0
+    fi
     printf '%s' '{"models":[{"model_id":"auto"},{"model_id":"claude-opus-5"},{"model_id":"claude-sonnet-5"}],"default_model":"auto"}'
     exit 0
     ;;
@@ -336,6 +353,7 @@ run_kiro_spawn() {
     FM_FAKE_TMUX_CALL_LOG="$case_dir/tmux-calls.log" \
     FM_FAKE_KIRO_MODELS_FAIL="${FM_FAKE_KIRO_MODELS_FAIL:-0}" \
     FM_FAKE_KIRO_MODELS_HANG="${FM_FAKE_KIRO_MODELS_HANG:-0}" \
+    FM_FAKE_KIRO_MODELS_PRETTY="${FM_FAKE_KIRO_MODELS_PRETTY:-0}" \
     FM_KIRO_MODELS_TIMEOUT="${FM_KIRO_MODELS_TIMEOUT:-1}" \
     PATH="$fakebin:$BASE_PATH" \
     "$SPAWN" "$id" "$proj" --harness kiro --mode no-mistakes --yolo off "$@" 2>&1
@@ -384,12 +402,16 @@ test_kiro_per_task_hook_config_is_out_of_tree() {
   settings="$home_dir/settings/cli.json"
   [ -f "$agent" ] || fail "kiro spawn did not write the per-task agent config"
   [ -f "$settings" ] || fail "kiro spawn did not seed the per-task trust setting"
-  assert_grep '"userPromptSubmit"' "$agent" "the kiro agent config lacks the busy-open hook"
-  assert_grep '"stop"' "$agent" "the kiro agent config lacks the turn-end hook"
-  assert_grep 'fm-busy-event.sh' "$agent" "the kiro hooks do not drive the busy-event writer"
-  assert_grep "$id.turn-ended" "$agent" "the kiro stop hook does not keep the turn-ended touch"
-  assert_grep 'kiro-hook' "$agent" "the kiro hooks do not record the kiro-hook source"
-  assert_grep 'disableTrustAllConfirmation' "$settings" "the kiro trust modal is not suppressed"
+  # The emitted config is the kiro-consumed contract, so it is parsed as JSON,
+  # never grepped. Its hook COMMANDS are executed end to end in
+  # tests/fm-busy-adapter-wiring.test.sh.
+  jq -e . "$agent" >/dev/null || fail "the kiro agent config is not valid JSON"
+  jq -e '.hooks.userPromptSubmit[0].command' "$agent" >/dev/null \
+    || fail "the kiro agent config lacks the busy-open hook command"
+  jq -e '.hooks.stop[0].command' "$agent" >/dev/null \
+    || fail "the kiro agent config lacks the turn-end hook command"
+  [ "$(jq -r '.["chat.disableTrustAllConfirmation"]' "$settings")" = true ] \
+    || fail "the kiro trust modal is not suppressed"
   # The pivotal element-3 guarantee: nothing is written into the disposable
   # worktree's own .kiro/.
   [ ! -e "$WT_DIR/.kiro" ] || fail "kiro spawn wrote into the worktree's own .kiro/ (must stay out of tree)"
@@ -422,6 +444,34 @@ test_kiro_unlisted_model_refuses_before_pane_creation() {
   assert_contains "$out" "not listed by 'kiro-cli --list-models'" "the refusal did not name the model check"
   [ -s "$CASE_DIR/launch.log" ] && fail "an unlisted model created a launch command" || true
   pass "fm-spawn: an unlisted kiro model refuses before any pane is created"
+}
+
+# `-f json` is free to pretty-print, so the model check must read ids from a
+# whitespaced listing too. Without that a valid model would hit the refusal
+# branch and no kiro spawn could carry --model at all.
+test_kiro_pretty_printed_listing_validates_the_model() {
+  local id rec out rc launch
+  id="kiro-pretty-z9-$$"
+  rec=$(make_kiro_spawn_case pretty "$id")
+  read_kiro_spawn_record "$rec"
+  out=$(FM_FAKE_KIRO_MODELS_PRETTY=1 \
+    run_kiro_spawn "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" --model claude-opus-5)
+  rc=$?
+  expect_code 0 "$rc" "a pretty-printed listing must still validate a listed model: $out"
+  assert_not_contains "$out" "not listed by" "a pretty-printed listing refused a listed model"
+  launch=$(cat "$CASE_DIR/launch.log")
+  assert_contains "$launch" "--model 'claude-opus-5'" "the pretty-printed case did not carry the model"
+
+  # And it must still REFUSE an unlisted id rather than accept everything.
+  id="kiro-prettybad-z10-$$"
+  rec=$(make_kiro_spawn_case prettybad "$id")
+  read_kiro_spawn_record "$rec"
+  out=$(FM_FAKE_KIRO_MODELS_PRETTY=1 \
+    run_kiro_spawn "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" --model no-such-model)
+  rc=$?
+  [ "$rc" -ne 0 ] || fail "a pretty-printed listing must still refuse an unlisted model"
+  assert_contains "$out" "not listed by 'kiro-cli --list-models'" "the refusal did not name the model check"
+  pass "fm-spawn: a pretty-printed kiro listing validates listed models and refuses unlisted ones"
 }
 
 test_kiro_unreachable_listing_launches_unvalidated() {
@@ -496,14 +546,14 @@ test_kiro_liveness_names_the_command_an_agent
 test_kiro_control_mechanics_are_the_verified_ones
 test_kiro_wiring_path_is_the_out_of_tree_hook_config
 test_kiro_hook_is_the_trusted_primary_source
-test_kiro_record_wins_and_pane_fallback_carries
-test_kiro_busy_signature_is_harness_scoped
+test_kiro_record_is_the_only_state_source
 test_kiro_composer_glyph_and_placeholder
 test_kiro_delivery_footer_matches_and_is_scoped
 test_kiro_launch_carries_brief_agent_engine_and_clears_markers
 test_kiro_per_task_hook_config_is_out_of_tree
 test_kiro_effort_xhigh_passes_through
 test_kiro_unlisted_model_refuses_before_pane_creation
+test_kiro_pretty_printed_listing_validates_the_model
 test_kiro_unreachable_listing_launches_unvalidated
 test_kiro_hung_listing_is_cut_off_and_launches
 test_kiro_secondmate_is_refused
