@@ -2,6 +2,7 @@
 # Live drift guard for the Kiro CLI adapter's vendor-controlled surface (V2
 # engine only): the per-turn agent-config hooks (the busy/turn-end state
 # signal), the rendered `Kiro is working` footer the DELIVERY guard matches, the
+# anchored `kiro-cli` foreground process name both detection arms key on, the
 # composer glyph and idle placeholder, Escape interrupt, and /quit exit with its
 # resume line. Opt-in because it submits real prompts (no echo provider exists
 # for kiro). v3/KAS is explicitly out of scope and never exercised here.
@@ -120,14 +121,28 @@ done
 # The busy footer must render while the launch turn is in flight so the portable
 # matcher has live text to prove. Turns can take a while on cold start.
 busy_live=
+KIRO_COMM=
 for _ in $(seq 1 240); do
   screen=$(capture)
-  if printf '%s' "$screen" | kiro_footer_busy; then busy_live=1; break; fi
+  if printf '%s' "$screen" | kiro_footer_busy; then
+    busy_live=1
+    KIRO_COMM=$("$REAL_TMUX" -L "$SOCKET" display-message -p -t "$TARGET" '#{pane_current_command}' 2>/dev/null || true)
+    break
+  fi
   case "$screen" in *80235*|*80,235*) break ;; esac
   sleep 1
 done
 [ -n "$busy_live" ] || fail "the kiro delivery guard never matched the real kiro turn in flight"
 pass "the real kiro busy footer matches the kiro delivery guard in flight"
+
+# The foreground process name captured above, while the turn was provably in
+# flight, is the whole of kiro's detection surface: bin/fm-harness.sh and
+# bin/fm-agent-process-lib.sh both anchor on the exact word `kiro-cli`. A rename
+# turns harness detection into `unknown` and pane liveness into `other`, so the
+# name is asserted here rather than merely used.
+[ "$KIRO_COMM" = kiro-cli ] \
+  || fail "the live kiro foreground command must be the anchored 'kiro-cli', got '$KIRO_COMM'"
+pass "the real kiro foreground process name is the anchored 'kiro-cli'"
 
 # The launch turn must complete and its reply land.
 for _ in $(seq 1 480); do
@@ -196,12 +211,17 @@ pass "a single Escape cancels the real kiro turn"
   || fail "could not type the kiro exit command"
 "$REAL_TMUX" -L "$SOCKET" send-keys -t "$TARGET" Enter \
   || fail "could not submit the kiro exit command"
+# Exit proof is the DISAPPEARANCE of the captured name: the pane outlives the
+# agent (the launch line ran under a shell), so a readable command that is no
+# longer $KIRO_COMM means the process stopped. An unreadable read proves nothing
+# and keeps waiting rather than passing.
 gone=
 for _ in $(seq 1 60); do
   current=$("$REAL_TMUX" -L "$SOCKET" display-message -p -t "$TARGET" '#{pane_current_command}' 2>/dev/null || true)
-  case "$current" in *kiro-cli*) sleep 0.5 ;; *) gone=1; break ;; esac
+  if [ -n "$current" ] && [ "$current" != "$KIRO_COMM" ]; then gone=1; break; fi
+  sleep 0.5
 done
-[ -n "$gone" ] || fail "/quit never stopped the real kiro process"
+[ -n "$gone" ] || fail "/quit never stopped the real kiro process (foreground command still '$KIRO_COMM')"
 case "$(capture)" in
   *"--resume-id"*) pass "/quit stops the real kiro process and prints its resume-id line" ;;
   *) pass "/quit stops the real kiro process" ;;

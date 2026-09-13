@@ -100,14 +100,16 @@ Seeding that setting into the per-task `KIRO_HOME` suppresses the modal, and a p
 ## Live guard result
 
 `FM_KIRO_SIGNALS_LIVE=1 tests/fm-kiro-signals-live-e2e.test.sh` passed on 2026-09-13 against kiro-cli 2.21.4: the busy footer matched in flight, the launch prompt was answered, both V2 hooks fired per turn, a single Escape cancelled a long turn, and `/quit` stopped the process and printed its resume-id line.
-Two parts of the guard changed after that run, so its recorded pass is evidence for the vendor facts above and not for what the guard checks today.
+Three parts of the guard changed after that run, so its recorded pass is evidence for the vendor facts above and not for what the guard checks today.
 Its footer matcher now folds the captured screen and calls the delivery guard `fm_busy_lines_match kiro` instead of a classifier helper the adapter no longer has.
 Its hook commands now carry the shell constructs the spawn emits - a `;`-joined pair with a `2>/dev/null || true` tail whose awaited marker comes from a redirect - where the recorded run used bare `touch` commands, so whether kiro shell-interprets a hook command string is asserted but not yet observed.
-Re-running the guard on the Linux desk where the real tool lives is what would prove both.
+It now captures `#{pane_current_command}` while the turn is in flight and fails unless that name is exactly `kiro-cli`, then treats the disappearance of that captured name as the `/quit` exit proof; previously any non-matching value counted as the process being gone, so a rename would have passed the exit check while both anchored detection arms stopped recognizing a kiro worker.
+Re-running the guard on the Linux desk where the real tool lives is what would prove all three.
 
 ## What is NOT verified
 
 - The v3/KAS engine (out of scope; unsupported on AL2, hooks not yet at parity).
 - Any StopFailure/SessionEnd-equivalent hook trigger (none found). On an abnormal turn end (a stream or API error, a model-side abort) the `stop` hook never fires, so the busy record stays open and the supervisor reads the worker as provably working - deferring instead of surfacing or retiring the endpoint - until the next `userPromptSubmit` re-opens the record. The rendered footer does not rescue it: it is a delivery guard only and the classifier has no kiro pane arm.
+- Whether kiro V2 hands a hook `command` string to a shell or splits it into argv. The spawn emits a compound shell command for both hooks: `userPromptSubmit` carries a `2>/dev/null || true` tail, and `stop` is a `;`-joined pair with the same tail. If the tool splits argv instead, `fm-busy-event.sh` receives `2>/dev/null`, `||`, and `true` as positional arguments and exits on its usage path, `touch` receives the rest as filenames, and no `kiro-hook` record is ever written - so the `busy fm-spawn` seed from the arm never clears and the supervisor reads the worker as working until the busy-turn bound demotes the pane. There is no second signal to degrade to, because a harness with a semantic source gets no rendered-text classification. The live guard now carries exactly these shell constructs and each of its markers is produced by a redirect, so one re-run of it on the Linux desk where the real tool lives settles this. This is awaiting that re-run.
 - Primary or secondmate operation: no supervision protocol exists, and `bin/fm-spawn.sh` refuses a secondmate launch.
 - Backends other than tmux for the rendered surface (the portable regression drives the signals apart with real processes; the live guard exercises tmux).
