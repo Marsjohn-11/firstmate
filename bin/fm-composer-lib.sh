@@ -306,7 +306,7 @@ fm_composer_strip_ghost() {
 # Matching a footer to confirm a keystroke landed is a different question from
 # asking what a worker is doing, and the two must not be conflated.
 # Delivery-only rendered busy footers per harness. claude/codex: "esc to
-# interrupt"; opencode: "esc interrupt"; pi: "Working..."; omp: "Working…"; grok: "Ctrl+c:cancel"; agy: "esc to cancel".
+# interrupt"; opencode: "esc interrupt"; pi: "Working..."; omp: "Working…"; grok: "Ctrl+c:cancel"; agy: "esc to cancel"; kiro: "Kiro is working".
 # Claude's current spinner has a rotating glyph and word, but every active-turn
 # line has an ellipsis followed by a parenthesized elapsed duration. Keep this
 # signature separate from the shared default because that shape is not generic
@@ -370,6 +370,16 @@ FM_DELIVERY_CURSOR_BUSY_REGEX_DEFAULT='ctrl\+c to stop'
 # acknowledgement. Delivery guard only; recorded worker state comes from the
 # agy-regex fold in bin/fm-busy-lib.sh.
 FM_DELIVERY_AGY_BUSY_REGEX_DEFAULT='esc[[:space:]]+to[[:space:]]+cancel'
+# kiro (Kiro CLI) renders its composer footer as `› Kiro is working · Type to
+# steer · Ctrl+S to queue` while a turn runs, and an idle footer of
+# `Trust All Tools active ... /quit to exit` or the `ask a question or describe
+# a task` placeholder otherwise (verified live, kiro-cli 2.21.4). The
+# harness-named `Kiro is working` literal is matched rather than the bare
+# `esc to cancel` token kiro also renders in its tool-call region and shares with
+# agy, so echoed worker output cannot fake an acknowledgement. Delivery guard
+# only; recorded worker state comes from the kiro-hook record, with the
+# kiro-regex fold in bin/fm-busy-lib.sh as its second signal.
+FM_DELIVERY_KIRO_BUSY_REGEX_DEFAULT='Kiro is working'
 FM_DELIVERY_KIMI_BUSY_REGEX_DEFAULT='^[[:space:]]*(🌑|🌒|🌓|🌔|🌕|🌖|🌗|🌘)[[:space:]]+·[[:space:]]+'
 
 fm_busy_lines_match() {  # [harness]
@@ -386,6 +396,7 @@ fm_busy_lines_match() {  # [harness]
       omp) regex=$FM_DELIVERY_OMP_BUSY_REGEX_DEFAULT ;;
       grok) regex=$FM_DELIVERY_GROK_BUSY_REGEX_DEFAULT ;;
       agy) regex=$FM_DELIVERY_AGY_BUSY_REGEX_DEFAULT ;;
+      kiro) regex=$FM_DELIVERY_KIRO_BUSY_REGEX_DEFAULT ;;
       kimi) regex=$FM_DELIVERY_KIMI_BUSY_REGEX_DEFAULT ;;
       cursor) regex=$FM_DELIVERY_CURSOR_BUSY_REGEX_DEFAULT ;;
       '') regex=$FM_DELIVERY_BUSY_REGEX_DEFAULT ;;
@@ -415,9 +426,11 @@ FM_COMPOSER_SHELL_PROMPT_GLYPHS=$(printf '%s\n' '>' '$' '%' '#')
 # hence the unanchored tail). cursor-agent renders
 # two, both anchored: `Plan, search, build anything` in a fresh session and
 # `Add a follow-up` once a turn has completed (verified live on cursor-agent
-# 2026.08.11-e8db854). FM_COMPOSER_IDLE_RE overrides for an unverified harness;
+# 2026.08.11-e8db854). kiro renders `ask a question or describe a task` followed
+# by a de-emphasised `↵` submit hint, hence the unanchored tail (verified live on
+# kiro-cli 2.21.4). FM_COMPOSER_IDLE_RE overrides for an unverified harness;
 # matching is case-insensitive.
-FM_COMPOSER_IDLE_RE_DEFAULT='^Type a message\.\.\.$|^Ask anything(\.\.\.|…)|^Plan, search, build anything$|^Add a follow-up$'
+FM_COMPOSER_IDLE_RE_DEFAULT='^Type a message\.\.\.$|^Ask anything(\.\.\.|…)|^Plan, search, build anything$|^Add a follow-up$|^ask a question or describe a task'
 
 # Opencode draws a mode/model footer line INSIDE its left-bar composer
 # ("Build · GPT-5.5 Fast OpenAI · high"). It is composer furniture, not typed

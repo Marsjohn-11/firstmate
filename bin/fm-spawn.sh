@@ -135,7 +135,7 @@
 #   profile consultation. A --secondmate spawn is exempt and resolves the SECONDMATE
 #   harness (config/secondmate-harness -> config/crew-harness -> own), so the
 #   secondmate-vs-crewmate split is DURABLE across every respawn (recovery,
-#   /updatefirstmate, restart). A bare adapter name (claude|codex|opencode|pi|pi-signed|grok|kimi|cursor|gemini|muse|rovo|omp|agy)
+#   /updatefirstmate, restart). A bare adapter name (claude|codex|opencode|pi|pi-signed|grok|kimi|cursor|gemini|muse|rovo|omp|agy|kiro)
 #   overrides it for this spawn (either kind). A non-flag string containing
 #   whitespace is treated as a RAW launch command - the escape hatch for verifying
 #   new adapters. For pi and pi-signed, fm-spawn resolves the selected executable
@@ -287,6 +287,8 @@
 #     __GEMINISETTINGS__ firstmate-owned per-task gemini settings file (busy-state hooks)
 #     __ROVOBIN__   resolved, rovo-verified executable for a rovo launch
 #     __AGYBIN__    resolved, agy-verified executable for an agy launch
+#     __KIROBIN__   resolved, kiro-verified executable for a kiro launch
+#     __KIROHOME__  firstmate-owned per-task KIRO_HOME dir (hook agent config + trust setting)
 # Verified per-harness turn-end hooks are installed automatically where enabled; some live outside the worktree.
 # Kimi uses one surgically installed Firstmate region in $HOME/.kimi-code/config.toml,
 # a firstmate-owned global hook and registry, and a gitignored per-task pointer.
@@ -319,6 +321,19 @@
 # busy turn - answering the dialog first if it renders anyway - before
 # reporting success (the rovo/kimi launch-then-confirm shape). Its busy state
 # is a screen-scrape fallback like grok and rovo, and it is crewmate/scout only.
+# kiro (Kiro CLI, V2 engine) IS claude-shaped: its V2 agent-config hooks
+# (userPromptSubmit opens a turn, stop closes it and keeps the turn-ended
+# notification touch) are the per-task turn-end wiring. That config must not go
+# into the worktree's own .kiro/, so - mirroring gemini - the spawn writes a
+# firstmate-owned per-task agent config under state/<id>.kiro-home/agents/ and
+# reaches it by relocating KIRO_HOME onto that dir on the launch command; the
+# captain's real ~/.kiro is never touched and auth (in the XDG data dir) is
+# unaffected. --agent is name-only (a path is rejected), and --trust-all-tools
+# would otherwise block on a modal, so the spawn seeds
+# chat.disableTrustAllConfirmation into that per-task home's settings. kiro is
+# crewmate/scout only and refused for --secondmate. Its busy state has two
+# independent signals (the kiro-hook record plus the rendered `Kiro is working`
+# footer, bin/fm-busy-lib.sh).
 # cursor installs no per-task hook either: it writes state/<id>.cursor-session to
 # bind the pane to cursor's own conversation transcript (projects root, the exact
 # workspace path cursor records in .workspace-trusted, and the conversations that
@@ -1589,7 +1604,7 @@ if [ "$RELAUNCH" -eq 1 ]; then
   }
 elif [ "$KIND" = secondmate ]; then
   case "${POS[1]:-}" in
-  '' | claude | codex | opencode | pi | pi-signed | grok | kimi | cursor | gemini | muse | rovo | omp | agy)
+  '' | claude | codex | opencode | pi | pi-signed | grok | kimi | cursor | gemini | muse | rovo | omp | agy | kiro)
     ARG3=${POS[1]:-}
     ;;
   *' '*)
@@ -1695,6 +1710,39 @@ agy_model_validate() {  # <agy-bin> <model>
     return 0
   fi
   echo "error: agy model '$model' is not listed by 'agy models'; choose a listed id or omit --model" >&2
+  return 1
+}
+
+# kiro pre-launch model validation. `kiro-cli chat --agent-engine v2
+# --list-models -f json` (kiro-cli 2.21.4) prints
+# {"models":[{"model_id":"<id>",...}],"default_model":"auto"} for the account's
+# catalog; model ids are bare (claude-opus-5, auto), never provider-prefixed. A
+# requested model absent from a reachable listing is concrete unsupported
+# evidence and refuses the spawn, so a stale id fails loudly here instead of
+# wedging a worker pane. The listing is a remote fetch that needs network and a
+# signed-in account, so the probe runs under the shared hard bound
+# (bin/fm-timeout-lib.sh) with stdin detached: a stalled fetch or a sign-in
+# prompt can never block the spawn before any pane exists. model_ids are read
+# with grep/sed rather than jq so the check has no extra dependency. An
+# unreachable listing establishes nothing (harness-adapters model-and-effort.md)
+# and launches unvalidated with a notice.
+kiro_model_validate() {  # <kiro-bin> <model>
+  local bin=$1 model=$2 listing rc=0 bound=${FM_KIRO_MODELS_TIMEOUT:-15}
+  case "$bound" in ''|*[!0-9]*|0*) bound=15 ;; esac
+  [ -n "$model" ] && [ "$model" != default ] || return 0
+  listing=$(fm_run_timed "$bound" "$bin" chat --agent-engine v2 --list-models -f json 2>/dev/null < /dev/null) || rc=$?
+  if [ "$rc" -ne 0 ] || [ -z "$listing" ]; then
+    if [ "$rc" -eq 124 ]; then
+      echo "notice: 'kiro-cli --list-models' did not answer within ${bound}s; launching with --model '$model' unvalidated" >&2
+    else
+      echo "notice: 'kiro-cli --list-models' listing is unreachable (exit $rc); launching with --model '$model' unvalidated" >&2
+    fi
+    return 0
+  fi
+  if printf '%s' "$listing" | grep -oE '"model_id":"[^"]+"' | sed 's/.*:"//;s/"$//' | grep -qxF -- "$model"; then
+    return 0
+  fi
+  echo "error: kiro model '$model' is not listed by 'kiro-cli --list-models'; choose a listed model_id or omit --model" >&2
   return 1
 }
 
@@ -1829,6 +1877,24 @@ launch_template() {
   # agy exposes no hook surface, so busy state is a rendered-tail fallback
   # (bin/fm-busy-lib.sh) and nothing is armed below.
   agy) printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS __AGYBIN__ --prompt-interactive "$(__OPINPUT__ encode launch-brief < __BRIEF__)" __MODELFLAG____EFFORTFLAG__--dangerously-skip-permissions' ;;
+  # kiro (Kiro CLI, V2 engine): a positional prompt starts the supervised
+  # interactive session and auto-submits the brief (verified: a positional
+  # brief submitted itself with no extra Enter, kiro-cli 2.21.4). --agent-engine
+  # v2 pins the AL2-supported engine (v3/KAS is out of scope and unsupported
+  # here). --agent names the firstmate-owned per-task agent config that carries
+  # the busy/turn-end hooks; --agent is name-only, so the config is reached by
+  # relocating KIRO_HOME onto the per-task home that holds an agents/firstmate.json
+  # (see the hook section below) rather than by a config path. --trust-all-tools
+  # auto-approves every tool call an unattended crewmate needs; its otherwise
+  # blocking confirmation modal is suppressed by the chat.disableTrustAllConfirmation
+  # setting the hook section seeds into that same per-task home. --model takes a
+  # bare catalog model_id from --list-models; --effort takes low|medium|high|xhigh|max.
+  # The foreign primary markers are cleared for the same reason cursor/gemini/agy
+  # clear them: kiro publishes no marker of its own and does not scrub an
+  # inherited CLAUDECODE, so bin/fm-harness.sh must not read a kiro worker as its
+  # launcher. The V2 stop hook is a real turn-end pair, so busy state is armed
+  # below (unlike agy's screen-scrape-only fallback).
+  kiro) printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS KIRO_HOME=__KIROHOME__ __KIROBIN__ chat --agent-engine v2 --agent firstmate __MODELFLAG____EFFORTFLAG__--trust-all-tools "$(__OPINPUT__ encode launch-brief < __BRIEF__)"' ;;
   # grok (Grok Build TUI): a positional prompt starts the supervised interactive
   # session. --always-approve auto-approves every tool execution (verified: the
   # crewmate runs fully autonomously, no permission gate), which an unattended
@@ -1995,7 +2061,7 @@ case "$ARG3" in
   ;;
 esac
 
-# muse, gemini, and agy are verified as CREWMATE/SCOUT adapters only. A secondmate is
+# muse, gemini, agy, and kiro are verified as CREWMATE/SCOUT adapters only. A secondmate is
 # a firstmate instance, so it needs a primary supervision protocol.
 # gemini has none: docs/supervision-protocols/ carries no gemini wake protocol
 # and this task verified only crewmate-side launch, busy state, interrupt, and
@@ -2007,7 +2073,10 @@ esac
 # secondmate whose supervision cycle could never be armed.
 # agy has none either: it exposes no hook surface for primary supervision and
 # docs/supervision-protocols/ carries no agy wake protocol (agy 1.2.0).
-if [ "$KIND" = secondmate ] && { [ "$HARNESS" = muse ] || [ "$HARNESS" = gemini ] || [ "$HARNESS" = agy ]; }; then
+# kiro has none either: this task verified only crewmate-side launch, busy state,
+# interrupt, exit, and resume on the V2 engine, and docs/supervision-protocols/
+# carries no kiro wake protocol (kiro-cli 2.21.4).
+if [ "$KIND" = secondmate ] && { [ "$HARNESS" = muse ] || [ "$HARNESS" = gemini ] || [ "$HARNESS" = agy ] || [ "$HARNESS" = kiro ]; }; then
   echo "error: $HARNESS is a verified crewmate/scout adapter only and cannot run a secondmate; it has no primary supervision protocol. Select a harness verified for secondmates." >&2
   exit 1
 fi
@@ -2067,6 +2136,12 @@ agy)
     exit 1
   }
   ;;
+kiro)
+  KIRO_BIN=$(resolve_pi_executable kiro-cli) || {
+    echo "error: kiro-cli executable not found on PATH; install Kiro CLI or select a different verified harness" >&2
+    exit 1
+  }
+  ;;
 esac
 
 # config/secondmate-harness may carry optional model/effort tokens alongside the
@@ -2104,6 +2179,9 @@ if [ "$HARNESS" = omp ]; then
 fi
 if [ "$HARNESS" = agy ]; then
   agy_model_validate "$AGY_BIN" "$MODEL" || exit 1
+fi
+if [ "$HARNESS" = kiro ]; then
+  kiro_model_validate "$KIRO_BIN" "$MODEL" || exit 1
 fi
 
 secondmate_registry_value() {
@@ -2226,7 +2304,7 @@ model_flag_for_harness() {
   local harness=$1 model=$2
   [ -n "$model" ] && [ "$model" != default ] || return 0
   case "$harness" in
-  claude | codex | opencode | pi | pi-signed | grok | kimi | cursor | gemini | muse | rovo | omp | agy)
+  claude | codex | opencode | pi | pi-signed | grok | kimi | cursor | gemini | muse | rovo | omp | agy | kiro)
     printf -- '--model %s ' "$(shell_quote "$model")"
     ;;
   esac
@@ -2267,6 +2345,14 @@ effort_flag_for_harness() {
     # omitted rather than passed as known-bad values (record-and-omit).
     case "$effort" in
     low | medium | high) printf -- '--effort %s ' "$(shell_quote "$effort")" ;;
+    esac
+    ;;
+  kiro)
+    # kiro-cli 2.21.4 --effort accepts the full shared vocabulary
+    # (low|medium|high|xhigh|max, per `kiro-cli chat --help`), so every level
+    # passes through.
+    case "$effort" in
+    low | medium | high | xhigh | max) printf -- '--effort %s ' "$(shell_quote "$effort")" ;;
     esac
     ;;
   pi | pi-signed)
@@ -3843,7 +3929,7 @@ if [ "$KIND" != secondmate ]; then
     ;;
   esac
   case "$HARNESS" in
-  claude* | opencode* | pi | pi-signed | omp)
+  claude* | opencode* | pi | pi-signed | omp | kiro)
     BUSY_GEN=$("$FM_ROOT/bin/fm-busy-event.sh" arm "$STATE_REAL" "$ID") || {
       echo "error: failed to arm the busy-state contract for $ID" >&2
       exit 1
@@ -3926,6 +4012,42 @@ EOF
 {"hooks":{"BeforeAgent":[{"hooks":[{"type":"command","command":"$g_before"}]}],"AfterAgent":[{"hooks":[{"type":"command","command":"$g_after"}]}],"SessionEnd":[{"hooks":[{"type":"command","command":"$g_sessionend"}]}]}}
 EOF
     fi
+    ;;
+  kiro)
+    # Semantic busy-state hooks (bin/fm-busy-lib.sh): the V2 agent-config
+    # userPromptSubmit hook opens a turn and the stop hook closes it, with the
+    # stop hook also keeping the turn-ended NOTIFICATION touch for the watcher.
+    # Verified live on kiro-cli 2.21.4 as a clean per-turn pair in both the
+    # non-interactive run and the interactive TUI (userPromptSubmit fired on
+    # submit, stop fired at turn end). Like Claude's Stop hook, kiro's stop
+    # does NOT fire on a manual Escape interrupt, so fm-control preserves the
+    # adapter-owned record there (fm_control_interrupt_ack_source is none). kiro
+    # V2 exposes no verified StopFailure/SessionEnd equivalent, so an abnormal
+    # turn end can leave the record busy until the next userPromptSubmit
+    # re-opens it; the rendered `Kiro is working` fallback is the second signal
+    # that keeps a hook gap from blinding the supervisor.
+    #
+    # These are written into a FIRSTMATE-OWNED per-task agent config under
+    # state/<id>.kiro-home/agents/, reached by relocating KIRO_HOME onto that
+    # home on the launch command, never into the worktree's own .kiro/ - that
+    # dir belongs to the project, and --agent is name-only so a config path is
+    # not an option. The same per-task home carries a settings/cli.json seeding
+    # chat.disableTrustAllConfirmation, which suppresses --trust-all-tools's
+    # otherwise blocking confirmation modal (verified: the modal is the only
+    # blocker; auth stays in the XDG data dir and is unaffected by KIRO_HOME).
+    # Each hook command tolerates a refused event (|| true) so a stale-gen
+    # writer can never break kiro's own lifecycle; no stdout contract applies
+    # (kiro ran bare touch hooks cleanly).
+    KIRO_HOME_DIR="$STATE_REAL/$ID.kiro-home"
+    mkdir -p "$KIRO_HOME_DIR/agents" "$KIRO_HOME_DIR/settings"
+    printf '{"chat.disableTrustAllConfirmation":true}\n' >"$KIRO_HOME_DIR/settings/cli.json"
+    busy_cmd_prefix="$(shell_quote "$FM_ROOT/bin/fm-busy-event.sh") apply $(shell_quote "$STATE_REAL") $(shell_quote "$ID")"
+    busy_suffix="--gen $(shell_quote "$BUSY_GEN") --source kiro-hook"
+    k_submit=$(json_escape "$busy_cmd_prefix busy $busy_suffix --event user-prompt-submit 2>/dev/null || true")
+    k_stop=$(json_escape "touch $(shell_quote "$TURNEND"); $busy_cmd_prefix idle $busy_suffix --event stop 2>/dev/null || true")
+    cat >"$KIRO_HOME_DIR/agents/firstmate.json" <<EOF
+{"name":"firstmate","description":"Firstmate per-task crewmate agent (busy-state and turn-end hooks)","tools":["*"],"allowedTools":["*"],"hooks":{"userPromptSubmit":[{"command":"$k_submit"}],"stop":[{"command":"$k_stop"}]}}
+EOF
     ;;
   opencode*)
     mkdir -p "$WT/.opencode/plugins"
@@ -4431,10 +4553,14 @@ cursor) LAUNCH=${LAUNCH//__CURSORBIN__/"$(shell_quote "$CURSOR_BIN")"} ;;
 gemini) LAUNCH=${LAUNCH//__GEMINISETTINGS__/"$(shell_quote "$STATE_REAL/$ID.gemini-settings.json")"} ;;
 omp) LAUNCH=${LAUNCH//__OMPBIN__/"$(shell_quote "$OMP_BIN")"} ;;
 agy) LAUNCH=${LAUNCH//__AGYBIN__/"$(shell_quote "$AGY_BIN")"} ;;
+kiro)
+  LAUNCH=${LAUNCH//__KIROBIN__/"$(shell_quote "$KIRO_BIN")"}
+  LAUNCH=${LAUNCH//__KIROHOME__/"$(shell_quote "$STATE_REAL/$ID.kiro-home")"}
+  ;;
 esac
 LAUNCH=${LAUNCH//__WORKTREE__/$sq_worktree}
 case "$HARNESS" in
-claude | codex | opencode | pi | pi-signed | grok | kimi | gemini | muse | rovo | agy)
+claude | codex | opencode | pi | pi-signed | grok | kimi | gemini | muse | rovo | agy | kiro)
   LAUNCH="env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI $LAUNCH"
   ;;
 esac
