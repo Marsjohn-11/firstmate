@@ -492,10 +492,13 @@ fm_lock_role() {
   cat "$1/role" 2>/dev/null
 }
 
+# Refuse an empty basename rather than returning the parent directory, which
+# reads as a valid but different path and lets a caller act on the wrong one.
 fm_lock_abs_path() {
   local path=$1 dir base
   fm_dirname_to dir "$path"
   fm_basename_to base "$path"
+  [ -n "$base" ] || return 1
   dir=$(cd "$dir" 2>/dev/null && pwd -P) || return 1
   printf '%s/%s\n' "$dir" "$base"
 }
@@ -1072,23 +1075,51 @@ fm_lock_reap_dead_link() {
   fm_lock_discard_owner "$tomb"
 }
 
+# Remove a stale holder that is not a link lock, such as a directory lock left
+# by an older revision. Link locks go through fm_lock_reap_dead_link instead,
+# whose tombstone election keeps competing reapers off a successor's link.
+_fm_lock_reclaim_if_stale() {  # <path>
+  local path=$1 pid
+  [ -e "$path" ] && [ ! -L "$path" ] || return 1
+  pid=$(cat "$path/pid" 2>/dev/null || true)
+  fm_lock_recheck_stale_owner "$path" '' "$pid" || return 1
+  fm_lock_remove_path "$path"
+}
+
+# Reap a dead holder of <path> by the form it was created in.
+_fm_lock_reap_stale_holder() {  # <path>
+  if [ -L "$1" ]; then
+    fm_lock_reap_dead_link "$1"
+  else
+    _fm_lock_reclaim_if_stale "$1"
+  fi
+}
+
 # Acquire the short-lived steal mutex without recursively creating another
-# steal mutex. A dead holder is reaped once; a dead nested steal marker left by
-# the former recursive reclaim is reaped too so it cannot block the claim. A
-# hold abandoned by this very process (a trap interrupted its critical section)
-# is reclaimed like fm_lock_try_acquire's self-held branch.
+# steal mutex. Recovering it with the primary algorithm would descend onto
+# "<lock>.steal.steal" for as long as each level looks stale, and every crashed
+# stealer leaves one more stale level behind, so the descent runs until the
+# pathname and process stack give out. A dead holder is reaped once instead; a
+# dead nested steal marker left by the former recursive reclaim is reaped too so
+# it cannot block the claim. A hold abandoned by this very process (a trap
+# interrupted its critical section) is reclaimed like fm_lock_try_acquire's
+# self-held branch.
 fm_lock_try_acquire_steal_mutex() {  # <steal-lock>
   local lockdir=$1 current
   FM_LOCK_OWNER_DIR=
   fm_lock_try_create "$lockdir" && return 0
   fm_current_pid current || return 1
-  fm_lock_reap_dead_link "$lockdir.steal" || true
+  _fm_lock_reap_stale_holder "$lockdir.steal" || true
   if [ "$(cat "$lockdir/pid" 2>/dev/null || true)" = "$current" ]; then
     fm_lock_remove_path "$lockdir" || true
   elif [ -e "$lockdir" ] || [ -L "$lockdir" ]; then
-    fm_lock_reap_dead_link "$lockdir" || return 1
+    _fm_lock_reap_stale_holder "$lockdir" || return 1
   fi
   fm_lock_try_create "$lockdir"
+}
+
+fm_lock_steal_try_acquire() {  # <steal-lock>
+  fm_lock_try_acquire_steal_mutex "$@"
 }
 
 fm_lock_try_acquire() {
