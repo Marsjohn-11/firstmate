@@ -109,6 +109,19 @@ It now reads the live pane's foreground process group while the turn is in fligh
 It deliberately does not assert `#{pane_current_command}`, which reports the launcher's name wherever kiro-cli sits behind a wrapper, and captures that field only as the `/quit` exit baseline, where the exit now requires a readable command that differs from the captured one instead of accepting any non-matching value.
 Re-running the guard on the Linux desk where the real tool lives is what would prove all four.
 
+## Open defect: steering a kiro worker
+
+A validation run that drove the real `kiro-cli` on macOS reports that the real idle kiro composer classifies as `pending` rather than a proven-empty composer, so `bin/fm-send.sh` never types a steer into a kiro worker.
+Ten of its eleven live scenarios passed and this was the one failure.
+That observation is recorded here as the validation run made it and is not independently reproduced, so treat it as a live report rather than an established fact until a second run confirms it.
+
+Two candidate causes are ruled out by direct measurement rather than by argument.
+The absent kiro entry in the fleet-wide idle-placeholder set is not the cause: classifying kiro's real composer row through `fm_composer_classify_screen` returns `unknown` at both styled and unstyled capture, with the entry present and absent alike, so restoring it changes no verdict.
+The bare composer row alone is not the cause either, because that same row classifies `unknown` rather than `pending`, which means the `pending` verdict comes from the surrounding captured screen and not from the composer row in isolation.
+
+Reproducing it needs the real tool, since no synthetic screen has produced the reported verdict.
+A worker that cannot be steered does not satisfy the crewmate contract, so this is a blocker for using the adapter rather than a limitation to note.
+
 Three of the guard's other assertions are weaker than the vendor surface its header names, and strengthening them is not attempted here.
 Its resume-line check passes whether or not `--resume-id` appears, so a release that drops that line leaves the guard green.
 It never asserts the `›` composer glyph, so a glyph change - which would flip every bare-row kiro composer read from `empty` to `unknown` and make steer delivery defer - would not redden it.
