@@ -3,6 +3,8 @@
 Maintainer-verification record for the `kiro` crewmate/scout adapter (V2 engine).
 It records the active empirical facts the adapter depends on and the exact commands that establish them.
 The live drift guard `tests/fm-kiro-signals-live-e2e.test.sh` (family `live-harness-optin`, control `FM_KIRO_SIGNALS_LIVE`) is what refreshes the vendor-controlled facts below; run it after every kiro upgrade.
+It is opt-in and submits real prompts, so its runtime is unbounded and it is run deliberately rather than from a validation step.
+The portable regression `tests/fm-kiro-harness.test.sh` is what CI enforces, and it does not cover the vendor-rendered surface, so a green suite is not evidence that these signals still work.
 
 Scope: V2 engine only (`--agent-engine v2`). The v3/KAS engine is out of scope and was not exercised: it is unsupported on this Amazon Linux 2 host and its hooks are not yet at parity.
 

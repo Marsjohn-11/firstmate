@@ -7,6 +7,14 @@
 # resume line. Opt-in because it submits real prompts (no echo provider exists
 # for kiro). v3/KAS is explicitly out of scope and never exercised here.
 #
+# Run this deliberately, never from inside a validation step. Each scenario waits
+# on real model turns, so the runtime is unbounded by construction and a
+# step-capped agent invocation cannot contain it - one attempt spent 64 minutes
+# across two invocations and died on a 30-minute cap without reporting. The
+# portable regression tests/fm-kiro-harness.test.sh is what CI enforces; it does
+# not cover the vendor-rendered surface above, so a green suite is not evidence
+# these signals still work.
+#
 # Isolation: the worker runs under a per-guard KIRO_HOME so its agent config,
 # trust setting, and sessions land in the lab store, never the operator's real
 # ~/.kiro; auth lives in the XDG data dir and is unaffected by KIRO_HOME, so the
