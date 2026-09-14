@@ -115,11 +115,15 @@ A validation run that drove the real `kiro-cli` on macOS reports that the real i
 Ten of its eleven live scenarios passed and this was the one failure.
 That observation is recorded here as the validation run made it and is not independently reproduced, so treat it as a live report rather than an established fact until a second run confirms it.
 
-Two candidate causes are ruled out by direct measurement rather than by argument.
-The absent kiro entry in the fleet-wide idle-placeholder set is not the cause: classifying kiro's real composer row through `fm_composer_classify_screen` returns `unknown` at both styled and unstyled capture, with the entry present and absent alike, so restoring it changes no verdict.
-The bare composer row alone is not the cause either, because that same row classifies `unknown` rather than `pending`, which means the `pending` verdict comes from the surrounding captured screen and not from the composer row in isolation.
+One candidate cause is ruled out by measurement: the absent kiro entry in the fleet-wide idle-placeholder set is not it.
+Classifying the styled row with the capabilities a styled capture carries (`styled=1`, `cursor=1`, `rows=6`) returns `empty` with the entry present and absent alike, so restoring it changes no verdict.
 
-Reproducing it needs the real tool, since no synthetic screen has produced the reported verdict.
+No cause is established beyond that, and the synthetic reconstruction and the live report disagree.
+`tests/fm-kiro-harness.test.sh` builds a styled reconstruction of the idle row and measures `empty`, which is reproducible and is what the classifier does on that input.
+The live run measured `pending` on the real pane.
+Both can hold only if the real capture differs from the reconstruction in a way that changes the verdict, so the reconstruction is not confirmed faithful to what the real pane produces, and its `empty` result must not be read as evidence about the real tool.
+
+Reproducing the reported verdict needs the real tool, since no synthetic screen has produced it.
 A worker that cannot be steered does not satisfy the crewmate contract, so this is a blocker for using the adapter rather than a limitation to note.
 
 Three of the guard's other assertions are weaker than the vendor surface its header names, and strengthening them is not attempted here.
