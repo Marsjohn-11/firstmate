@@ -1756,6 +1756,26 @@ kiro_model_validate() {  # <kiro-bin> <model>
   return 1
 }
 
+# kiro's hook commands are single-token absolute paths, so a hook path carrying
+# whitespace cannot be delivered as one token under either interpretation - a
+# shell splits it and an argv split does the same, and no quoting fixes both.
+# kiro has no second state source, so the seeded busy record would never clear
+# and the supervisor would read the worker as provably working forever. Refuse
+# alongside the model check, before any worktree or pane exists, and name the
+# path. The physical resolution is what gets embedded, so that is what is
+# checked; an unresolvable state dir falls back to the configured string.
+kiro_hook_path_validate() {  # <state-dir> <id>
+  local state=$1 id=$2 real
+  real=$(cd "$state" 2>/dev/null && pwd -P) || real=$state
+  [ -n "$real" ] || real=$state
+  case "$real/$id.kiro-home" in
+    *[[:space:]]*)
+      echo "error: kiro hook scripts would live under '$real/$id.kiro-home', whose path contains whitespace; kiro hook commands must be a single unquoted token, so point FM_HOME or FM_STATE_OVERRIDE at a whitespace-free path" >&2
+      return 1 ;;
+  esac
+  return 0
+}
+
 # The verified launch command per adapter. The knowledge half of each adapter
 # (busy-state source, exit command, dialogs, quirks) lives in the harness-adapters skill.
 launch_template() {
@@ -2192,6 +2212,9 @@ if [ "$HARNESS" = agy ]; then
 fi
 if [ "$HARNESS" = kiro ]; then
   kiro_model_validate "$KIRO_BIN" "$MODEL" || exit 1
+  if [ "$RAW_LAUNCH" -eq 0 ]; then
+    kiro_hook_path_validate "$STATE" "$ID" || exit 1
+  fi
 fi
 
 secondmate_registry_value() {

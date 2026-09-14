@@ -102,11 +102,12 @@ Seeding that setting into the per-task `KIRO_HOME` suppresses the modal, and a p
 ## Live guard result
 
 `FM_KIRO_SIGNALS_LIVE=1 tests/fm-kiro-signals-live-e2e.test.sh` passed on 2026-09-13 against kiro-cli 2.21.4: the busy footer matched in flight, the launch prompt was answered, both V2 hooks fired per turn, a single Escape cancelled a long turn, and `/quit` stopped the process and printed its resume-id line.
-Three parts of the guard changed after that run, so its recorded pass is evidence for the vendor facts above and not for what the guard checks today.
+Four parts of the guard changed after that run, so its recorded pass is evidence for the vendor facts above and not for what the guard checks today.
 Its footer matcher now folds the captured screen and calls the delivery guard `fm_busy_lines_match kiro` instead of a classifier helper the adapter no longer has.
 Its hook commands are now single-token absolute paths to generated scripts, the shape the spawn emits, where the recorded run used bare `touch` commands, so the trigger firing is what the markers now prove.
-It now captures `#{pane_current_command}` while the turn is in flight and fails unless that name is exactly `kiro-cli`, then treats the disappearance of that captured name as the `/quit` exit proof; previously any non-matching value counted as the process being gone, so a rename would have passed the exit check while both anchored detection arms stopped recognizing a kiro worker.
-Re-running the guard on the Linux desk where the real tool lives is what would prove all three.
+It now reads the live pane's foreground process group while the turn is in flight and fails unless some comm or argv[0] basename in that group is exactly `kiro-cli`, `fm_backend_agent_state tmux` reads `alive`, and `fm-harness.sh ancestry` returns `comm kiro` for one of that group's pids.
+It deliberately does not assert `#{pane_current_command}`, which reports the launcher's name wherever kiro-cli sits behind a wrapper, and captures that field only as the `/quit` exit baseline, where the exit now requires a readable command that differs from the captured one instead of accepting any non-matching value.
+Re-running the guard on the Linux desk where the real tool lives is what would prove all four.
 
 Three of the guard's other assertions are weaker than the vendor surface its header names, and strengthening them is not attempted here.
 Its resume-line check passes whether or not `--resume-id` appears, so a release that drops that line leaves the guard green.

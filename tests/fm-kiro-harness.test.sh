@@ -372,7 +372,7 @@ run_kiro_spawn() {
   local case_dir=$1 home=$2 proj=$3 wt=$4 fakebin=$5 id=$6
   shift 6
   HOME="$home" FM_ROOT_OVERRIDE='' FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
+    FM_STATE_OVERRIDE="${FM_TEST_STATE_OVERRIDE:-$home/state}" FM_DATA_OVERRIDE="$home/data" \
     FM_PROJECTS_OVERRIDE="$home/projects" FM_CONFIG_OVERRIDE="$home/config" \
     FM_SPAWN_NO_GUARD=1 FM_FAKE_PANE_PATH="$wt" TMUX="fake,1,0" \
     FM_FAKE_LAUNCH_LOG="$case_dir/launch.log" \
@@ -481,6 +481,28 @@ test_kiro_unlisted_model_refuses_before_pane_creation() {
   assert_contains "$out" "not listed by 'kiro-cli --list-models'" "the refusal did not name the model check"
   [ -s "$CASE_DIR/launch.log" ] && fail "an unlisted model created a launch command" || true
   pass "fm-spawn: an unlisted kiro model refuses before any pane is created"
+}
+
+# Every other spawn case runs under a whitespace-free temporary root, so the
+# single-token assertions above cannot see the one path shape that breaks the
+# hooks under both a shell and an argv split.
+test_kiro_whitespace_hook_path_refuses_before_pane_creation() {
+  local id rec out rc spaced spaced_real
+  id="kiro-space-z10-$$"
+  rec=$(make_kiro_spawn_case spaced "$id")
+  read_kiro_spawn_record "$rec"
+  spaced="$CASE_DIR/spaced state"
+  mkdir -p "$spaced"
+  cp "$HOME_DIR/state/.last-watcher-beat" "$spaced/.last-watcher-beat"
+  spaced_real=$(cd "$spaced" && pwd -P)
+  out=$(FM_TEST_STATE_OVERRIDE="$spaced" \
+    run_kiro_spawn "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id")
+  rc=$?
+  [ "$rc" -ne 0 ] || fail "a kiro hook path containing whitespace must refuse the spawn"
+  assert_contains "$out" "$spaced_real/$id.kiro-home" "the refusal did not name the offending hook path"
+  [ ! -e "$spaced/$id.kiro-home" ] || fail "the refused spawn still armed the per-task home"
+  [ -s "$CASE_DIR/launch.log" ] && fail "a whitespace hook path created a launch command" || true
+  pass "fm-spawn: a kiro hook path containing whitespace refuses before any pane is created"
 }
 
 # `-f json` is free to pretty-print, so the model check must read ids from a
@@ -611,6 +633,7 @@ test_kiro_launch_carries_brief_agent_engine_and_clears_markers
 test_kiro_per_task_hook_config_is_out_of_tree
 test_kiro_effort_xhigh_passes_through
 test_kiro_unlisted_model_refuses_before_pane_creation
+test_kiro_whitespace_hook_path_refuses_before_pane_creation
 test_kiro_pretty_printed_listing_validates_the_model
 test_kiro_unparseable_listing_launches_unvalidated
 test_kiro_unreachable_listing_launches_unvalidated
