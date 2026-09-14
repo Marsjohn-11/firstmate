@@ -25,8 +25,8 @@
 #      not block on its modal. Teardown removes the whole per-task home.
 #   4. The launch carries the brief as a positional prompt on --agent-engine v2
 #      with --agent, --trust-all-tools, --model, and --effort; a requested model
-#      a reachable --list-models omits refuses loudly, while a hung or
-#      unreachable listing is cut off and never blocks. --effort passes the full
+#      a reachable --list-models omits refuses loudly, while a hung, unreachable
+#      or unreadable listing launches unvalidated instead. --effort passes the full
 #      low|medium|high|xhigh|max vocabulary (unlike agy, which omits xhigh).
 #   5. kiro is a crewmate/scout adapter only: a secondmate launch is refused.
 set -u
@@ -150,14 +150,17 @@ test_kiro_control_mechanics_are_the_verified_ones() {
 }
 
 test_kiro_wiring_path_is_the_out_of_tree_hook_config() {
-  local out
+  local out expected
   out=$(fm_control_harness_wiring_paths kiro /wt /state kid)
-  [ "$out" = "/state/kid.kiro-home/agents/firstmate.json" ] \
-    || fail "kiro wiring must be the per-task hook config, got '$out'"
+  expected="/state/kid.kiro-home/agents/firstmate.json
+/state/kid.kiro-home/hooks/user-prompt-submit
+/state/kid.kiro-home/hooks/stop"
+  [ "$out" = "$expected" ] \
+    || fail "kiro wiring must retire the per-task hook config and both hook scripts, got '$out'"
   case "$out" in
-    /wt/*) fail "kiro wiring must not point inside the worktree" ;;
+    */wt/*) fail "kiro wiring must not point inside the worktree" ;;
   esac
-  pass "fm-control-lib: kiro wiring path is the out-of-tree per-task hook config"
+  pass "fm-control-lib: kiro wiring paths are the out-of-tree hook config and its two hook scripts"
 }
 
 # --- Busy: the hook record is the only state source -------------------------
@@ -302,6 +305,11 @@ case "$*" in
   *"--list-models"*)
     if [ "${FM_FAKE_KIRO_MODELS_FAIL:-0}" = 1 ]; then exit 3; fi
     if [ "${FM_FAKE_KIRO_MODELS_HANG:-0}" = 1 ]; then cat > /dev/null; sleep 30; exit 0; fi
+    # A reachable listing whose id field kiro has renamed, so no model_id parses.
+    if [ "${FM_FAKE_KIRO_MODELS_RENAMED:-0}" = 1 ]; then
+      printf '%s' '{"models":[{"id":"auto"},{"id":"claude-opus-5"}],"default_model":"auto"}'
+      exit 0
+    fi
     # -f json is free to pretty-print, so both shapes must yield model ids.
     if [ "${FM_FAKE_KIRO_MODELS_PRETTY:-0}" = 1 ]; then
       cat <<'JSON'
@@ -372,6 +380,7 @@ run_kiro_spawn() {
     FM_FAKE_KIRO_MODELS_FAIL="${FM_FAKE_KIRO_MODELS_FAIL:-0}" \
     FM_FAKE_KIRO_MODELS_HANG="${FM_FAKE_KIRO_MODELS_HANG:-0}" \
     FM_FAKE_KIRO_MODELS_PRETTY="${FM_FAKE_KIRO_MODELS_PRETTY:-0}" \
+    FM_FAKE_KIRO_MODELS_RENAMED="${FM_FAKE_KIRO_MODELS_RENAMED:-0}" \
     FM_KIRO_MODELS_TIMEOUT="${FM_KIRO_MODELS_TIMEOUT:-1}" \
     PATH="$fakebin:$BASE_PATH" \
     "$SPAWN" "$id" "$proj" --harness kiro --mode no-mistakes --yolo off "$@" 2>&1
@@ -408,7 +417,7 @@ test_kiro_launch_carries_brief_agent_engine_and_clears_markers() {
 }
 
 test_kiro_per_task_hook_config_is_out_of_tree() {
-  local id rec out rc home_dir agent settings
+  local id rec out rc home_dir agent settings trigger cmd
   id="kiro-hooks-z2-$$"
   rec=$(make_kiro_spawn_case hooks "$id")
   read_kiro_spawn_record "$rec"
@@ -421,13 +430,23 @@ test_kiro_per_task_hook_config_is_out_of_tree() {
   [ -f "$agent" ] || fail "kiro spawn did not write the per-task agent config"
   [ -f "$settings" ] || fail "kiro spawn did not seed the per-task trust setting"
   # The emitted config is the kiro-consumed contract, so it is parsed as JSON,
-  # never grepped. Its hook COMMANDS are executed end to end in
+  # never grepped. Each hook command must be a runnable single-token path under
+  # the per-task home, which is what makes the hooks work whether kiro shells out
+  # or splits argv. What those scripts DO is executed end to end in
   # tests/fm-busy-adapter-wiring.test.sh.
   jq -e . "$agent" >/dev/null || fail "the kiro agent config is not valid JSON"
-  jq -e '.hooks.userPromptSubmit[0].command' "$agent" >/dev/null \
-    || fail "the kiro agent config lacks the busy-open hook command"
-  jq -e '.hooks.stop[0].command' "$agent" >/dev/null \
-    || fail "the kiro agent config lacks the turn-end hook command"
+  for trigger in userPromptSubmit stop; do
+    cmd=$(jq -r ".hooks[\"$trigger\"][0].command" "$agent")
+    [ -n "$cmd" ] && [ "$cmd" != null ] \
+      || fail "the kiro agent config lacks the $trigger hook command"
+    [ "$cmd" = "${cmd%%[[:space:]]*}" ] \
+      || fail "the kiro $trigger hook command must be a single token, got '$cmd'"
+    [ -x "$cmd" ] || fail "the kiro $trigger hook command is not an executable file: '$cmd'"
+    case "$cmd" in
+      "$home_dir"/*) ;;
+      *) fail "the kiro $trigger hook script must live under the per-task home, got '$cmd'" ;;
+    esac
+  done
   [ "$(jq -r '.["chat.disableTrustAllConfirmation"]' "$settings")" = true ] \
     || fail "the kiro trust modal is not suppressed"
   # The pivotal element-3 guarantee: nothing is written into the disposable
@@ -490,6 +509,27 @@ test_kiro_pretty_printed_listing_validates_the_model() {
   [ "$rc" -ne 0 ] || fail "a pretty-printed listing must still refuse an unlisted model"
   assert_contains "$out" "not listed by 'kiro-cli --list-models'" "the refusal did not name the model check"
   pass "fm-spawn: a pretty-printed kiro listing validates listed models and refuses unlisted ones"
+}
+
+# A reachable listing whose model_id fields cannot be read establishes nothing
+# about whether the model exists, so it must take the unvalidated-launch path
+# rather than refuse. Refusing would break every kiro --model spawn the day kiro
+# renames the field or an account's catalog comes back empty.
+test_kiro_unparseable_listing_launches_unvalidated() {
+  local id rec out rc
+  id="kiro-renamed-z11-$$"
+  rec=$(make_kiro_spawn_case renamed "$id")
+  read_kiro_spawn_record "$rec"
+  out=$(FM_FAKE_KIRO_MODELS_RENAMED=1 \
+    run_kiro_spawn "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" --model claude-opus-5)
+  rc=$?
+  expect_code 0 "$rc" "a listing with no readable model_id must launch unvalidated: $out"
+  assert_not_contains "$out" "not listed by" "an unreadable listing claimed the model is absent"
+  assert_contains "$out" "carries no model_id" "an unreadable listing launched without its notice"
+  [ -s "$CASE_DIR/launch.log" ] || fail "an unreadable listing produced no launch command"
+  assert_contains "$(cat "$CASE_DIR/launch.log")" "--model 'claude-opus-5'" \
+    "the unvalidated launch dropped the requested model"
+  pass "fm-spawn: a kiro listing with no readable model_id establishes nothing and launches"
 }
 
 test_kiro_unreachable_listing_launches_unvalidated() {
@@ -572,6 +612,7 @@ test_kiro_per_task_hook_config_is_out_of_tree
 test_kiro_effort_xhigh_passes_through
 test_kiro_unlisted_model_refuses_before_pane_creation
 test_kiro_pretty_printed_listing_validates_the_model
+test_kiro_unparseable_listing_launches_unvalidated
 test_kiro_unreachable_listing_launches_unvalidated
 test_kiro_hung_listing_is_cut_off_and_launches
 test_kiro_secondmate_is_refused

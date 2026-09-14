@@ -35,7 +35,7 @@ Hi
 ```
 
 `stop` does NOT fire on a manual Escape interrupt (the claude behaviour), and no StopFailure/SessionEnd equivalent was found among the accepted triggers.
-Those bare commands carry no shell metacharacter, so this run establishes nothing about whether kiro shell-interprets a command string - which the spawn's compound hook commands depend on, and which the live guard now asserts.
+Those bare commands carry no shell metacharacter, so this run establishes nothing about whether kiro shell-interprets a command string, and nothing needs it to: each hook `command` the spawn emits is a single-token absolute path to a generated script under `state/<id>.kiro-home/hooks/`, which runs the same whether kiro execs it directly or hands it to a shell.
 
 ## Out-of-tree config via KIRO_HOME; `--agent` is name-only
 
@@ -54,7 +54,7 @@ Global:    /tmp/kh/agents          # relocated
 # /tmp/kh/{agents,settings} created; auth untouched, chat turns still authenticate
 ```
 
-So the spawn writes `state/<id>.kiro-home/agents/firstmate.json` (the hook config) and reaches it with `KIRO_HOME=state/<id>.kiro-home --agent firstmate`, never writing into the worktree's own `.kiro/`.
+So the spawn writes `state/<id>.kiro-home/agents/firstmate.json` (the hook config) plus the two hook scripts it names under `state/<id>.kiro-home/hooks/`, and reaches them with `KIRO_HOME=state/<id>.kiro-home --agent firstmate`, never writing into the worktree's own `.kiro/`.
 
 ## Trust modal and its suppression setting
 
@@ -96,7 +96,7 @@ Seeding that setting into the per-task `KIRO_HOME` suppresses the modal, and a p
 
 ## Model and effort
 
-- `kiro-cli chat --agent-engine v2 --list-models -f json` returns `{"models":[{"model_id":"<id>"},...],"default_model":"auto"}`; ids are bare (`auto`, `claude-opus-5`, ...). The spawn refuses a requested id a reachable listing omits and launches unvalidated with a notice when the listing is unreachable or hung.
+- `kiro-cli chat --agent-engine v2 --list-models -f json` returns `{"models":[{"model_id":"<id>"},...],"default_model":"auto"}`; ids are bare (`auto`, `claude-opus-5`, ...). The spawn refuses a requested id a reachable listing omits, and launches unvalidated with a notice when the listing is unreachable, hung, or yields no `model_id` at all (a renamed field or an empty catalog establishes nothing about whether the model exists).
 - `--effort` accepts `low|medium|high|xhigh|max` (per `kiro-cli chat --help`), so the full shared vocabulary passes through.
 
 ## Live guard result
@@ -104,7 +104,7 @@ Seeding that setting into the per-task `KIRO_HOME` suppresses the modal, and a p
 `FM_KIRO_SIGNALS_LIVE=1 tests/fm-kiro-signals-live-e2e.test.sh` passed on 2026-09-13 against kiro-cli 2.21.4: the busy footer matched in flight, the launch prompt was answered, both V2 hooks fired per turn, a single Escape cancelled a long turn, and `/quit` stopped the process and printed its resume-id line.
 Three parts of the guard changed after that run, so its recorded pass is evidence for the vendor facts above and not for what the guard checks today.
 Its footer matcher now folds the captured screen and calls the delivery guard `fm_busy_lines_match kiro` instead of a classifier helper the adapter no longer has.
-Its hook commands now carry the shell constructs the spawn emits - a `;`-joined pair with a `2>/dev/null || true` tail whose awaited marker comes from a redirect - where the recorded run used bare `touch` commands, so whether kiro shell-interprets a hook command string is asserted but not yet observed.
+Its hook commands are now single-token absolute paths to generated scripts, the shape the spawn emits, where the recorded run used bare `touch` commands, so the trigger firing is what the markers now prove.
 It now captures `#{pane_current_command}` while the turn is in flight and fails unless that name is exactly `kiro-cli`, then treats the disappearance of that captured name as the `/quit` exit proof; previously any non-matching value counted as the process being gone, so a rename would have passed the exit check while both anchored detection arms stopped recognizing a kiro worker.
 Re-running the guard on the Linux desk where the real tool lives is what would prove all three.
 
@@ -124,7 +124,7 @@ A settled-pane union negative also has to run after a tool-call turn settles, be
 
 - The v3/KAS engine (out of scope; unsupported on AL2, hooks not yet at parity).
 - Any StopFailure/SessionEnd-equivalent hook trigger (none found). On an abnormal turn end (a stream or API error, a model-side abort) the `stop` hook never fires, so the busy record stays open and the supervisor reads the worker as provably working - deferring instead of surfacing or retiring the endpoint - until the next `userPromptSubmit` re-opens the record. The rendered footer does not rescue it: it is a delivery guard only and the classifier has no kiro pane arm.
-- Whether kiro V2 hands a hook `command` string to a shell or splits it into argv. The spawn emits a compound shell command for both hooks: `userPromptSubmit` carries a `2>/dev/null || true` tail, and `stop` is a `;`-joined pair with the same tail. If the tool splits argv instead, `fm-busy-event.sh` receives `2>/dev/null`, `||`, and `true` as positional arguments and exits on its usage path, `touch` receives the rest as filenames, and no `kiro-hook` record is ever written - so the `busy fm-spawn` seed from the arm never clears and the supervisor reads the worker as working until the busy-turn bound demotes the pane. There is no second signal to degrade to, because a harness with a semantic source gets no rendered-text classification. The live guard now carries exactly these shell constructs and each of its markers is produced by a redirect, so one re-run of it on the Linux desk where the real tool lives settles this. This is awaiting that re-run.
+- Whether kiro V2 hands a hook `command` string to a shell or splits it into argv. Nothing depends on it: both hook commands are single-token absolute paths to scripts the spawn generates under `state/<id>.kiro-home/hooks/`, so the same script runs either way, and the redirect, the `|| true` tolerance of a refused event and the turn-end `touch` all sit inside the script where the interpreter is fixed by its shebang. The portable regression executes each generated script directly rather than through `sh -c`, so a shape that only a shell could run cannot pass CI.
 - Whether a settled kiro pane can carry a stale `esc to cancel` row that the harness-less union matches. This is an inference from the token list and the delivery path, not an observation: kiro renders that token in its tool-call region, agy's `esc[[:space:]]+to[[:space:]]+cancel` alternative is in `FM_DELIVERY_BUSY_REGEX_DEFAULT`, both submit-core reads pass no harness, and a busy read is what lets `fm_composer_queued_enter_verdict` convert a proven `pending` composer to `empty` - so a stale row surviving into the folded tail would let an undelivered steer be recorded as delivered. No run has been observed doing this, and the guard's settled-pane negative runs against the harness-scoped signature rather than the union, so its recorded pass does not bear on it. Narrowing or harness-splitting the union would change agy's delivery semantics and is out of scope for this adapter.
 - Primary or secondmate operation: no supervision protocol exists, and `bin/fm-spawn.sh` refuses a secondmate launch.
 - Backends other than tmux for the rendered surface (the portable regression drives the signals apart with real processes; the live guard exercises tmux).

@@ -410,11 +410,18 @@ test_gemini_is_refused_as_a_secondmate() {
 # Kiro's hooks live in a firstmate-owned per-task agent config outside the
 # worktree, and each trigger is a FLAT array of {"command": ...} (no nested
 # hooks array like claude/gemini). No stdout contract applies.
+#
+# The command is EXECUTED DIRECTLY, never through `sh -c`: kiro may exec a hook
+# command as argv rather than hand it to a shell, and running it under a shell
+# here would make this suite green for a wiring the real tool cannot run. That is
+# what a single-token script path buys, so this is where it gets proven.
 run_kiro_hook() {  # <agent-config.json> <trigger>
   local cmd
   cmd=$(jq -r ".hooks[\"$2\"][0].command" "$1")
   [ -n "$cmd" ] && [ "$cmd" != null ] || fail "no $2 hook command in $1"
-  sh -c "$cmd"
+  [ "$cmd" = "${cmd%%[[:space:]]*}" ] || fail "the $2 hook command is not a single token: '$cmd'"
+  [ -x "$cmd" ] || fail "the $2 hook command is not an executable file: '$cmd'"
+  "$cmd"
 }
 
 test_kiro_hooks_semantic_lifecycle() {

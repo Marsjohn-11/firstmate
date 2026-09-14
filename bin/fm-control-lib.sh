@@ -181,12 +181,10 @@ fm_control_interrupt_ack_source() {  # <harness>
     # rovo's TUI prints "Agent cancelled" on Escape, but for parity with
     # claude/cursor this stays 'none': the ack is a rendered string, not a
     # recorded state source, and rovo has no busy wiring to confirm against.
-    claude|codex|opencode|pi|pi-signed|omp|grok|kimi|cursor|gemini|rovo|agy) printf 'none' ;;
-    # kiro's stop hook fires on normal completion, but like claude it does NOT
-    # fire on a manual Escape interrupt, and its `Cancelled ...` row is a rendered
-    # string rather than a recorded state source, so the interrupt ack stays
-    # 'none': fm-control preserves the adapter-owned busy record on interrupt.
-    kiro) printf 'none' ;;
+    # kiro's stop hook fires on normal completion but, like claude's, not on a
+    # manual Escape, and its `Cancelled ...` row is likewise rendered rather than
+    # recorded, so fm-control preserves the adapter-owned busy record instead.
+    claude|codex|opencode|pi|pi-signed|omp|grok|kimi|cursor|gemini|rovo|agy|kiro) printf 'none' ;;
     *) return 1 ;;
   esac
 }
@@ -268,13 +266,17 @@ fm_control_harness_wiring_paths() {  # <harness> <worktree> <state-dir> <id>
     gemini) printf '%s\n' "$state/$id.gemini-settings.json" ;;
     # kiro's busy-state and turn-end hooks live in a firstmate-owned per-task
     # agent config the launch reaches through a relocated KIRO_HOME, at
-    # <state>/<id>.kiro-home/agents/firstmate.json. Retiring that one file
-    # retires the incarnation's hooks (a hook cannot fire without its agent
-    # config); the sibling settings/sessions under the per-task home carry no
-    # gen and are cleared wholesale by teardown's rm -rf of <id>.kiro-home.
-    # Nothing is written into the worktree, whose own .kiro/ belongs to the
-    # project, and nothing in the captain's real ~/.kiro is touched.
-    kiro) printf '%s\n' "$state/$id.kiro-home/agents/firstmate.json" ;;
+    # <state>/<id>.kiro-home/agents/firstmate.json, whose two hook commands are
+    # generated scripts beside it under hooks/. All three carry the incarnation's
+    # gen, so all three are retired; the sibling settings/sessions carry no gen
+    # and are cleared wholesale by teardown's rm -rf of <id>.kiro-home. Nothing
+    # is written into the worktree, whose own .kiro/ belongs to the project, and
+    # nothing in the captain's real ~/.kiro is touched.
+    kiro)
+      printf '%s\n' "$state/$id.kiro-home/agents/firstmate.json"
+      printf '%s\n' "$state/$id.kiro-home/hooks/user-prompt-submit"
+      printf '%s\n' "$state/$id.kiro-home/hooks/stop"
+      ;;
   esac
 }
 

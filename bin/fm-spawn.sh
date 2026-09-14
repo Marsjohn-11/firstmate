@@ -1726,9 +1726,12 @@ agy_model_validate() {  # <agy-bin> <model>
 # unreachable listing establishes nothing (harness-adapters model-and-effort.md)
 # and launches unvalidated with a notice. The field pattern tolerates whitespace
 # around the JSON colon so a pretty-printed listing still yields model ids
-# instead of refusing every requested model.
+# instead of refusing every requested model. A listing that yields no model_id at
+# all - a renamed field, or an empty catalog - also establishes nothing about
+# whether the model exists, so it takes the same unvalidated-launch notice; only
+# a listing that parses and omits the requested id is unsupported evidence.
 kiro_model_validate() {  # <kiro-bin> <model>
-  local bin=$1 model=$2 listing rc=0 bound=${FM_KIRO_MODELS_TIMEOUT:-15}
+  local bin=$1 model=$2 listing ids rc=0 bound=${FM_KIRO_MODELS_TIMEOUT:-15}
   case "$bound" in ''|*[!0-9]*|0*) bound=15 ;; esac
   [ -n "$model" ] && [ "$model" != default ] || return 0
   listing=$(fm_run_timed "$bound" "$bin" chat --agent-engine v2 --list-models -f json 2>/dev/null < /dev/null) || rc=$?
@@ -1740,8 +1743,13 @@ kiro_model_validate() {  # <kiro-bin> <model>
     fi
     return 0
   fi
-  if printf '%s' "$listing" | grep -oE '"model_id"[[:space:]]*:[[:space:]]*"[^"]+"' \
-    | sed 's/.*:[[:space:]]*"//;s/"$//' | grep -qxF -- "$model"; then
+  ids=$(printf '%s' "$listing" | grep -oE '"model_id"[[:space:]]*:[[:space:]]*"[^"]+"' \
+    | sed 's/.*:[[:space:]]*"//;s/"$//')
+  if [ -z "$ids" ]; then
+    echo "notice: 'kiro-cli --list-models' listing carries no model_id; launching with --model '$model' unvalidated" >&2
+    return 0
+  fi
+  if printf '%s\n' "$ids" | grep -qxF -- "$model"; then
     return 0
   fi
   echo "error: kiro model '$model' is not listed by 'kiro-cli --list-models'; choose a listed model_id or omit --model" >&2
@@ -4039,9 +4047,14 @@ EOF
       # chat.disableTrustAllConfirmation, which suppresses --trust-all-tools's
       # otherwise blocking confirmation modal (verified: the modal is the only
       # blocker; auth stays in the XDG data dir and is unaffected by KIRO_HOME).
-      # Each hook command tolerates a refused event (|| true) so a stale-gen
-      # writer can never break kiro's own lifecycle; no stdout contract applies
-      # (kiro ran bare touch hooks cleanly).
+      #
+      # Each hook command is a single-token absolute path to a generated script
+      # under the same per-task home, so the hooks behave identically whether
+      # kiro hands the command to a shell or splits it into argv - a vendor fact
+      # nothing here has to depend on. The redirect, the refused-event tolerance
+      # (|| true) and the turn-end touch all live inside the scripts, where the
+      # interpreter is fixed by their own shebang, so a stale-gen writer still
+      # cannot break kiro's lifecycle. No stdout contract applies.
       #
       # A raw launch command carries no KIRO_HOME and no --agent, so neither hook
       # could ever fire; arming and writing the config anyway would seed a busy
@@ -4049,14 +4062,26 @@ EOF
       # reason, and for the same reason claude does not: its hooks land in the
       # worktree, which a raw claude launch still reads.
       KIRO_HOME_DIR="$STATE_REAL/$ID.kiro-home"
-      mkdir -p "$KIRO_HOME_DIR/agents" "$KIRO_HOME_DIR/settings"
+      mkdir -p "$KIRO_HOME_DIR/agents" "$KIRO_HOME_DIR/settings" "$KIRO_HOME_DIR/hooks"
       printf '{"chat.disableTrustAllConfirmation":true}\n' >"$KIRO_HOME_DIR/settings/cli.json"
       busy_cmd_prefix="$(shell_quote "$FM_ROOT/bin/fm-busy-event.sh") apply $(shell_quote "$STATE_REAL") $(shell_quote "$ID")"
       busy_suffix="--gen $(shell_quote "$BUSY_GEN") --source kiro-hook"
-      k_submit=$(json_escape "$busy_cmd_prefix busy $busy_suffix --event user-prompt-submit 2>/dev/null || true")
-      k_stop=$(json_escape "touch $(shell_quote "$TURNEND"); $busy_cmd_prefix idle $busy_suffix --event stop 2>/dev/null || true")
+      k_submit="$KIRO_HOME_DIR/hooks/user-prompt-submit"
+      k_stop="$KIRO_HOME_DIR/hooks/stop"
+      cat >"$k_submit" <<EOF
+#!/bin/sh
+$busy_cmd_prefix busy $busy_suffix --event user-prompt-submit 2>/dev/null || true
+exit 0
+EOF
+      cat >"$k_stop" <<EOF
+#!/bin/sh
+touch $(shell_quote "$TURNEND")
+$busy_cmd_prefix idle $busy_suffix --event stop 2>/dev/null || true
+exit 0
+EOF
+      chmod +x "$k_submit" "$k_stop"
       cat >"$KIRO_HOME_DIR/agents/firstmate.json" <<EOF
-{"name":"firstmate","description":"Firstmate per-task crewmate agent (busy-state and turn-end hooks)","tools":["*"],"allowedTools":["*"],"hooks":{"userPromptSubmit":[{"command":"$k_submit"}],"stop":[{"command":"$k_stop"}]}}
+{"name":"firstmate","description":"Firstmate per-task crewmate agent (busy-state and turn-end hooks)","tools":["*"],"allowedTools":["*"],"hooks":{"userPromptSubmit":[{"command":"$(json_escape "$k_submit")"}],"stop":[{"command":"$(json_escape "$k_stop")"}]}}
 EOF
     fi
     ;;

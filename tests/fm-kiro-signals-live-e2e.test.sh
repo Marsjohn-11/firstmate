@@ -73,18 +73,30 @@ export PATH
 # files, exactly the claude-shaped pair the adapter installs. Auth is NOT
 # relocated (it lives in the XDG data dir), so the operator's sign-in applies.
 #
-# Each hook command carries the SHELL constructs bin/fm-spawn.sh emits - a
-# `;`-joined pair with a `2>/dev/null || true` tail - because whether kiro hands
-# a hook command string to a shell or splits it into argv is a vendor fact only
-# this guard can pin. Every marker is produced by a REDIRECT rather than by
-# `touch`, so a split creates none of them (the `>` and its path become plain
-# arguments to `printf`) and the checks below fail. A split would leave the busy
-# record open on every turn while the unit tests, which run the command through
-# `sh -c` themselves, stay green.
+# Each hook command is a single-token absolute path to a generated script, the
+# shape bin/fm-spawn.sh emits, so what this guard proves is that the trigger
+# fires - not how kiro interprets a command string, which the script shape makes
+# irrelevant. Each script writes its markers through a REDIRECT and ends in the
+# same `|| true` tolerance the adapter's scripts carry, so a marker means the
+# whole script ran.
 KIRO_HOME_DIR="$LAB/home"
+mkdir -p "$KIRO_HOME_DIR/hooks"
 printf '{"chat.disableTrustAllConfirmation":true}\n' > "$KIRO_HOME_DIR/settings/cli.json"
-K_SUBMIT_CMD="printf seen > $LAB/SUBMIT_SEEN; printf submit > $LAB/PROMPT 2>/dev/null || true"
-K_STOP_CMD="printf seen > $LAB/TURNEND; printf stop > $LAB/STOP 2>/dev/null || true"
+K_SUBMIT_CMD="$KIRO_HOME_DIR/hooks/user-prompt-submit"
+K_STOP_CMD="$KIRO_HOME_DIR/hooks/stop"
+cat > "$K_SUBMIT_CMD" <<EOF
+#!/bin/sh
+printf seen > $LAB/SUBMIT_SEEN
+printf submit > $LAB/PROMPT 2>/dev/null || true
+exit 0
+EOF
+cat > "$K_STOP_CMD" <<EOF
+#!/bin/sh
+printf seen > $LAB/TURNEND
+printf stop > $LAB/STOP 2>/dev/null || true
+exit 0
+EOF
+chmod +x "$K_SUBMIT_CMD" "$K_STOP_CMD"
 cat > "$KIRO_HOME_DIR/agents/firstmate.json" <<EOF
 {"name":"firstmate","description":"live guard","tools":["*"],"allowedTools":["*"],"hooks":{"userPromptSubmit":[{"command":"$K_SUBMIT_CMD"}],"stop":[{"command":"$K_STOP_CMD"}]}}
 EOF
@@ -223,19 +235,18 @@ case "$(capture)" in
 esac
 
 # The claude-shaped per-turn hooks (kiro's only state signal) must both have
-# fired: userPromptSubmit on submit and stop at turn end. Each marker proves
-# BOTH that the trigger fired and that kiro shell-interpreted the whole command
-# string, because a split creates no marker at all.
+# fired: userPromptSubmit on submit and stop at turn end. Both markers of a pair
+# prove the whole hook script ran, not just that it was invoked.
 [ -f "$LAB/SUBMIT_SEEN" ] && [ -f "$LAB/PROMPT" ] \
-  || fail "the kiro userPromptSubmit hook never fired, or its command string was not shell-interpreted"
+  || fail "the kiro userPromptSubmit hook never fired, or its script did not run to the end"
 hook_stop=
 for _ in $(seq 1 60); do
   [ -f "$LAB/TURNEND" ] && [ -f "$LAB/STOP" ] && { hook_stop=1; break; }
   sleep 0.5
 done
 [ -n "$hook_stop" ] \
-  || fail "the kiro stop hook never fired at turn end, or its command string was not shell-interpreted"
-pass "the real kiro V2 userPromptSubmit and stop hooks both fire per turn, shell-interpreted"
+  || fail "the kiro stop hook never fired at turn end, or its script did not run to the end"
+pass "the real kiro V2 userPromptSubmit and stop hooks both fire per turn and run their scripts through"
 
 # Once settled to the idle composer, the busy footer must no longer match.
 idle_settled=
