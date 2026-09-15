@@ -272,17 +272,20 @@ fm_composer_strip_ghost() {
       if ((hi - lo) > grayspreadmax) return lumamax
       return (graylumamax > lumamax) ? graylumamax : lumamax
     }
-    # palette_gray_level: the channel level of a 256-colour index that is GREY in
-    # the standard xterm-256 palette - the 232-255 greyscale ramp and the 6x6x6
-    # cube diagonal - and -1 for every other index, including the theme-remapped
-    # 0-15. A grey has r == g == b, so its level IS its luminance.
-    function palette_gray_level(n,   c, r, g, b) {
+    # palette_gray_level: the channel level of a 256-colour index in the 232-255
+    # greyscale ramp, and -1 for EVERY other index. A ramp entry has
+    # r == g == b, so its level IS its luminance.
+    #
+    # The ramp alone is deliberate, not an oversight. It is the only index range
+    # whose RGB is fixed by definition rather than by a theme, so it needs no
+    # palette guessing. The 6x6x6 cube diagonal is arithmetically grey too, but
+    # it is NOT tested here: nothing has measured a harness drawing ghost text
+    # there, and widening this predicate is how the palette-dependence problem
+    # the 38;5 carve-out warns about gets in. The test asserting an index outside
+    # 232-255 is untouched exists to hold that line.
+    function palette_gray_level(n) {
       if (n >= 232 && n <= 255) return 8 + (n - 232) * 10
-      if (n < 16 || n > 231) return -1
-      c = n - 16
-      r = int(c / 36); g = int((c % 36) / 6); b = c % 6
-      if (r != g || g != b) return -1
-      return (r == 0) ? 0 : 55 + r * 40
+      return -1
     }
     function gray_is_dark(lv) {
       return (lv >= 0 && lv < ceiling_for(lv, lv, lv)) ? 1 : 0

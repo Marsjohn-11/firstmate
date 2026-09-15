@@ -841,10 +841,15 @@ test_palette_gray_ghost_is_stripped_and_chromatic_indexes_survive() {
   [ -z "${out//[[:space:]]/}" ] \
     || fail "the colon form 38:5:247 must strip the same grey, got '$out'"
 
-  # The 6x6x6 cube's r==g==b diagonal is grey too (145 is level 175).
+  # SCOPE GUARD: only the 232-255 ramp is luminance-tested. The 6x6x6 cube's
+  # r==g==b diagonal is arithmetically grey (145 computes to level 175) and is
+  # deliberately NOT tested, because no harness has been measured drawing ghost
+  # text there and widening the predicate reintroduces the palette-dependence
+  # problem the 38;5 carve-out exists for. This case is what stops that widening;
+  # do not "fix" it by extending palette_gray_level to the cube.
   out=$(printf '%s' "${ESC}[38;5;145mplaceholder text${ESC}[0m" | fm_composer_strip_ghost)
-  [ -z "${out//[[:space:]]/}" ] \
-    || fail "a cube-diagonal grey (38;5;145, level 175) must strip as ghost text, got '$out'"
+  [ "$out" = 'placeholder text' ] \
+    || fail "SCOPE GUARD: a cube-diagonal grey outside 232-255 (38;5;145) must be untouched, got '$out'"
 
   # NON-REGRESSION: a grey above the ceiling is real input, and a CHROMATIC index
   # carries no fixed grey to measure, so both survive.

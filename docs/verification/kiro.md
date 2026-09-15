@@ -123,7 +123,12 @@ That separates all four measured cases without threading a harness argument thro
 
 The same ceiling covers the 256-colour encoding of the same grey, because the encoding follows the pane's terminal rather than the harness.
 A kiro crewmate launched into a pane with no `COLORTERM` draws the placeholder as `38;5;247`, xterm grey level 158 - the identical colour - and while only truecolour was luminance-tested that pane's composer read `pending`, so every steer to that worker was skipped and the doorbell never rang.
-A palette index is tested only when it is grey in the standard xterm-256 palette, which is the 232-255 greyscale ramp and the 6x6x6 cube's `r == g == b` diagonal; a chromatic index carries no fixed grey to measure and indices 0-15 are remapped by every terminal theme, so both stay untested and are kept.
+A palette index is tested only when it falls in the 232-255 greyscale ramp, whose RGB is fixed by definition rather than by a theme.
+Every other index is kept untested: a chromatic index carries no fixed grey to measure, indices 0-15 are remapped by every terminal theme, and the 6x6x6 cube's `r == g == b` diagonal is arithmetically grey but has not been measured carrying any harness's ghost text, so testing it would reintroduce the palette-dependence problem the carve-out exists for.
+
+This gap was found because the carve-out was written down rather than left implicit.
+Recording that a 38;5 palette index is never luminance-tested is what made it checkable, and driving a real crewmate on a pane without `COLORTERM` is what turned that limit from a footnote into a defect: the fix worked on every truecolor pane and left the original failure fully live everywhere else.
+A limit stated plainly can be tested against reality; the same limit left unstated would have shipped as a passing suite over a live defect.
 `tests/fm-composer-lib.test.sh` pins the palette greys alongside the truecolor cases, and `tests/fm-kiro-harness.test.sh` classifies kiro's idle row in both encodings, each reading `empty`.
 
 Verified two ways.
