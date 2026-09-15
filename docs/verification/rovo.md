@@ -77,11 +77,16 @@ row 12  ╰───────────────────────
 ```
 
 Real typed text in the same row, captured separately, renders at `38;2;206;207;210` (luminance ~207).
-Both values sit above `bin/fm-composer-lib.sh`'s default `FM_COMPOSER_GHOST_LUMA_MAX` of 128, so `fm_composer_strip_ghost` leaves the placeholder unstripped and a fresh rovo composer can misclassify as `pending` rather than `empty`.
+Both values sit above `bin/fm-composer-lib.sh`'s default `FM_COMPOSER_GHOST_LUMA_MAX` of 128, so `fm_composer_strip_ghost` left the placeholder unstripped and a fresh rovo composer misclassified as `pending` rather than `empty`.
 Raising the shared default was considered and rejected: muse's own real, must-not-be-stripped prompt glyph measures luminance ~149.9 (`muse.md`), below rovo's ghost luminance of ~163, so no single global threshold can keep muse's glyph real while dropping rovo's ghost chip.
-This is recorded as a known gap rather than patched, because the safe fix needs a harness-scoped signal the shared composer classifier does not carry today, and a threshold change risks regressing muse's already-credentialed behavior for a rovo-scoped fix.
+
+This is now fixed by chromaticity rather than by a harness-scoped signal.
+`fm_composer_strip_ghost` applies a higher ceiling, `FM_COMPOSER_GHOST_GRAY_LUMA_MAX` (default 180), only to a NEAR-ACHROMATIC truecolor run, and keeps the 128 default for anything more saturated.
+Rovo's ghost chip is near-gray at spread 3 and strips; rovo's real typed text is also near-gray but is separated by luminance alone at ~207 and is kept; muse's glyph is strongly chromatic at spread 165 and cannot be reached by any luminance ceiling.
+The signal is intrinsic to the run rather than attached to a harness, which is why no argument had to be threaded through the shared composer entry points.
+`tests/fm-composer-lib.test.sh` pins all four measured cases, including rovo's real text and muse's glyph as explicit non-regression assertions.
 The blast radius is bounded to composer-emptiness consumers such as steering delivery, which already retries through the doorbell ladder on a non-`empty` read.
-It does not block readiness: readiness leads with the `Welcome to Rovo!` banner, so the ghost chip is never the deciding signal there. Delivery, however, requires composer-empty as one conjunct (alongside the echoed pointer or a nonzero `Context:` percentage), and on the herdr backend this conjunct may fail to settle within its poll window (the composer read non-empty even mid-turn in the live herdr run below), so `rovo_wait_for_delivery` can fail the gate and tear the pane down there. tmux delivery is separately verified working (see the tmux backend-liveness section below). This is a known limitation whose fix is tracked as a separate follow-up, not fixed in this change.
+It does not block readiness: readiness leads with the `Welcome to Rovo!` banner, so the ghost chip is never the deciding signal there. Delivery, however, requires composer-empty as one conjunct (alongside the echoed pointer or a nonzero `Context:` percentage), and on the herdr backend this conjunct may fail to settle within its poll window (the composer read non-empty even mid-turn in the live herdr run below), so `rovo_wait_for_delivery` can fail the gate and tear the pane down there. tmux delivery is separately verified working (see the tmux backend-liveness section below). That herdr poll-window behaviour is a separate limitation from the ghost chip and is NOT what the chromaticity fix above addresses: it was observed with the composer reading non-empty mid-turn, when real output is present, so it is not established that stripping the idle chip settles it. It remains a known limitation whose fix is tracked as a separate follow-up.
 
 ## Interrupt: confirmed under real tmux
 

@@ -109,22 +109,26 @@ It now reads the live pane's foreground process group while the turn is in fligh
 It deliberately does not assert `#{pane_current_command}`, which reports the launcher's name wherever kiro-cli sits behind a wrapper, and captures that field only as the `/quit` exit baseline, where the exit now requires a readable command that differs from the captured one instead of accepting any non-matching value.
 Re-running the guard on the Linux desk where the real tool lives is what would prove all four.
 
-## Open defect: steering a kiro worker
+## Steering a kiro worker: fixed
 
-A validation run that drove the real `kiro-cli` on macOS reports that the real idle kiro composer classifies as `pending` rather than a proven-empty composer, so `bin/fm-send.sh` never types a steer into a kiro worker.
-Ten of its eleven live scenarios passed and this was the one failure.
-That observation is recorded here as the validation run made it and is not independently reproduced, so treat it as a live report rather than an established fact until a second run confirms it.
+A real idle kiro composer used to classify as `pending`, and `fm_task_inbox_ring` defers on an exact `pending`, so every steer was skipped and the watcher re-rang forever because the verdict never changed.
+`fm_backend_composer_state` returning `pending` on a live idle pane was reproduced directly, and the cause is a colour threshold rather than anything kiro-specific.
 
-One candidate cause is ruled out by measurement: the absent kiro entry in the fleet-wide idle-placeholder set is not it.
-Classifying the styled row with the capabilities a styled capture carries (`styled=1`, `cursor=1`, `rows=6`) returns `empty` with the entry present and absent alike, so restoring it changes no verdict.
+kiro draws its idle placeholder in truecolor `38;2;158;158;158`, luminance 158.0, above the 128 `FM_COMPOSER_GHOST_LUMA_MAX` default, so `fm_composer_strip_ghost` left it in place and it read as real typed content.
+rovo had the same defect from the same cause at luminance 162.9, recorded in `rovo.md`, so this was never a kiro-only problem.
 
-No cause is established beyond that, and the synthetic reconstruction and the live report disagree.
-`tests/fm-kiro-harness.test.sh` builds a styled reconstruction of the idle row and measures `empty`, which is reproducible and is what the classifier does on that input.
-The live run measured `pending` on the real pane.
-Both can hold only if the real capture differs from the reconstruction in a way that changes the verdict, so the reconstruction is not confirmed faithful to what the real pane produces, and its `empty` result must not be read as evidence about the real tool.
+The fix applies a higher ceiling only to NEAR-ACHROMATIC truecolor runs, `FM_COMPOSER_GHOST_GRAY_LUMA_MAX` (default 180) within `FM_COMPOSER_GHOST_GRAY_SPREAD_MAX` (default 12) of channel spread, and keeps 128 for anything more saturated.
+That separates all four measured cases without threading a harness argument through the shared composer entry points: kiro's ghost at spread 0 and rovo's at spread 3 strip, rovo's real typed text is also near-gray but separated by luminance at 207.0 and is kept, and muse's real prompt glyph at spread 165 is strongly chromatic and unreachable by any luminance ceiling.
+`bin/fm-composer-lib.sh`'s ghost-strip comment owns the measured values and both margins.
 
-Reproducing the reported verdict needs the real tool, since no synthetic screen has produced it.
-A worker that cannot be steered does not satisfy the crewmate contract, so this is a blocker for using the adapter rather than a limitation to note.
+Verified two ways.
+`tests/fm-composer-lib.test.sh` pins the four cases and fails on pre-fix code, with rovo's real text and muse's glyph written as explicit non-regression assertions.
+Classifying a capture of a live kiro idle pane with tmux's actual descriptor (`styled=1 cursor=1 identity=1 rows=0`) and the cursor on the composer row returns `empty` after the fix, where it returned `pending` before.
+
+Two earlier claims in this record were wrong and are corrected here.
+The verdict is portably reproducible from a real capture, so it never needed the live tool.
+The descriptor tmux passes is `styled=1 cursor=1 identity=1 rows=0`, not `rows=6`; the earlier `empty` measurement used a descriptor tmux does not send and was therefore not evidence about the real pane.
+Restoring the absent kiro entry to the fleet-wide idle-placeholder set still changes no verdict, which remains measured, so that omission stays correct.
 
 Three of the guard's other assertions are weaker than the vendor surface its header names, and strengthening them is not attempted here.
 Its resume-line check passes whether or not `--resume-id` appears, so a release that drops that line leaves the guard green.

@@ -773,6 +773,48 @@ test_selected_content_is_composer_scoped_and_wrap_normalized() {
   pass "fm_composer_extract_selected_content: scopes user content and excludes furniture"
 }
 
+# Near-gray ghost text: kiro and rovo both draw their idle placeholder in a
+# NEAR-ACHROMATIC truecolor above the 128 ghost ceiling, so it survived the strip
+# and read as real typed content - a composer that never reports empty, which
+# makes every steer defer forever on the exact `pending` skip.
+#
+# Chromaticity is what separates the four measured cases, and it is intrinsic to
+# the run rather than attached to a harness:
+#   kiro ghost      38;2;158;158;158  luma 158.0  spread   0  -> must STRIP
+#   rovo ghost      38;2;162;163;165  luma 162.9  spread   3  -> must STRIP
+#   rovo real text  38;2;206;207;210  luma 207.0  spread   4  -> must SURVIVE
+#   muse real glyph 38;2;90;160;255   luma 149.9  spread 165  -> must SURVIVE
+# Margins around the near-gray ceiling: 17 below (162.9 -> 180) and 27 above
+# (180 -> 207.0). muse is strongly chromatic, so no luminance threshold can
+# reach it; that is a structural property, not a tuned margin.
+test_near_gray_ghost_is_stripped_and_real_text_survives() {
+  local out
+  out=$(printf '%s' "${ESC}[38;2;158;158;158mask a question or describe a task${ESC}[0m" | fm_composer_strip_ghost)
+  [ -z "${out//[[:space:]]/}" ] \
+    || fail "kiro's near-gray placeholder (luma 158.0, spread 0) must strip as ghost text, got '$out'"
+
+  out=$(printf '%s' "${ESC}[38;2;162;163;165mSummarize my open tasks${ESC}[0m" | fm_composer_strip_ghost)
+  [ -z "${out//[[:space:]]/}" ] \
+    || fail "rovo's near-gray placeholder (luma 162.9, spread 3) must strip as ghost text, got '$out'"
+
+  # NON-REGRESSION: rovo's REAL typed text is also near-gray, and is separated
+  # from its own placeholder by luminance alone (207.0 vs 162.9). Stripping it
+  # would delete a human's input. Do not delete this case as redundant.
+  out=$(printf '%s' "${ESC}[38;2;206;207;210mdeploy the thing${ESC}[0m" | fm_composer_strip_ghost)
+  [ "$out" = 'deploy the thing' ] \
+    || fail "NON-REGRESSION: rovo's real typed text (luma 207.0, spread 4) must survive the strip, got '$out'"
+
+  # NON-REGRESSION: muse's real prompt glyph is the one case where stripping
+  # types over a human's input. It is strongly chromatic (spread 165), so the
+  # near-gray ceiling must not reach it at any luminance. Do not delete this
+  # case as redundant.
+  out=$(printf '%s' "${ESC}[38;2;90;160;255m⟩${ESC}[0m" | fm_composer_strip_ghost)
+  [ "$out" = '⟩' ] \
+    || fail "NON-REGRESSION: muse's chromatic prompt glyph (luma 149.9, spread 165) must survive the strip, got '$out'"
+
+  pass "fm_composer_strip_ghost: near-gray ghost strips while near-gray real text and muse's chromatic glyph survive"
+}
+
 test_bare_shell_glyphs_are_unknown
 test_stripped_unbordered_content_uses_plain_content
 test_bare_shell_prompt_with_command_is_not_empty
@@ -836,3 +878,4 @@ test_queued_enter_verdict_does_not_convert_other_states() {
 test_queued_enter_verdict_busy_pending_is_empty
 test_queued_enter_verdict_idle_pending_stays_pending
 test_queued_enter_verdict_does_not_convert_other_states
+test_near_gray_ghost_is_stripped_and_real_text_survives

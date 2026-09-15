@@ -210,12 +210,34 @@ fm_composer_normalize_trim_var() {  # <varname>
 # the tightest margin over the 128 default in the fleet. Above ~150 that glyph is
 # stripped as ghost text, which is why the bare-glyph fallback below must also
 # recognise every agent glyph from the UNSTRIPPED plain row.
+#
+# A NEAR-ACHROMATIC truecolor run gets a higher ceiling instead, because that is
+# what separates ghost text from real input without needing to know the harness:
+#   FM_COMPOSER_GHOST_GRAY_LUMA_MAX (default 180) applies when
+#   FM_COMPOSER_GHOST_GRAY_SPREAD_MAX (default 12) covers the run's channel
+#   spread (max channel minus min channel); every other run keeps the 128 default.
+# The four measured cases this separates:
+#   kiro ghost      38;2;158;158;158  luminance 158.0  spread   0  -> stripped
+#   rovo ghost      38;2;162;163;165  luminance 162.9  spread   3  -> stripped
+#   rovo real text  38;2;206;207;210  luminance 207.0  spread   4  -> kept
+#   muse real glyph 38;2;90;160;255   luminance 149.9  spread 165  -> kept
+# Margins around 180 are 17 below (rovo's ghost at 162.9) and 27 above (rovo's
+# real text at 207.0). muse is strongly chromatic, so no luminance ceiling can
+# reach it - a structural property rather than a tuned margin, and the reason a
+# gray-only ceiling is safe where raising the shared default was not.
+# NON-TRUECOLOR RUNS ARE UNCHANGED: a 38;5 palette index and the base 30-37 /
+# 90-97 foregrounds carry no channels to measure a spread from, so they keep
+# their existing behaviour - 38;5 is still never luminance-tested and a base
+# colour still ends a dark run. This gate only ever narrows which TRUECOLOR runs
+# count as de-emphasised.
 # The dim/faint and dark-foreground states are tracked together as "de-emphasis";
 # codes are processed left to right within a sequence, so "ESC[0;2m" reads as dim.
 # LC_ALL=C makes awk walk bytes, so multibyte glyphs (e.g. ❯) and de-emphasised
 # runs alike pass through or drop intact without locale-dependent classes.
 fm_composer_strip_ghost() {
-  LC_ALL=C awk -v lumamax="${FM_COMPOSER_GHOST_LUMA_MAX:-128}" '
+  LC_ALL=C awk -v lumamax="${FM_COMPOSER_GHOST_LUMA_MAX:-128}" \
+    -v graylumamax="${FM_COMPOSER_GHOST_GRAY_LUMA_MAX:-180}" \
+    -v grayspreadmax="${FM_COMPOSER_GHOST_GRAY_SPREAD_MAX:-12}" '
     function sgr_code(v, b) {
       b = v
       sub(/:.*/, "", b)
@@ -232,20 +254,29 @@ fm_composer_strip_ghost() {
       if (code == "2") return p + 4
       return p + 1
     }
+    # ceiling_for: the luminance ceiling that applies to one truecolor run.
+    # A NEAR-ACHROMATIC run (max channel minus min channel within
+    # grayspreadmax) gets graylumamax; anything more saturated keeps lumamax.
+    function ceiling_for(r, g, b,   hi, lo) {
+      hi = r; if (g > hi) hi = g; if (b > hi) hi = b
+      lo = r; if (g < lo) lo = g; if (b < lo) lo = b
+      return ((hi - lo) <= grayspreadmax) ? graylumamax : lumamax
+    }
     # fg38_is_dark: 1 when the SGR 38 foreground starting at param p is a
-    # TRUECOLOR (38;2 / 38:2) whose luminance is below lumamax; 0 otherwise
-    # (a 38;5 palette colour, a bright truecolor, or a malformed run).
+    # TRUECOLOR (38;2 / 38:2) whose luminance is below the ceiling that applies
+    # to it; 0 otherwise (a 38;5 palette colour, a bright truecolor, or a
+    # malformed run).
     function fg38_is_dark(a, p, k, lumamax,   spec, nf, f, r, g, b) {
       spec = a[p]
       if (index(spec, ":") > 0) {           # colon form: whole colour in a[p]
         nf = split(spec, f, ":")
         if (f[2] != "2" || nf < 5) return 0
         r = f[nf - 2] + 0; g = f[nf - 1] + 0; b = f[nf] + 0
-        return ((299*r + 587*g + 114*b) / 1000 < lumamax) ? 1 : 0
+        return ((299*r + 587*g + 114*b) / 1000 < ceiling_for(r, g, b)) ? 1 : 0
       }
       if (p + 1 > k || a[p + 1] != "2" || p + 4 > k) return 0
       r = a[p + 2] + 0; g = a[p + 3] + 0; b = a[p + 4] + 0
-      return ((299*r + 587*g + 114*b) / 1000 < lumamax) ? 1 : 0
+      return ((299*r + 587*g + 114*b) / 1000 < ceiling_for(r, g, b)) ? 1 : 0
     }
     {
       line = $0; out = ""; dim = 0; darkfg = 0; n = length(line); i = 1
