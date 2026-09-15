@@ -114,9 +114,10 @@ Run `bin/fm-doc-audience-check.sh`; it enforces classification, README setup rou
 
 ## No-mistakes test configuration
 
-Never configure a deterministic suite-walk `commands.test` in any repository's no-mistakes config, whether it selects the full suite, changed tests, a family, or a fixed script list.
-Targeted validation belongs to the no-mistakes evidence path, while CI owns broad deterministic regression coverage.
-Firstmate PR #3644 demonstrated the cost: pinning a 75-162-script walk took 32.7 minutes per validation, while removing it restored the 3.6-minute targeted-validation posture.
+Firstmate configures `commands.test` to `bin/fm-no-mistakes-test.sh`.
+That command is the single owner of the validation Test workload: it derives the current CI lanes from real test discovery, proves every `tests/*.test.sh` file appears exactly once, runs the lanes in isolated concurrent checkouts, and emits one aggregate count.
+Do not replace it with agent-selected validation, a changed-test subset, a family, or a fixed script list.
+Targeted checks remain useful implementation evidence, but they do not replace the configured complete-suite verdict.
 
 ## Repo style rules
 

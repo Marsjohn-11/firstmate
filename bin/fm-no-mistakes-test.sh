@@ -1,0 +1,411 @@
+#!/usr/bin/env bash
+# fm-no-mistakes-test.sh - deterministic complete-suite command for the
+# no-mistakes Test step.
+#
+# Usage:
+#   fm-no-mistakes-test.sh
+#   fm-no-mistakes-test.sh --list-plan
+#   fm-no-mistakes-test.sh --check-plan <path>
+#
+# The execution path derives its lanes from bin/fm-test-run.sh --list-lanes:
+# both portable parallel lanes, every portable-serial-<k>of<n> shard, and the
+# real-herdr-gated lane.
+# It writes "<lane><TAB><tests/*.test.sh path>" rows, then validates that plan
+# against the runner's real --list --all discovery before executing anything.
+# A discovered file in zero lanes, a file in multiple lanes, an empty lane, an
+# unknown file, or a zero-test inventory fails by name.
+#
+# Every lane runs serially inside its own independent local clone and private
+# TMPDIR.
+# The lanes run concurrently, matching CI's isolation boundary while keeping
+# concurrency below the repository runner's 16-worker refusal.
+# The current worktree diff is applied to every clone so local verification
+# exercises tracked edits before they are committed.
+#
+# Each lane writes runner timing JSON.
+# The command refuses a missing artifact, a lane count that differs from its
+# validated plan, an aggregate count that differs from discovery, or any failed
+# script.
+# Expected capability gate-skips remain distinct from passes and are reported
+# in FM_TEST_GATE_SUMMARY.skipped_gate.
+# The required Herdr lane fails if Herdr is absent, and portable lanes fail if
+# the installed Pi typecheck prerequisite is absent.
+#
+# The --list-plan and --check-plan inspection modes execute no tests.
+# --check-plan validates a supplied plan against current discovery so the
+# missing-file and duplicate-file refusals can be demonstrated without
+# weakening the real plan generator.
+set -eu
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+RUNNER="$ROOT/bin/fm-test-run.sh"
+MODE=run
+CHECK_PLAN=
+
+usage() {
+  awk '
+    NR == 1 { next }
+    /^#/ { sub(/^# ?/, ""); print; next }
+    { exit }
+  ' "$0" >&2
+}
+
+die() {
+  printf 'fm-no-mistakes-test: %s\n' "$*" >&2
+  exit 2
+}
+
+now_ms() {
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -c 'import time; print(int(time.time() * 1000))'
+  else
+    echo $(($(date +%s) * 1000))
+  fi
+}
+
+load_snapshot() {
+  local cores loads
+  cores=$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo unknown)
+  if [ -r /proc/loadavg ]; then
+    loads=$(awk '{ print $1 "/" $2 "/" $3 }' /proc/loadavg)
+  else
+    loads=$(sysctl -n vm.loadavg 2>/dev/null |
+      sed 's/[{}]//g; s/^[[:space:]]*//; s/[[:space:]][[:space:]]*/\//g' || echo unknown)
+  fi
+  printf 'cores=%s load1_5_15=%s' "$cores" "$loads"
+}
+
+selected_lanes() {
+  local lane found_parallel_1=0 found_parallel_2=0 found_serial=0 found_herdr=0
+  while IFS= read -r lane; do
+    case "$lane" in
+      portable-parallel-1)
+        printf '%s\n' "$lane"
+        found_parallel_1=1
+        ;;
+      portable-parallel-2)
+        printf '%s\n' "$lane"
+        found_parallel_2=1
+        ;;
+      portable-serial-[0-9]*of[0-9]*)
+        printf '%s\n' "$lane"
+        found_serial=$((found_serial + 1))
+        ;;
+      real-herdr-gated)
+        printf '%s\n' "$lane"
+        found_herdr=1
+        ;;
+    esac
+  done < <("$RUNNER" --list-lanes)
+  [ "$found_parallel_1" -eq 1 ] || die "runner did not publish portable-parallel-1"
+  [ "$found_parallel_2" -eq 1 ] || die "runner did not publish portable-parallel-2"
+  [ "$found_serial" -gt 0 ] || die "runner published no portable serial shards"
+  [ "$found_herdr" -eq 1 ] || die "runner did not publish real-herdr-gated"
+}
+
+write_plan() { # <path>
+  local out=$1 lane script count
+  : >"$out"
+  while IFS= read -r lane; do
+    count=0
+    while IFS= read -r script; do
+      [ -n "$script" ] || continue
+      printf '%s\t%s\n' "$lane" "$script" >>"$out"
+      count=$((count + 1))
+    done < <("$RUNNER" --list --lane "$lane")
+    [ "$count" -gt 0 ] || die "lane '$lane' selected zero tests"
+  done < <(selected_lanes)
+}
+
+validate_plan() { # <path>
+  local plan=$1 tmp missing extra duplicates invalid line lane script
+  [ -f "$plan" ] || die "plan not found: $plan"
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-nm-plan.XXXXXX") || return 1
+  "$RUNNER" --list --all | LC_ALL=C sort -u >"$tmp/discovered"
+  if [ ! -s "$tmp/discovered" ]; then
+    rm -rf "$tmp"
+    die "test discovery returned zero tests"
+  fi
+
+  : >"$tmp/planned"
+  invalid=0
+  while IFS=$'\t' read -r lane script extra_field; do
+    line=${lane}${script}${extra_field:-}
+    [ -n "$line" ] || continue
+    if [ -z "$lane" ] || [ -z "$script" ] || [ -n "${extra_field:-}" ]; then
+      printf 'fm-no-mistakes-test: invalid plan row: %s\\t%s\\t%s\n' \
+        "$lane" "$script" "${extra_field:-}" >&2
+      invalid=1
+      continue
+    fi
+    printf '%s\n' "$script" >>"$tmp/planned"
+  done <"$plan"
+  if [ "$invalid" -ne 0 ]; then
+    rm -rf "$tmp"
+    return 1
+  fi
+
+  LC_ALL=C sort "$tmp/planned" >"$tmp/planned.sorted"
+  LC_ALL=C uniq -d "$tmp/planned.sorted" >"$tmp/duplicates"
+  LC_ALL=C sort -u "$tmp/planned.sorted" >"$tmp/planned.unique"
+  duplicates=$(cat "$tmp/duplicates")
+  missing=$(comm -23 "$tmp/discovered" "$tmp/planned.unique" || true)
+  extra=$(comm -13 "$tmp/discovered" "$tmp/planned.unique" || true)
+  if [ -n "$duplicates" ]; then
+    printf 'fm-no-mistakes-test: files assigned to multiple lanes:\n%s\n' "$duplicates" >&2
+  fi
+  if [ -n "$missing" ]; then
+    printf 'fm-no-mistakes-test: discovered files assigned to zero lanes:\n%s\n' "$missing" >&2
+  fi
+  if [ -n "$extra" ]; then
+    printf 'fm-no-mistakes-test: planned files absent from discovery:\n%s\n' "$extra" >&2
+  fi
+  if [ -n "$duplicates" ] || [ -n "$missing" ] || [ -n "$extra" ]; then
+    rm -rf "$tmp"
+    return 1
+  fi
+  printf 'FM_TEST_PLAN ok total=%s lanes=%s\n' \
+    "$(wc -l <"$tmp/discovered" | tr -d ' ')" \
+    "$(cut -f1 "$plan" | LC_ALL=C sort -u | wc -l | tr -d ' ')"
+  rm -rf "$tmp"
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --list-plan)
+      [ "$MODE" = run ] || die "choose only one inspection mode"
+      MODE=list
+      shift
+      ;;
+    --check-plan)
+      [ "$MODE" = run ] || die "choose only one inspection mode"
+      [ "$#" -gt 1 ] || die "--check-plan requires a path"
+      MODE=check
+      CHECK_PLAN=$2
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      die "unknown argument: $1"
+      ;;
+  esac
+done
+
+if [ "$MODE" = list ]; then
+  plan_tmp=$(mktemp "${TMPDIR:-/tmp}/fm-nm-plan.XXXXXX")
+  trap 'rm -f "$plan_tmp"' EXIT
+  write_plan "$plan_tmp"
+  validate_plan "$plan_tmp" >/dev/null
+  cat "$plan_tmp"
+  exit 0
+fi
+
+if [ "$MODE" = check ]; then
+  validate_plan "$CHECK_PLAN"
+  exit $?
+fi
+
+command -v git >/dev/null 2>&1 || die "git is required"
+command -v python3 >/dev/null 2>&1 || die "python3 is required"
+[ -x "$RUNNER" ] || die "test runner is not executable: $RUNNER"
+
+RUN_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/fm-nm-test.XXXXXX") || exit 1
+PLAN="$RUN_ROOT/plan.tsv"
+PATCH="$RUN_ROOT/worktree.patch"
+AGGREGATE="$RUN_ROOT/aggregate.json"
+RUN_STARTED_MS=$(now_ms)
+LANE_PIDS=()
+
+# shellcheck disable=SC2329 # Invoked by the EXIT trap below.
+cleanup() {
+  local pid
+  for pid in "${LANE_PIDS[@]+"${LANE_PIDS[@]}"}"; do
+    kill "$pid" 2>/dev/null || true
+  done
+  for pid in "${LANE_PIDS[@]+"${LANE_PIDS[@]}"}"; do
+    wait "$pid" 2>/dev/null || true
+  done
+  rm -rf "$RUN_ROOT"
+}
+
+# shellcheck disable=SC2329 # Invoked by the signal traps below.
+interrupted() {
+  trap - HUP INT TERM
+  cleanup
+  exit 130
+}
+
+trap cleanup EXIT
+trap interrupted HUP INT TERM
+
+write_plan "$PLAN"
+validate_plan "$PLAN"
+"$RUNNER" --check-coverage
+git -C "$ROOT" diff --binary HEAD -- . >"$PATCH"
+HEAD_SHA=$(git -C "$ROOT" rev-parse HEAD)
+
+LANES=()
+while IFS= read -r lane; do
+  [ -n "$lane" ] || continue
+  LANES+=("$lane")
+done < <(cut -f1 "$PLAN" | LC_ALL=C sort -u)
+[ "${#LANES[@]}" -gt 0 ] || die "validated plan contains zero lanes"
+
+printf 'FM_TEST_GATE_BEGIN commit=%s lanes=%s tests=%s %s\n' \
+  "$HEAD_SHA" "${#LANES[@]}" "$(wc -l <"$PLAN" | tr -d ' ')" "$(load_snapshot)"
+
+lane_index=0
+for lane in "${LANES[@]}"; do
+  lane_index=$((lane_index + 1))
+  lane_dir="$RUN_ROOT/lane-$lane_index"
+  lane_count=$(awk -F '\t' -v lane="$lane" '$1 == lane { n++ } END { print n + 0 }' "$PLAN")
+  mkdir -p "$lane_dir/tmp"
+  (
+    set +e
+    checkout="$lane_dir/repo"
+    log="$lane_dir/output.log"
+    json="$lane_dir/timing.json"
+    {
+      printf 'FM_TEST_LANE_BEGIN lane=%s planned=%s %s\n' "$lane" "$lane_count" "$(load_snapshot)"
+      git clone --quiet --no-hardlinks "$ROOT" "$checkout" &&
+        git -C "$checkout" checkout --quiet --detach "$HEAD_SHA" &&
+        if [ -s "$PATCH" ]; then git -C "$checkout" apply --binary "$PATCH"; else :; fi
+      prep_rc=$?
+      if [ "$prep_rc" -eq 0 ]; then
+        lane_args=(--lane "$lane" --per-script-timeout-secs 900 --json "$json")
+        case "$lane" in
+          real-herdr-gated)
+            lane_args+=(--fail-on-gate-skip 'herdr not found')
+            ;;
+          *)
+            lane_args+=(--fail-on-gate-skip 'Pi extension typecheck prerequisite not found')
+            ;;
+        esac
+        (
+          cd "$checkout" || exit 1
+          export TMPDIR="$lane_dir/tmp"
+          export TMP="$lane_dir/tmp"
+          unset FM_HOME FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_ROOT_OVERRIDE \
+            FM_PROJECTS_OVERRIDE FM_CONFIG_OVERRIDE FM_BACKEND 2>/dev/null || true
+          bash bin/fm-test-run.sh "${lane_args[@]}"
+        )
+        rc=$?
+      else
+        rc=$prep_rc
+      fi
+      printf 'FM_TEST_LANE_END lane=%s exit=%s %s\n' "$lane" "$rc" "$(load_snapshot)"
+    } >"$log" 2>&1
+    printf '%s\n' "$rc" >"$lane_dir/exit"
+    exit 0
+  ) &
+  LANE_PIDS+=("$!")
+done
+
+last_progress=0
+while :; do
+  completed=0
+  for lane_index in "${!LANES[@]}"; do
+    lane_dir="$RUN_ROOT/lane-$((lane_index + 1))"
+    [ -f "$lane_dir/exit" ] && completed=$((completed + 1))
+  done
+  [ "$completed" -lt "${#LANES[@]}" ] || break
+  elapsed=$((($(now_ms) - RUN_STARTED_MS) / 1000))
+  if [ "$elapsed" -ge $((last_progress + 30)) ]; then
+    printf 'FM_TEST_GATE_PROGRESS completed=%s/%s elapsed_seconds=%s %s\n' \
+      "$completed" "${#LANES[@]}" "$elapsed" "$(load_snapshot)"
+    last_progress=$elapsed
+  fi
+  sleep 2
+done
+
+for lane_index in "${!LANES[@]}"; do
+  wait "${LANE_PIDS[$lane_index]}" || true
+done
+LANE_PIDS=()
+
+lane_failure=0
+JSON_INPUTS=()
+for lane_index in "${!LANES[@]}"; do
+  lane=${LANES[$lane_index]}
+  lane_dir="$RUN_ROOT/lane-$((lane_index + 1))"
+  cat "$lane_dir/output.log"
+  rc=$(cat "$lane_dir/exit" 2>/dev/null || echo 1)
+  [ "$rc" -eq 0 ] || lane_failure=1
+  if [ ! -f "$lane_dir/timing.json" ]; then
+    printf 'fm-no-mistakes-test: lane %s produced no timing artifact\n' "$lane" >&2
+    lane_failure=1
+    continue
+  fi
+  JSON_INPUTS+=("$lane_dir/timing.json")
+done
+
+[ "${#JSON_INPUTS[@]}" -eq "${#LANES[@]}" ] || lane_failure=1
+if [ "${#JSON_INPUTS[@]}" -gt 0 ]; then
+  "$RUNNER" --aggregate-json "$AGGREGATE" "${JSON_INPUTS[@]}"
+else
+  printf 'fm-no-mistakes-test: no lane timing artifacts were produced\n' >&2
+  exit 1
+fi
+
+set +e
+python3 - "$AGGREGATE" "$PLAN" "$RUN_STARTED_MS" <<'PY'
+import collections
+import json
+import sys
+import time
+
+aggregate_path, plan_path, started_ms = sys.argv[1:]
+doc = json.load(open(aggregate_path, encoding="utf-8"))
+plan = []
+with open(plan_path, encoding="utf-8") as handle:
+    for line in handle:
+        lane, path = line.rstrip("\n").split("\t", 1)
+        plan.append((lane, path))
+
+rows = doc.get("scripts") or []
+summary = doc.get("summary") or {}
+expected_paths = sorted(path for _, path in plan)
+actual_paths = sorted(str(row.get("path") or "") for row in rows)
+problems = []
+if actual_paths != expected_paths:
+    expected = collections.Counter(expected_paths)
+    actual = collections.Counter(actual_paths)
+    for path in sorted((expected - actual).elements()):
+        problems.append(f"missing aggregate result: {path}")
+    for path in sorted((actual - expected).elements()):
+        problems.append(f"unexpected or duplicate aggregate result: {path}")
+
+total = int(summary.get("total") or 0)
+failed = int(summary.get("failed") or 0)
+skipped = int(summary.get("skipped_gate") or 0)
+lanes = int(summary.get("lanes") or 0)
+if total != len(plan):
+    problems.append(f"aggregate total {total} differs from validated plan {len(plan)}")
+if lanes != len(set(lane for lane, _ in plan)):
+    problems.append(f"aggregate lane count {lanes} differs from validated plan")
+if total <= 0:
+    problems.append("aggregate reported zero tests")
+passed = total - failed - skipped
+if passed < 0:
+    problems.append("failed plus skipped exceeds total")
+duration_ms = max(0, int(time.time() * 1000) - int(started_ms))
+print(
+    "FM_TEST_GATE_SUMMARY "
+    f"lanes={lanes} total={total} passed={passed} failed={failed} "
+    f"skipped_gate={skipped} duration_ms={duration_ms}"
+)
+for problem in problems:
+    print(f"fm-no-mistakes-test: {problem}", file=sys.stderr)
+if problems or failed:
+    raise SystemExit(1)
+PY
+summary_rc=$?
+set -e
+
+if [ "$lane_failure" -ne 0 ] || [ "$summary_rc" -ne 0 ]; then
+  exit 1
+fi
+exit 0

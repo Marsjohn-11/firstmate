@@ -103,6 +103,7 @@ Portable shards, each portable serial shard, and the Herdr lane upload runner-ge
 
 [CONTRIBUTING.md](../CONTRIBUTING.md) owns the local test policy and common entry points.
 `bin/fm-test-run.sh --help` owns exact lane names, selection flags, and bounded `--jobs` mechanics.
+`bin/fm-no-mistakes-test.sh` owns the configured complete-suite execution that runs every lane in an isolated checkout and aggregates their counts.
 
 ## Timeouts
 
