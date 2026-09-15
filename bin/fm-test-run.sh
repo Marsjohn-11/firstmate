@@ -1338,7 +1338,7 @@ families_for_changed_path() {
       # through run_script_bounded, so it cannot regress fixture Git isolation.
       printf '%s\n' pure-contract-unit
       ;;
-    bin/fm-no-mistakes-test.sh)
+    bin/fm-no-mistakes-test.sh|bin/fm-test-lane-guard.py)
       printf '%s\n' "__script__:fm-nm-test-contract.test.sh"
       ;;
     bin/backends/herdr*|bin/fm-herdr-lab.sh|tests/herdr-test-safety.sh|tests/herdr-client-pair-fixture.sh)

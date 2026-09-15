@@ -8,6 +8,7 @@ set -u
 
 NM="$ROOT/.no-mistakes.yaml"
 GATE="$ROOT/bin/fm-no-mistakes-test.sh"
+LANE_GUARD="$ROOT/bin/fm-test-lane-guard.py"
 
 test_nm_configures_complete_suite_gate() {
   command -v ruby >/dev/null 2>&1 \
@@ -63,7 +64,48 @@ test_duplicate_target_fails_by_name() {
   pass "a test assigned to multiple lanes fails loudly by name"
 }
 
+test_abandoned_lane_process_group_is_reaped() {
+  command -v python3 >/dev/null 2>&1 \
+    || fail "python3 is required to verify abandoned lane cleanup"
+  local tmp group_pid helper_pid owner_pid owner_start watcher_pid attempt
+  tmp=$(fm_test_tmproot fm-nm-test-reaper)
+  cat >"$tmp/lane.sh" <<'SH'
+#!/usr/bin/env bash
+sleep 30 &
+printf '%s\n' "$!" > "$1"
+wait
+SH
+  chmod +x "$tmp/lane.sh"
+  python3 "$LANE_GUARD" run "$tmp/lane.sh" "$tmp/helper.pid" &
+  group_pid=$!
+  printf '%s\n' "$group_pid" >"$tmp/groups"
+  attempt=0
+  while [ ! -s "$tmp/helper.pid" ] && [ "$attempt" -lt 100 ]; do
+    sleep 0.02
+    attempt=$((attempt + 1))
+  done
+  assert_present "$tmp/helper.pid" "lane fixture did not publish its helper pid"
+  helper_pid=$(cat "$tmp/helper.pid")
+
+  sleep 0.3 &
+  owner_pid=$!
+  owner_start=$(ps -p "$owner_pid" -o lstart= | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+  python3 "$LANE_GUARD" watch "$owner_pid" "$owner_start" "$tmp/groups" &
+  watcher_pid=$!
+  wait "$owner_pid"
+  wait "$watcher_pid"
+
+  if kill -0 "$helper_pid" 2>/dev/null; then
+    python3 "$LANE_GUARD" reap "$tmp/groups" >/dev/null 2>&1 || true
+    wait "$group_pid" 2>/dev/null || true
+    fail "watchdog left a lane helper alive after its owner disappeared"
+  fi
+  wait "$group_pid" 2>/dev/null || true
+  pass "an independent watchdog reaps an abandoned lane process group"
+}
+
 test_nm_configures_complete_suite_gate
 test_plan_is_complete_and_disjoint
 test_missing_target_fails_by_name
 test_duplicate_target_fails_by_name
+test_abandoned_lane_process_group_is_reaped

@@ -16,11 +16,14 @@
 # unknown file, or a zero-test inventory fails by name.
 #
 # Every lane runs serially inside its own independent local clone and private
-# TMPDIR.
+# TMPDIR and process group.
 # The lanes run concurrently, matching CI's isolation boundary while keeping
 # concurrency below the repository runner's 16-worker refusal.
 # The current worktree diff is applied to every clone so local verification
 # exercises tracked edits before they are committed.
+# An independent watchdog reaps every lane process group if this command exits
+# without reaching its shell traps, so a helper cannot survive its lane owner
+# and contaminate later measurements.
 #
 # Each lane writes runner timing JSON.
 # The command refuses a missing artifact, a lane count that differs from its
@@ -39,6 +42,7 @@ set -eu
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUNNER="$ROOT/bin/fm-test-run.sh"
+LANE_GUARD="$ROOT/bin/fm-test-lane-guard.py"
 MODE=run
 CHECK_PLAN=
 
@@ -170,6 +174,52 @@ validate_plan() { # <path>
   rm -rf "$tmp"
 }
 
+run_lane_process() { # <lane-dir> <patch> <head-sha> <lane> <planned-count>
+  local lane_dir=$1 patch=$2 head_sha=$3 lane=$4 lane_count=$5
+  local checkout log json prep_rc rc
+  local -a lane_args
+  set +e
+  checkout="$lane_dir/repo"
+  log="$lane_dir/output.log"
+  json="$lane_dir/timing.json"
+  {
+    printf 'FM_TEST_LANE_BEGIN lane=%s planned=%s %s\n' "$lane" "$lane_count" "$(load_snapshot)"
+    git clone --quiet --no-hardlinks "$ROOT" "$checkout" &&
+      git -C "$checkout" checkout --quiet --detach "$head_sha" &&
+      if [ -s "$patch" ]; then git -C "$checkout" apply --binary "$patch"; else :; fi
+    prep_rc=$?
+    if [ "$prep_rc" -eq 0 ]; then
+      lane_args=(--lane "$lane" --per-script-timeout-secs 900 --json "$json")
+      case "$lane" in
+        real-herdr-gated)
+          lane_args+=(--fail-on-gate-skip 'herdr not found')
+          ;;
+        *)
+          lane_args+=(--fail-on-gate-skip 'Pi extension typecheck prerequisite not found')
+          ;;
+      esac
+      (
+        cd "$checkout" || exit 1
+        env -u FM_HOME -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_ROOT_OVERRIDE \
+          -u FM_PROJECTS_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_BACKEND \
+          TMPDIR="$lane_dir/tmp" TMP="$lane_dir/tmp" \
+          bash bin/fm-test-run.sh "${lane_args[@]}"
+      )
+      rc=$?
+    else
+      rc=$prep_rc
+    fi
+    printf 'FM_TEST_LANE_END lane=%s exit=%s %s\n' "$lane" "$rc" "$(load_snapshot)"
+  } >"$log" 2>&1
+  printf '%s\n' "$rc" >"$lane_dir/exit"
+  exit 0
+}
+
+if [ "${1:-}" = "--run-lane" ]; then
+  [ "$#" -eq 6 ] || die "--run-lane requires five internal arguments"
+  run_lane_process "$2" "$3" "$4" "$5" "$6"
+fi
+
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --list-plan)
@@ -211,20 +261,28 @@ fi
 command -v git >/dev/null 2>&1 || die "git is required"
 command -v python3 >/dev/null 2>&1 || die "python3 is required"
 [ -x "$RUNNER" ] || die "test runner is not executable: $RUNNER"
+[ -x "$LANE_GUARD" ] || die "lane guard is not executable: $LANE_GUARD"
 
 RUN_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/fm-nm-test.XXXXXX") || exit 1
 PLAN="$RUN_ROOT/plan.tsv"
 PATCH="$RUN_ROOT/worktree.patch"
 AGGREGATE="$RUN_ROOT/aggregate.json"
+GROUPS_FILE="$RUN_ROOT/lane-groups"
 RUN_STARTED_MS=$(now_ms)
 LANE_PIDS=()
+WATCHDOG_PID=
+CLEANED=0
 
 # shellcheck disable=SC2329 # Invoked by the EXIT trap below.
 cleanup() {
-  local pid
-  for pid in "${LANE_PIDS[@]+"${LANE_PIDS[@]}"}"; do
-    kill "$pid" 2>/dev/null || true
-  done
+  [ "$CLEANED" -eq 0 ] || return 0
+  CLEANED=1
+  if [ -n "$WATCHDOG_PID" ]; then
+    kill "$WATCHDOG_PID" 2>/dev/null || true
+    wait "$WATCHDOG_PID" 2>/dev/null || true
+    WATCHDOG_PID=
+  fi
+  python3 "$LANE_GUARD" reap "$GROUPS_FILE" 2>/dev/null || true
   for pid in "${LANE_PIDS[@]+"${LANE_PIDS[@]}"}"; do
     wait "$pid" 2>/dev/null || true
   done
@@ -246,6 +304,11 @@ validate_plan "$PLAN"
 "$RUNNER" --check-coverage
 git -C "$ROOT" diff --binary HEAD -- . >"$PATCH"
 HEAD_SHA=$(git -C "$ROOT" rev-parse HEAD)
+: >"$GROUPS_FILE"
+PARENT_START=$(ps -p "$$" -o lstart= | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+[ -n "$PARENT_START" ] || die "could not read parent process identity"
+python3 "$LANE_GUARD" watch "$$" "$PARENT_START" "$GROUPS_FILE" &
+WATCHDOG_PID=$!
 
 LANES=()
 while IFS= read -r lane; do
@@ -263,45 +326,11 @@ for lane in "${LANES[@]}"; do
   lane_dir="$RUN_ROOT/lane-$lane_index"
   lane_count=$(awk -F '\t' -v lane="$lane" '$1 == lane { n++ } END { print n + 0 }' "$PLAN")
   mkdir -p "$lane_dir/tmp"
-  (
-    set +e
-    checkout="$lane_dir/repo"
-    log="$lane_dir/output.log"
-    json="$lane_dir/timing.json"
-    {
-      printf 'FM_TEST_LANE_BEGIN lane=%s planned=%s %s\n' "$lane" "$lane_count" "$(load_snapshot)"
-      git clone --quiet --no-hardlinks "$ROOT" "$checkout" &&
-        git -C "$checkout" checkout --quiet --detach "$HEAD_SHA" &&
-        if [ -s "$PATCH" ]; then git -C "$checkout" apply --binary "$PATCH"; else :; fi
-      prep_rc=$?
-      if [ "$prep_rc" -eq 0 ]; then
-        lane_args=(--lane "$lane" --per-script-timeout-secs 900 --json "$json")
-        case "$lane" in
-          real-herdr-gated)
-            lane_args+=(--fail-on-gate-skip 'herdr not found')
-            ;;
-          *)
-            lane_args+=(--fail-on-gate-skip 'Pi extension typecheck prerequisite not found')
-            ;;
-        esac
-        (
-          cd "$checkout" || exit 1
-          export TMPDIR="$lane_dir/tmp"
-          export TMP="$lane_dir/tmp"
-          unset FM_HOME FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_ROOT_OVERRIDE \
-            FM_PROJECTS_OVERRIDE FM_CONFIG_OVERRIDE FM_BACKEND 2>/dev/null || true
-          bash bin/fm-test-run.sh "${lane_args[@]}"
-        )
-        rc=$?
-      else
-        rc=$prep_rc
-      fi
-      printf 'FM_TEST_LANE_END lane=%s exit=%s %s\n' "$lane" "$rc" "$(load_snapshot)"
-    } >"$log" 2>&1
-    printf '%s\n' "$rc" >"$lane_dir/exit"
-    exit 0
-  ) &
-  LANE_PIDS+=("$!")
+  python3 "$LANE_GUARD" run "$0" --run-lane \
+    "$lane_dir" "$PATCH" "$HEAD_SHA" "$lane" "$lane_count" &
+  lane_pid=$!
+  LANE_PIDS+=("$lane_pid")
+  printf '%s\n' "$lane_pid" >>"$GROUPS_FILE"
 done
 
 last_progress=0
