@@ -79,7 +79,7 @@ Seeding that setting into the per-task `KIRO_HOME` suppresses the modal, and a p
 ## Rendered surface (V2 TUI)
 
 - Composer glyph: `›` (U+203A), the same glyph codex draws.
-- Idle placeholder: `ask a question or describe a task` (followed by a de-emphasised `↵`), rendered dim, so a styled capture strips it back to the bare glyph and an unstyled one degrades to `unknown` through the bare-row rule.
+- Idle placeholder: `ask a question or describe a task` (followed by a `↵` hint), drawn in truecolor near-gray `38;2;158;158;158` at luminance 158. That clears the shared 128 ghost ceiling, so the near-achromatic ceiling in `fm_composer_strip_ghost` is what strips it back to the bare glyph on a styled capture; an unstyled one degrades to `unknown` through the bare-row rule.
 - Busy footer: `› Kiro is working · Type to steer · Ctrl+S to queue`. The delivery guard matches the harness-named `Kiro is working` literal, not the bare `esc to cancel` token kiro also renders in its tool region and shares with agy. It is never a recorded worker state, and its one reachable consumer is the harness-less union in `FM_DELIVERY_BUSY_REGEX_DEFAULT` that the tmux submit core reads to acknowledge a submit.
 `FM_DELIVERY_KIRO_BUSY_REGEX_DEFAULT` is registered per the fleet convention that every verified harness declares its own signature, and has no caller today: away-mode injection reads the primary harness and the pending-reply observation reads a secondmate's harness, neither of which kiro can ever be.
 

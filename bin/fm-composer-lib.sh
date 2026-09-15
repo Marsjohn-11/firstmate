@@ -266,7 +266,7 @@ fm_composer_strip_ghost() {
     # TRUECOLOR (38;2 / 38:2) whose luminance is below the ceiling that applies
     # to it; 0 otherwise (a 38;5 palette colour, a bright truecolor, or a
     # malformed run).
-    function fg38_is_dark(a, p, k, lumamax,   spec, nf, f, r, g, b) {
+    function fg38_is_dark(a, p, k,   spec, nf, f, r, g, b) {
       spec = a[p]
       if (index(spec, ":") > 0) {           # colon form: whole colour in a[p]
         nf = split(spec, f, ":")
@@ -297,7 +297,7 @@ fm_composer_strip_ghost() {
               for (p = 1; p <= k; p++) {
                 v = a[p]; code = sgr_code(v)
                 if (code == "38") {
-                  darkfg = fg38_is_dark(a, p, k, lumamax)
+                  darkfg = fg38_is_dark(a, p, k)
                   p = skip_color_payload(a, p, k)
                 } else if (code == "48" || code == "58") {
                   p = skip_color_payload(a, p, k)

@@ -222,17 +222,20 @@ test_kiro_composer_glyph_and_placeholder() {
   [ "$state" = empty ] || fail "a bare kiro › composer must read empty, got '$state'"
 
   # kiro's REAL idle composer row: a bright `›` glyph, then the placeholder and
-  # a de-emphasised `↵` submit hint, both dim (kiro-cli 2.21.4).
-  row="› ${esc}[2mask a question or describe a task ↵${esc}[0m"
+  # a `↵` submit hint, both drawn in truecolor near-gray 38;2;158;158;158
+  # (kiro-cli 2.21.5). Luminance 158 clears the shared 128 ghost ceiling, so
+  # only the near-achromatic ceiling strips this row - keep the colour as the
+  # tool renders it so removing that ceiling turns this case red.
+  row="› ${esc}[38;2;158;158;158mask a question or describe a task ↵${esc}[0m"
   screen=$'transcript line\n'"$row"
   plain=$'transcript line\n›  ask a question or describe a task ↵'
 
-  # NON-VACUOUSNESS: on a styled capture the dim placeholder is ghost text, so
-  # the row reduces to the bare glyph, which is what decides the verdict.
+  # NON-VACUOUSNESS: on a styled capture the near-gray placeholder is ghost
+  # text, so the row reduces to the bare glyph, which decides the verdict.
   stripped=$(printf '%s' "$row" | fm_composer_strip_ghost)
   fm_composer_normalize_trim_var stripped
   [ "$stripped" = '›' ] \
-    || fail "kiro's dim placeholder must strip to the bare glyph, got '$stripped'"
+    || fail "kiro's near-gray placeholder must strip to the bare glyph, got '$stripped'"
   state=$(fm_composer_classify_screen "$caps" "$screen" 1)
   [ "$state" = empty ] || fail "kiro's styled idle row must read empty, got '$state'"
 

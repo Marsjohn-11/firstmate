@@ -498,9 +498,12 @@ test_matrix_opencode_leftbar_signals() {
   assert_screen "opencode idle on zellij" empty "$CAPS_STYLED_NOID" "$dim_screen"
   assert_screen "opencode idle on cmux/orca" empty "$CAPS_PLAIN" "$screen"
   # This sanitized live OpenCode 1.18.30 capture preserves its U+2026 hint and
-  # RGB 128 styling. RGB 128 is deliberately outside the ghost threshold, so
-  # the placeholder spelling is the independent empty signal. The completed-
-  # turn row above the active composer also pins the incident's idle layout.
+  # RGB 128 styling. RGB 128 is spread 0 at luminance 128, so the near-
+  # achromatic ghost ceiling strips it and the row reads empty through the
+  # strip. What this case still proves is that a real capture's U+2026 hint and
+  # its truecolor styling survive normalization intact, and the completed-turn
+  # row above the active composer pins the incident's idle layout. The signal-
+  # separation case is the FM_COMPOSER_IDLE_RE override below.
   captured_idle=$'  ▣ Build · Big Pickle · 3.4s\n\n  ┃\n  ┃  '"${ESC}[38;2;128;128;128mAsk anything… \"Fix a TODO in the codebase\"${ESC}[38;2;255;255;255m"$'\n  ┃\n  ┃  Build · Big Pickle OpenCode Zen\n  ╹▀▀▀▀▀▀▀▀'
   assert_screen "opencode 1.18.30 completed-turn idle hint on tmux" empty "$CAPS_TMUX" "$captured_idle" 3
   captured_pending=$'  ▣ Build · Big Pickle · 3.4s\n\n  ┃\n  ┃  '"${ESC}[38;2;255;255;255mReply with OK.${ESC}[38;2;255;255;255m"$'\n  ┃\n  ┃  Build · Big Pickle OpenCode Zen\n  ╹▀▀▀▀▀▀▀▀'
