@@ -195,7 +195,8 @@ The suite does not test the accepted merge-to-cleanup re-hold window or asynchro
 
 Two of its cases pin how a task body is read back rather than any decision behavior, because both paths that read one are otherwise silent when they get it wrong.
 Holding a task that carries a body, and cleanup's retention of a captain-held row, both work where the installed JSON::PP defaults `allow_nonref` off and therefore rejects the JSON-encoded bare string a shown scalar field arrives as; the case forces that older default back off and probes that the simulation really does reject a bare scalar, so it cannot pass vacuously on a lenient library.
-No host carrying such a library is in the fleet, so that default is simulated rather than observed.
+A fleet host does carry such a library, and all three defects reproduce on it natively with no shim, so that behavior is observed and not only simulated.
+The case still forces the older default rather than depending on the installed one, which is what makes it deterministic on any host.
 A retained body's non-ASCII characters also survive cleanup's rewrite as their exact UTF-8 bytes, and the case asserts bytes rather than decoded strings: a codepoint at or below U+00FF is the one a stream with no raw layer emits as a single latin-1 byte, and comparing decoded strings cannot see that.
 It uses one row per character class, because any character above U+00FF makes the whole string print as UTF-8 and would mask the latin-1 case in a mixed body.
 
