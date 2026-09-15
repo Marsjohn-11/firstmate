@@ -21,6 +21,9 @@
 # concurrency below the repository runner's 16-worker refusal.
 # The current worktree diff is applied to every clone so local verification
 # exercises tracked edits before they are committed.
+# The assigned worker's FM_TASK_ID marker is removed only inside those
+# wrapper-owned clones; their independent Git directories otherwise look like
+# primary checkouts to the runner's task-placement refusal.
 # An independent watchdog reaps every lane process group if this command exits
 # without reaching its shell traps, so a helper cannot survive its lane owner
 # and contaminate later measurements.
@@ -200,7 +203,7 @@ run_lane_process() { # <lane-dir> <patch> <head-sha> <lane> <planned-count>
       esac
       (
         cd "$checkout" || exit 1
-        env -u FM_HOME -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_ROOT_OVERRIDE \
+        env -u FM_TASK_ID -u FM_HOME -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_ROOT_OVERRIDE \
           -u FM_PROJECTS_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_BACKEND \
           TMPDIR="$lane_dir/tmp" TMP="$lane_dir/tmp" \
           bash bin/fm-test-run.sh "${lane_args[@]}"
