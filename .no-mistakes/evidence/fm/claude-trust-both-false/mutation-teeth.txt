@@ -1,0 +1,27 @@
+Mutation evidence: does the new test actually catch what it claims?
+Sandbox copy of bin/ + tests/, test file trimmed to the named test only.
+
+== baseline (unmutated bin/fm-claude-trust.sh) ==
+ok - fm-claude-trust.sh: an uncorroborated approved=false survives registration as exactly false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=4483
+
+== mutant 1: declinedExternalImports drops the warningShown corroboration
+   (the original defect: a bare approved=false refuses every claude spawn) ==
+not ok - approved=false with the warning never shown is undecided, not a decline: error: project entry for <TMP>/import-false-uncorroborated/project in <TMP>/import-false-uncorroborated/claude-config/.claude.json already declined external CLAUDE.md imports; refusing to override that consent
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=2548
+
+== mutant 2: the project-root entry is never written (worktree entry only) ==
+  new fixture (project entry seeded hasTrustDialogAccepted:false):
+not ok - the project-root entry was not trusted on the undecided path
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=3202
+  pre-review fixture (project entry seeded hasTrustDialogAccepted:true) against the SAME mutant:
+ok - fm-claude-trust.sh: an uncorroborated approved=false survives registration as exactly false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=3975
+
+== mutant 3: a tidy-up deletes the two import flags on the undecided path ==
+  pre-existing sibling test (never-asked defaults, !== true helper):
+ok - fm-claude-trust.sh: a never-asked default external-imports pair is not treated as a decline
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=2685
+  new test (exact-false assertions):
+not ok - the undecided approved flag was rewritten instead of left untouched (expected false, got undefined)
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=3013

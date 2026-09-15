@@ -1,0 +1,26 @@
+=== scenario A: undecided approved=false (warningShown=false) — live CLI, product paths ===
+--- store BEFORE (project entry: trust=false, approved=false, warningShown=false, allowedTools=[Read]) ---
+{"hasCompletedOnboarding":true,"projects":{"<SANDBOX>/project":{"hasTrustDialogAccepted":false,"hasClaudeMdExternalIncludesApproved":false,"hasClaudeMdExternalIncludesWarningShown":false,"allowedTools":["Read"]}}}
+
+--- invoke: CLAUDE_CONFIG_DIR=<cfg> HOME=<cfg> bin/fm-claude-trust.sh <worktree> <project> ---
+trusted: <SANDBOX>/wt
+trusted (project root): <SANDBOX>/project
+exit=0
+
+--- store AFTER ---
+{
+  "hasCompletedOnboarding": true,
+  "projects": {
+    "<SANDBOX>/project": {
+      "hasTrustDialogAccepted": true,
+      "hasClaudeMdExternalIncludesApproved": false,
+      "hasClaudeMdExternalIncludesWarningShown": false,
+      "allowedTools": [
+        "Read"
+      ]
+    },
+    "<SANDBOX>/wt": {
+      "hasTrustDialogAccepted": true
+    }
+  }
+}

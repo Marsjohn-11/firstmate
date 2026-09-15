@@ -1,0 +1,12 @@
+=== scenario B (adversarial boundary): recorded decline, approved=false WITH warningShown=true ===
+--- store BEFORE ---
+{"hasCompletedOnboarding":true,"projects":{"<SANDBOX>/project":{"hasTrustDialogAccepted":true,"hasClaudeMdExternalIncludesApproved":false,"hasClaudeMdExternalIncludesWarningShown":true,"allowedTools":["Read"]}}}
+
+--- invoke same command ---
+error: project entry for <SANDBOX>/project in <SANDBOX>/cfg/.claude.json already declined external CLAUDE.md imports; refusing to override that consent
+error: refusing to pre-register Claude trust: could not record trust for '<SANDBOX>/wt' and project '<SANDBOX>/project' in '<SANDBOX>/cfg/.claude.json'
+exit=1
+
+--- store AFTER ---
+{"hasCompletedOnboarding":true,"projects":{"<SANDBOX>/project":{"hasTrustDialogAccepted":true,"hasClaudeMdExternalIncludesApproved":false,"hasClaudeMdExternalIncludesWarningShown":true,"allowedTools":["Read"]}}}
+store byte-for-byte unchanged: yes
