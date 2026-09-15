@@ -71,8 +71,15 @@ test_abandoned_lane_process_group_is_reaped() {
   tmp=$(fm_test_tmproot fm-nm-test-reaper)
   cat >"$tmp/lane.sh" <<'SH'
 #!/usr/bin/env bash
-sleep 30 &
-printf '%s\n' "$!" > "$1"
+python3 - "$1" <<'PY' &
+import subprocess
+import sys
+
+helper = subprocess.Popen(["sleep", "30"], start_new_session=True)
+with open(sys.argv[1], "w", encoding="utf-8") as handle:
+    handle.write(f"{helper.pid}\n")
+helper.wait()
+PY
 wait
 SH
   chmod +x "$tmp/lane.sh"
@@ -101,7 +108,7 @@ SH
     fail "watchdog left a lane helper alive after its owner disappeared"
   fi
   wait "$group_pid" 2>/dev/null || true
-  pass "an independent watchdog reaps an abandoned lane process group"
+  pass "an independent watchdog reaps nested groups under an abandoned lane"
 }
 
 test_nm_configures_complete_suite_gate

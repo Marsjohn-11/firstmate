@@ -12,8 +12,9 @@ The caller appends that PID to groups-file.
 
 `watch` remains independent of the parent it observes.
 If the parent's PID disappears or its process-start identity changes, the
-watcher terminates every recorded process group, waits briefly, and then kills
-any survivors.
+watcher terminates every recorded process group and every descendant process
+group, waits briefly, and then kills any survivors. Descendant discovery is
+required because utilities such as GNU timeout create a nested process group.
 This covers parent SIGKILL and other exits that cannot run shell traps.
 
 `reap` performs the same bounded group cleanup for the normal shell EXIT trap.
@@ -80,6 +81,43 @@ def group_exists(group: int) -> bool:
     return True
 
 
+def descendant_groups(groups: set[int]) -> set[int]:
+    result = subprocess.run(
+        ["ps", "-axo", "pid=,ppid=,pgid="],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        text=True,
+    )
+    if result.returncode != 0:
+        return set()
+    processes: dict[int, tuple[int, int]] = {}
+    for line in result.stdout.splitlines():
+        fields = line.split()
+        if len(fields) != 3 or not all(field.isdigit() for field in fields):
+            continue
+        pid, parent, group = (int(field) for field in fields)
+        processes[pid] = (parent, group)
+
+    descendants = {
+        pid for pid, (_, group) in processes.items() if group in groups
+    }
+    changed = True
+    while changed:
+        changed = False
+        for pid, (parent, _) in processes.items():
+            if pid not in descendants and parent in descendants:
+                descendants.add(pid)
+                changed = True
+
+    own_group = os.getpgrp()
+    return {
+        processes[pid][1]
+        for pid in descendants
+        if processes[pid][1] > 1 and processes[pid][1] != own_group
+    }
+
+
 def signal_groups(groups: list[int], sig: signal.Signals) -> None:
     for group in groups:
         try:
@@ -89,14 +127,18 @@ def signal_groups(groups: list[int], sig: signal.Signals) -> None:
 
 
 def reap(path: Path) -> None:
-    groups = read_groups(path)
-    signal_groups(groups, signal.SIGTERM)
+    groups = set(read_groups(path))
+    groups.update(descendant_groups(groups))
+    signal_groups(sorted(groups), signal.SIGTERM)
     deadline = time.monotonic() + 5.0
     while time.monotonic() < deadline:
         if not any(group_exists(group) for group in groups):
             return
+        groups.update(descendant_groups(groups))
         time.sleep(0.1)
-    signal_groups([group for group in groups if group_exists(group)], signal.SIGKILL)
+    signal_groups(
+        sorted(group for group in groups if group_exists(group)), signal.SIGKILL
+    )
 
 
 def run(argv: list[str]) -> None:
