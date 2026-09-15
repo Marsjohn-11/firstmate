@@ -216,6 +216,9 @@ fm_composer_normalize_trim_var() {  # <varname>
 #   FM_COMPOSER_GHOST_GRAY_LUMA_MAX (default 180) applies when
 #   FM_COMPOSER_GHOST_GRAY_SPREAD_MAX (default 12) covers the run's channel
 #   spread (max channel minus min channel); every other run keeps the 128 default.
+# The gray ceiling only ever RAISES the applicable ceiling. A near-gray run takes
+# the higher of the two, so an operator who raises FM_COMPOSER_GHOST_LUMA_MAX
+# above 180 still gets that wider strip on gray text as the knob documents.
 # The four measured cases this separates:
 #   kiro ghost      38;2;158;158;158  luminance 158.0  spread   0  -> stripped
 #   rovo ghost      38;2;162;163;165  luminance 162.9  spread   3  -> stripped
@@ -256,11 +259,14 @@ fm_composer_strip_ghost() {
     }
     # ceiling_for: the luminance ceiling that applies to one truecolor run.
     # A NEAR-ACHROMATIC run (max channel minus min channel within
-    # grayspreadmax) gets graylumamax; anything more saturated keeps lumamax.
+    # grayspreadmax) takes the HIGHER of graylumamax and lumamax, so the gray
+    # ceiling only ever raises the applicable ceiling and never reduces an
+    # operator-set one. Anything more saturated keeps lumamax.
     function ceiling_for(r, g, b,   hi, lo) {
       hi = r; if (g > hi) hi = g; if (b > hi) hi = b
       lo = r; if (g < lo) lo = g; if (b < lo) lo = b
-      return ((hi - lo) <= grayspreadmax) ? graylumamax : lumamax
+      if ((hi - lo) > grayspreadmax) return lumamax
+      return (graylumamax > lumamax) ? graylumamax : lumamax
     }
     # fg38_is_dark: 1 when the SGR 38 foreground starting at param p is a
     # TRUECOLOR (38;2 / 38:2) whose luminance is below the ceiling that applies

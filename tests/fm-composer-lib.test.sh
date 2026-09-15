@@ -815,6 +815,14 @@ test_near_gray_ghost_is_stripped_and_real_text_survives() {
   [ "$out" = '⟩' ] \
     || fail "NON-REGRESSION: muse's chromatic prompt glyph (luma 149.9, spread 165) must survive the strip, got '$out'"
 
+  # The gray ceiling raises the applicable ceiling and never lowers an
+  # operator-set one: luma 190 is above the 180 gray default but below a raised
+  # FM_COMPOSER_GHOST_LUMA_MAX, so the knob keeps applying to gray text.
+  out=$(printf '%s' "${ESC}[38;2;190;190;190mplaceholder text${ESC}[0m" \
+    | FM_COMPOSER_GHOST_LUMA_MAX=200 fm_composer_strip_ghost)
+  [ -z "${out//[[:space:]]/}" ] \
+    || fail "a near-gray run at luma 190 must strip under FM_COMPOSER_GHOST_LUMA_MAX=200, got '$out'"
+
   pass "fm_composer_strip_ghost: near-gray ghost strips while near-gray real text and muse's chromatic glyph survive"
 }
 

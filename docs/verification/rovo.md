@@ -66,7 +66,7 @@ Enter to queue, Ctrl+Enter to steer
 This is a rendered-tail fallback exactly like Grok's, not a semantic source: rovo's `eventHooks` (`~/.rovo/config.yml`) fire at tool granularity (`on_tool_start`/`on_tool_end`) only, never at turn-end, so no writer is armed and none is seeded.
 Grok was previously the only rendered-text arm the redesigned busy contract allowed; this task extends that same documented exception to rovo, scoped to `harness=rovo` exactly like Grok is scoped to `harness=grok`, and neither can classify the other (`tests/fm-rovo-harness.test.sh`'s isolation case).
 
-## Composer ghost text: measured, deliberately left unfixed
+## Composer ghost text: measured, now fixed by chromaticity
 
 A live idle-composer capture over a raw PTY located the inline placeholder chip inside the actual bordered content row, not merely in a suggestion list below it:
 

@@ -305,7 +305,7 @@
 # plus a gitignored .fm-grok-turnend worktree pointer and a state token.
 # muse installs no hook at all - its plugin engine is off in the default build - so
 # it writes state/<id>.muse-session to bind the pane to muse's own session event
-# log; muse, gemini, and agy are crewmate/scout only and are refused for --secondmate.
+# log; muse, gemini, agy, and kiro are crewmate/scout only and are refused for --secondmate.
 # rovo installs no hook either - its eventHooks fire at tool granularity only,
 # never turn-end - so it carries no busy-source wiring at all and no turn-end
 # hook. A positional brief is dead-on-arrival (rovo loads, never works, and drops
