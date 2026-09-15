@@ -585,6 +585,99 @@ SH
   pass "stale steal mutexes stay bounded at depth $deepest under $i stacked levels"
 }
 
+# A pre-generation legacy autoarm claim whose live owner is proven abandoned:
+# the shape fm_autoarm_release_abandoned retires with TERM before removing the
+# lock.
+autoarm_legacy_claim() {  # <state> <owner-pid> <owner-identity>
+  local state=$1 pid=$2 identity=$3 lock
+  lock="$state/.claude-autoarm.lock"
+  mkdir -p "$lock"
+  printf '%s\n' "$pid" > "$lock/pid"
+  printf '%s\n' "$identity" > "$lock/pid-identity"
+  printf 'autoarm\n' > "$lock/role"
+  printf 'epoch=1 owner_pid=%s outcome=armed\n' "$pid" \
+    > "$state/.claude-autoarm-epoch"
+}
+
+release_abandoned_under() {  # <state> <lib> [stub-body]
+  FM_STATE_OVERRIDE="$1" bash -c '
+    . "$2"
+    eval "${3:-}"
+    fm_autoarm_release_abandoned "$1"
+  ' _ "$1" "$2" "${3:-}"
+}
+
+# Reclaiming a STALE steal mutex is unserialized, so two reclaimers can each end
+# up believing they hold it - the loser's link no longer points at the owner
+# directory it created. fm_autoarm_release_abandoned acts destructively under
+# that belief, signalling the recorded legacy owner and deleting its lock, so it
+# must re-prove the mutex is still its own before it does either.
+test_autoarm_reclaim_refuses_when_the_steal_mutex_was_taken() {
+  local dir state lock victim identity rc i clobber
+  clobber='
+    fm_lock_steal_try_acquire() {
+      fm_lock_try_create "$1" || return 1
+      # A competitor reclaiming the same stale mutex removed ours, discarded our
+      # owner directory, and published its own.
+      rm -f "$1"
+      fm_lock_discard_owner "${FM_LOCK_OWNER_DIR:-}"
+      mkdir -p "$1.rival"
+      printf "%s\n" "$$" > "$1.rival/pid"
+      ln -s "$1.rival" "$1"
+    }
+  '
+
+  # Control first: the identical fixture with an uncontested mutex must reclaim,
+  # or the refusal below would prove nothing about the re-proof.
+  dir=$(make_case autoarm-steal-control)
+  state="$dir/state"
+  lock="$state/.claude-autoarm.lock"
+  sleep 30 &
+  victim=$!
+  identity=$(bash -c '. "$1"; fm_pid_identity "$2"' _ "$LIB" "$victim") \
+    || fail "could not record a pid identity for the legacy owner fixture"
+  [ -n "$identity" ] || fail "empty pid identity for the legacy owner fixture"
+  autoarm_legacy_claim "$state" "$victim" "$identity"
+  rc=0
+  release_abandoned_under "$state" "$LIB" || rc=$?
+  [ "$rc" -eq 0 ] || fail "an uncontested reclaim of a proven-abandoned legacy claim failed (rc=$rc)"
+  assert_absent "$lock" "the reclaimed legacy claim outlived its reclaim"
+  i=0
+  while [ "$i" -lt 50 ] && is_live_non_zombie "$victim"; do
+    sleep 0.1
+    i=$((i + 1))
+  done
+  is_live_non_zombie "$victim" \
+    && fail "the retired legacy owner was never signalled, so the control proves nothing"
+  wait "$victim" 2>/dev/null || true
+
+  dir=$(make_case autoarm-steal-taken)
+  state="$dir/state"
+  lock="$state/.claude-autoarm.lock"
+  sleep 30 &
+  victim=$!
+  identity=$(bash -c '. "$1"; fm_pid_identity "$2"' _ "$LIB" "$victim") \
+    || fail "could not record a pid identity for the contested fixture"
+  autoarm_legacy_claim "$state" "$victim" "$identity"
+  rc=0
+  release_abandoned_under "$state" "$LIB" "$clobber" || rc=$?
+  if [ "$rc" -eq 0 ]; then
+    kill -9 "$victim" 2>/dev/null || true
+    wait "$victim" 2>/dev/null || true
+    fail "the reclaim reported success after losing its steal mutex"
+  fi
+  assert_present "$lock" "a legacy claim was removed after the reclaim lost its steal mutex"
+  if ! is_live_non_zombie "$victim"; then
+    wait "$victim" 2>/dev/null || true
+    fail "the legacy owner was signalled after the reclaim lost its steal mutex"
+  fi
+  [ -z "$(sed -n '2p' "$state/.claude-autoarm-epoch" 2>/dev/null || true)" ] \
+    || fail "the ledger was grafted after the reclaim lost its steal mutex"
+  kill -9 "$victim" 2>/dev/null || true
+  wait "$victim" 2>/dev/null || true
+  pass "a reclaim that loses its steal mutex signals nothing and removes nothing"
+}
+
 test_watch_restart_rejects_reused_pid() {
   local dir state fakebin out live pid i
   dir=$(make_case restart-reused-pid)
@@ -1288,6 +1381,7 @@ test_lock_paused_mid_acquire_claim_fails_during_steal
 test_lock_reclaims_a_self_held_steal_mutex
 test_lock_never_creates_a_nested_steal_mutex
 test_lock_stale_steal_recovery_stays_bounded
+test_autoarm_reclaim_refuses_when_the_steal_mutex_was_taken
 test_watch_restart_rejects_reused_pid
 test_watch_restart_attaches_to_healthy_peer
 test_watcher_self_evicts_on_lock_takeover
