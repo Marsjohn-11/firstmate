@@ -1784,10 +1784,15 @@ fm_autoarm_claim_abandoned() {  # <state-dir> [grace]
 
 # Remove a proven-abandoned legacy claim so the next claimant can arm. The
 # proof is re-verified while holding the lock's steal mutex, the same
-# serialization fm_lock_try_acquire uses for stale-owner reclaim: while it is
-# held no other process can publish the primary lock, so the window between
-# proving abandonment and removing the lock cannot swallow a genuine new
-# claim.
+# serialization fm_lock_try_acquire uses for stale-owner reclaim, so a genuine
+# new claim cannot be swallowed in the window between proving abandonment and
+# removing the lock.
+#
+# Reclaiming a STALE steal mutex is itself unserialized, so two reclaimers can
+# each end up believing they hold it - the loser's link no longer points at the
+# owner directory it created. The mutex is therefore re-proven to still be ours
+# before anything destructive runs, as fm_lock_try_acquire does before its own
+# steal.
 #
 # Old-build code cannot re-check generations, so a LIVE proven-abandoned
 # legacy owner whose recorded identity is verified to match its pid is retired
@@ -1801,13 +1806,18 @@ fm_autoarm_claim_abandoned() {  # <state-dir> [grace]
 # TERM and the ledger graft below, keeping the documented bounded
 # upgrade-window residual instead of the deadlock.
 fm_autoarm_release_abandoned() {  # <state-dir> [grace]
-  local state=$1 grace=${2:-${FM_GUARD_GRACE:-300}} lock steal epoch lock_pid recorded current owner line1 tmp i
+  local state=$1 grace=${2:-${FM_GUARD_GRACE:-300}} lock steal steal_owner epoch lock_pid recorded current owner line1 tmp i
   lock="$state/.claude-autoarm.lock"
   steal="$lock.steal"
   epoch="$state/.claude-autoarm-epoch"
   fm_autoarm_claim_abandoned "$state" "$grace" || return 1
   fm_lock_steal_try_acquire "$steal" || return 1
+  steal_owner=${FM_LOCK_OWNER_DIR:-}
   if ! fm_autoarm_claim_abandoned "$state" "$grace"; then
+    fm_lock_release "$steal"
+    return 1
+  fi
+  if ! fm_lock_points_to_owner "$steal" "$steal_owner"; then
     fm_lock_release "$steal"
     return 1
   fi
