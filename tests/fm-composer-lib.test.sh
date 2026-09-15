@@ -826,6 +826,45 @@ test_near_gray_ghost_is_stripped_and_real_text_survives() {
   pass "fm_composer_strip_ghost: near-gray ghost strips while near-gray real text and muse's chromatic glyph survive"
 }
 
+# A pane with no COLORTERM gets the SAME grey from the SAME harness in the
+# 256-colour encoding: kiro draws its placeholder as 38;5;247, xterm grey level
+# 158, where a truecolor pane gets 38;2;158;158;158. Testing only truecolour left
+# that pane's composer reading `pending` forever, so every steer to the worker
+# was skipped. Only palette indices with a fixed grey RGB are tested.
+test_palette_gray_ghost_is_stripped_and_chromatic_indexes_survive() {
+  local out
+  out=$(printf '%s' "${ESC}[38;5;247mask a question or describe a task${ESC}[0m" | fm_composer_strip_ghost)
+  [ -z "${out//[[:space:]]/}" ] \
+    || fail "kiro's 256-colour placeholder (38;5;247, grey level 158) must strip as ghost text, got '$out'"
+
+  out=$(printf '%s' "${ESC}[38:5:247mask a question or describe a task${ESC}[0m" | fm_composer_strip_ghost)
+  [ -z "${out//[[:space:]]/}" ] \
+    || fail "the colon form 38:5:247 must strip the same grey, got '$out'"
+
+  # The 6x6x6 cube's r==g==b diagonal is grey too (145 is level 175).
+  out=$(printf '%s' "${ESC}[38;5;145mplaceholder text${ESC}[0m" | fm_composer_strip_ghost)
+  [ -z "${out//[[:space:]]/}" ] \
+    || fail "a cube-diagonal grey (38;5;145, level 175) must strip as ghost text, got '$out'"
+
+  # NON-REGRESSION: a grey above the ceiling is real input, and a CHROMATIC index
+  # carries no fixed grey to measure, so both survive.
+  out=$(printf '%s' "${ESC}[38;5;253mdeploy the thing${ESC}[0m" | fm_composer_strip_ghost)
+  [ "$out" = 'deploy the thing' ] \
+    || fail "NON-REGRESSION: a bright palette grey (38;5;253, level 218) must survive, got '$out'"
+
+  out=$(printf '%s' "${ESC}[38;5;33mdeploy the thing${ESC}[0m" | fm_composer_strip_ghost)
+  [ "$out" = 'deploy the thing' ] \
+    || fail "NON-REGRESSION: a chromatic palette index (38;5;33) must survive, got '$out'"
+
+  # NON-REGRESSION: indices 0-15 are remapped by every terminal theme, so they
+  # are never luminance-tested however dark the default palette draws them.
+  out=$(printf '%s' "${ESC}[38;5;8mdeploy the thing${ESC}[0m" | fm_composer_strip_ghost)
+  [ "$out" = 'deploy the thing' ] \
+    || fail "NON-REGRESSION: a theme-remapped index (38;5;8) must survive, got '$out'"
+
+  pass "fm_composer_strip_ghost: palette greys strip while bright, chromatic and theme-remapped indexes survive"
+}
+
 test_bare_shell_glyphs_are_unknown
 test_stripped_unbordered_content_uses_plain_content
 test_bare_shell_prompt_with_command_is_not_empty
@@ -890,3 +929,4 @@ test_queued_enter_verdict_busy_pending_is_empty
 test_queued_enter_verdict_idle_pending_stays_pending
 test_queued_enter_verdict_does_not_convert_other_states
 test_near_gray_ghost_is_stripped_and_real_text_survives
+test_palette_gray_ghost_is_stripped_and_chromatic_indexes_survive

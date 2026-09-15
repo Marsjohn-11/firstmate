@@ -201,10 +201,8 @@ fm_composer_normalize_trim_var() {  # <varname>
 #     dark-foreground run. This assumes a DARK terminal theme, the firstmate
 #     fleet reality, where real typed input is bright and only de-emphasised UI
 #     is dark; the SGR-2 signal above stays theme-independent. A 256-colour
-#     foreground (38;5;n) is NOT luminance-tested - it is palette-dependent and
-#     no fleet harness uses it for ghost text, so it is kept (real text wins:
-#     under-stripping merely defers, which the max-defer alarm surfaces, while
-#     over-stripping would inject over real input).
+#     foreground (38;5;n) is luminance-tested only when the index is GREY in the
+#     standard xterm-256 palette, described below.
 # Raising FM_COMPOSER_GHOST_LUMA_MAX is not free: muse draws its `⟩` prompt glyph
 # in truecolor 38;2;90;160;255, luminance ~149.9 (verified, muse 0.1.0-R708.1),
 # the tightest margin over the 128 default in the fleet. Above ~150 that glyph is
@@ -228,11 +226,17 @@ fm_composer_normalize_trim_var() {  # <varname>
 # real text at 207.0). muse is strongly chromatic, so no luminance ceiling can
 # reach it - a structural property rather than a tuned margin, and the reason a
 # gray-only ceiling is safe where raising the shared default was not.
-# NON-TRUECOLOR RUNS ARE UNCHANGED: a 38;5 palette index and the base 30-37 /
-# 90-97 foregrounds carry no channels to measure a spread from, so they keep
-# their existing behaviour - 38;5 is still never luminance-tested and a base
-# colour still ends a dark run. This gate only ever narrows which TRUECOLOR runs
-# count as de-emphasised.
+# The SAME grey ceiling covers a 256-colour foreground, because a harness draws
+# the same grey in whichever encoding the terminal advertises: kiro emits
+# 38;2;158;158;158 on a truecolor pane and 38;5;247 - the identical grey, xterm
+# level 158 - on a pane with no COLORTERM, so testing only truecolour left kiro's
+# placeholder unstripped and every steer to that worker deferring forever. Only
+# indices that are GREY in the standard xterm-256 palette are tested, since only
+# those carry a fixed RGB: the 232-255 greyscale ramp (level 8 + (n-232)*10) and
+# the 6x6x6 cube's r==g==b diagonal (16, 59, 102, 145, 188, 231). A chromatic
+# index is kept untested rather than converted, and indices 0-15 stay untested
+# because every terminal theme remaps them. The base 30-37 / 90-97 foregrounds
+# still just end a dark run.
 # The dim/faint and dark-foreground states are tracked together as "de-emphasis";
 # codes are processed left to right within a sequence, so "ESC[0;2m" reads as dim.
 # LC_ALL=C makes awk walk bytes, so multibyte glyphs (e.g. ❯) and de-emphasised
@@ -268,19 +272,40 @@ fm_composer_strip_ghost() {
       if ((hi - lo) > grayspreadmax) return lumamax
       return (graylumamax > lumamax) ? graylumamax : lumamax
     }
+    # palette_gray_level: the channel level of a 256-colour index that is GREY in
+    # the standard xterm-256 palette - the 232-255 greyscale ramp and the 6x6x6
+    # cube diagonal - and -1 for every other index, including the theme-remapped
+    # 0-15. A grey has r == g == b, so its level IS its luminance.
+    function palette_gray_level(n,   c, r, g, b) {
+      if (n >= 232 && n <= 255) return 8 + (n - 232) * 10
+      if (n < 16 || n > 231) return -1
+      c = n - 16
+      r = int(c / 36); g = int((c % 36) / 6); b = c % 6
+      if (r != g || g != b) return -1
+      return (r == 0) ? 0 : 55 + r * 40
+    }
+    function gray_is_dark(lv) {
+      return (lv >= 0 && lv < ceiling_for(lv, lv, lv)) ? 1 : 0
+    }
     # fg38_is_dark: 1 when the SGR 38 foreground starting at param p is a
-    # TRUECOLOR (38;2 / 38:2) whose luminance is below the ceiling that applies
-    # to it; 0 otherwise (a 38;5 palette colour, a bright truecolor, or a
-    # malformed run).
+    # TRUECOLOR (38;2 / 38:2) or a PALETTE GREY (38;5 / 38:5) whose luminance is
+    # below the ceiling that applies to it; 0 otherwise (a chromatic palette
+    # index, a bright colour, or a malformed run).
     function fg38_is_dark(a, p, k,   spec, nf, f, r, g, b) {
       spec = a[p]
       if (index(spec, ":") > 0) {           # colon form: whole colour in a[p]
         nf = split(spec, f, ":")
+        if (f[2] == "5" && nf >= 3) return gray_is_dark(palette_gray_level(f[nf] + 0))
         if (f[2] != "2" || nf < 5) return 0
         r = f[nf - 2] + 0; g = f[nf - 1] + 0; b = f[nf] + 0
         return ((299*r + 587*g + 114*b) / 1000 < ceiling_for(r, g, b)) ? 1 : 0
       }
-      if (p + 1 > k || a[p + 1] != "2" || p + 4 > k) return 0
+      if (p + 1 > k) return 0
+      if (a[p + 1] == "5") {
+        if (p + 2 > k) return 0
+        return gray_is_dark(palette_gray_level(a[p + 2] + 0))
+      }
+      if (a[p + 1] != "2" || p + 4 > k) return 0
       r = a[p + 2] + 0; g = a[p + 3] + 0; b = a[p + 4] + 0
       return ((299*r + 587*g + 114*b) / 1000 < ceiling_for(r, g, b)) ? 1 : 0
     }

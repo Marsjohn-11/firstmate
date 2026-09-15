@@ -121,6 +121,11 @@ The fix applies a higher ceiling only to NEAR-ACHROMATIC truecolor runs, `FM_COM
 That separates all four measured cases without threading a harness argument through the shared composer entry points: kiro's ghost at spread 0 and rovo's at spread 3 strip, rovo's real typed text is also near-gray but separated by luminance at 207.0 and is kept, and muse's real prompt glyph at spread 165 is strongly chromatic and unreachable by any luminance ceiling.
 `bin/fm-composer-lib.sh`'s ghost-strip comment owns the measured values and both margins.
 
+The same ceiling covers the 256-colour encoding of the same grey, because the encoding follows the pane's terminal rather than the harness.
+A kiro crewmate launched into a pane with no `COLORTERM` draws the placeholder as `38;5;247`, xterm grey level 158 - the identical colour - and while only truecolour was luminance-tested that pane's composer read `pending`, so every steer to that worker was skipped and the doorbell never rang.
+A palette index is tested only when it is grey in the standard xterm-256 palette, which is the 232-255 greyscale ramp and the 6x6x6 cube's `r == g == b` diagonal; a chromatic index carries no fixed grey to measure and indices 0-15 are remapped by every terminal theme, so both stay untested and are kept.
+`tests/fm-composer-lib.test.sh` pins the palette greys alongside the truecolor cases, and `tests/fm-kiro-harness.test.sh` classifies kiro's idle row in both encodings, each reading `empty`.
+
 Verified two ways.
 `tests/fm-composer-lib.test.sh` pins the four cases and fails on pre-fix code, with rovo's real text and muse's glyph written as explicit non-regression assertions.
 Classifying a capture of a live kiro idle pane with tmux's actual descriptor (`styled=1 cursor=1 identity=1 rows=0`) and the cursor on the composer row returns `empty` after the fix, where it returned `pending` before.

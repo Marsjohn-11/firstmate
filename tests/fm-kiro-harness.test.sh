@@ -239,6 +239,16 @@ test_kiro_composer_glyph_and_placeholder() {
   state=$(fm_composer_classify_screen "$caps" "$screen" 1)
   [ "$state" = empty ] || fail "kiro's styled idle row must read empty, got '$state'"
 
+  # The SAME idle row on a pane whose terminal advertises no truecolor: kiro
+  # draws the placeholder as 256-colour 38;5;247, xterm grey level 158, the
+  # identical grey. This row read `pending` while only truecolour was tested, so
+  # every steer to that worker was skipped forever.
+  row="› ${esc}[38;5;247mask a question or describe a task ↵${esc}[0m"
+  screen=$'transcript line\n'"$row"
+  state=$(fm_composer_classify_screen "$caps" "$screen" 1)
+  [ "$state" = empty ] \
+    || fail "kiro's 256-colour idle row must read empty, never pending, got '$state'"
+
   # An UNSTYLED capture cannot ghost-strip, so the bare-row path degrades any
   # trailing text to `unknown` rather than a false `pending`.
   state=$(fm_composer_classify_screen "$caps_plain" "$plain")
