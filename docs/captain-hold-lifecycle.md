@@ -195,10 +195,11 @@ The suite does not test the accepted merge-to-cleanup re-hold window or asynchro
 
 Two of its cases pin how a task body is read back rather than any decision behavior, because both paths that read one are otherwise silent when they get it wrong.
 Holding a task that carries a body, and cleanup's retention of a captain-held row, both work where the installed JSON::PP defaults `allow_nonref` off and therefore rejects the JSON-encoded bare string a shown scalar field arrives as; the case forces that older default back off and probes that the simulation really does reject a bare scalar, so it cannot pass vacuously on a lenient library.
-A fleet host does carry such a library, and all three defects reproduce on it natively with no shim, so that behavior is observed and not only simulated.
+A fleet host does carry such a library, and both failures reproduce on it natively with no shim, so that behavior is observed and not only simulated.
 The case still forces the older default rather than depending on the installed one, which is what makes it deterministic on any host.
 A retained body's non-ASCII characters also survive cleanup's rewrite as their exact UTF-8 bytes, and the case asserts bytes rather than decoded strings: a codepoint at or below U+00FF is the one a stream with no raw layer emits as a single latin-1 byte, and comparing decoded strings cannot see that.
 It uses one row per character class, because any character above U+00FF makes the whole string print as UTF-8 and would mask the latin-1 case in a mixed body.
+That latin-1 byte loss also reproduces natively on the fleet host carrying the older library, with no shim.
 
 The markdown-to-beads migration family runs the same suite's beads fixture (bd-driven scratch graph, self-skipping on markdown-only tasks-axi installs) and proves: `verify` and `complete` resolve an attested legacy id through a migrated row's marker note, through the configured prefix when no row carries a note - naming the resolved row in the completion line - and through the marker note of a pre-collapse derived identity; a marker-noted row wins over an unrelated captain-held row occupying the bare prefix namesake; an unresolvable id is refused once naming the id (never an empty name); and the attested id stays in `decision_keys=` for idempotent re-verification.
 One case in that family needs no beads install and always runs: a stubbed tasks-axi that fails any markdown file override proves the captain-hold hold, answer, and close mutations reach a beads-configured home without one.
