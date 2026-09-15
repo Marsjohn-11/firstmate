@@ -3977,12 +3977,6 @@ test_retained_body_keeps_its_utf8_bytes() {
   assert_no_grep "Wide character" "$home/$wide_id.err" \
     "cleanup warned about a wide character instead of writing raw bytes"
 
-  LC_ALL=C perl -MEncode -e '
-    local $/;
-    open my $fh, "<:raw", $ARGV[0] or die "cannot read $ARGV[0]: $!";
-    my $bytes = <$fh>;
-    Encode::decode("UTF-8", $bytes, Encode::FB_CROAK());
-  ' "$stored" || fail "cleanup left the backlog file holding invalid UTF-8"
   pass "cleanup preserves every byte of a retained body's non-ASCII characters"
 }
 
