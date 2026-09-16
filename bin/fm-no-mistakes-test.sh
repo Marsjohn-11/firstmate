@@ -18,8 +18,9 @@
 #
 # Every lane runs serially inside its own independent local clone and private
 # TMPDIR and process group.
-# The lanes run concurrently, matching CI's isolation boundary while keeping
-# concurrency below the repository runner's 16-worker refusal.
+# The lanes run concurrently, matching CI's isolation boundary. Each lane leaves
+# the runner serial, so concurrency comes from the lane count rather than from
+# the runner's bounded --jobs admission.
 # The current worktree diff is applied to every clone so local verification
 # exercises tracked edits before they are committed.
 # The assigned worker's FM_TASK_ID marker is removed only inside those

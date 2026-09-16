@@ -115,7 +115,7 @@ Run `bin/fm-doc-audience-check.sh`; it enforces classification, README setup rou
 ## No-mistakes test configuration
 
 Firstmate configures `commands.test` to `bin/fm-no-mistakes-test.sh`.
-That command is the single owner of the validation Test workload: it derives the current CI lanes from real test discovery, proves every `tests/*.test.sh` file appears exactly once, runs the lanes in isolated concurrent checkouts, and emits one aggregate count.
+That command is the single owner of the validation Test workload, and its own header owns the lane derivation, the exactly-once assignment proof, the isolation boundary, and the aggregate counts.
 Do not replace it with agent-selected validation, a changed-test subset, a family, or a fixed script list.
 Targeted checks remain useful implementation evidence, but they do not replace the configured complete-suite verdict.
 
