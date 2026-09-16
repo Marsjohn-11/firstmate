@@ -614,6 +614,7 @@ release_abandoned_under() {  # <state> <lib> [stub-body]
 # must re-prove the mutex is still its own before it does either.
 test_autoarm_reclaim_refuses_when_the_steal_mutex_was_taken() {
   local dir state lock victim identity rc i clobber
+  # shellcheck disable=SC2016 # This is a stub body; every expansion belongs to the child shell that evals it.
   clobber='
     fm_lock_steal_try_acquire() {
       fm_lock_try_create "$1" || return 1
