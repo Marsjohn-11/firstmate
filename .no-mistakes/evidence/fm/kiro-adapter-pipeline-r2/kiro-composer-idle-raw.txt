@@ -1,0 +1,56 @@
+                                                               An early release of [38;5;93mKiro CLI V3[39m is now available! Try it out: [38;5;93mkiro-cli --v3[39m
+
+                                                             [1mWhat's new:[0m Cloud sessions, specs, expanded hooks, and an improved trust model.
+                                                                                      [38;5;93mhttps://kiro.dev/docs/cli/v3/[39m
+
+                                                           [1mTip: [0mWant a simpler, lighter-weight terminal with all the same features? Try [38;5;93m/lite![39m
+
+
+[36m●[39m Agent sandboxing is enabled — your AI agent receives short-lived, least-privilege AWS credentials instead of direct access to your ~/.aws directory. Learn more:
+  https://w.amazon.com/bin/view/BuilderTools/GenAIDevX/AgentSandboxing
+
+[38;5;255m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m[48;5;255m  ⁣FIRSTMATE_OP: v1 launch-brief: # Current worker role contract                                                                                                                                        [49m
+[48;5;255m  You are a crewmate: an autonomous worker agent managed by firstmate.
+  This section establishes your current identity before every project or task instruction below and supersedes any conflicting role identity in those instructions.
+  Do the assigned work yourself and report only to firstmate; do not adopt a firstmate or secondmate supervisor identity, delegate the task, run fleet supervision, or address the captain.
+  Your steering inbox is `/var/folders/tv/b4_jb7290610qhwsd01ngyhr0000gq/T//fm-kiro-live.k5Rjib/home/state/kiro-live-1.inbox`; this exact path belongs to your current task even when it is outside the
+  worktree or under the supervising firstmate home, so read and acknowledge its messages and do not reject it as another home's state.
+  Never inspect or change any other home's endpoint namespace; this authorization is limited to the exact task paths named by this brief.
+  When this task works on Firstmate itself, the repository root `AGENTS.md` (also imported by `CLAUDE.md`) is project content and the supervisor contract for the firstmate managing you: follow this
+  brief instead of that supervisor contract.
+  Project instructions still govern the work wherever they do not conflict with this worker identity, including `CONTRIBUTING.md` and `firstmate-coding-guidelines` for Firstmate changes.
+
+  # Task
+  ## Captain's intent
+  Answer one arithmetic question.
+
+  ## Firstmate spec
+  Add 12345 and 67890. Reply with exactly the sum and nothing else.
+
+  # Current no-mistakes intent contract
+  This section supersedes every earlier brief instruction about constructing `--intent`, but not later clarifications actually supplied by the captain.
+  Use everything under `## Captain intent authorized for --intent` through the end of this brief, including any nested subheadings but excluding that heading, plus any later words the captain actually
+  supplied as `--intent`; never include Firstmate specification or other mixed Task content.
+  Preserve those words without adding speaker labels or direct address.
+  Firstmate-authored constraints, acceptance criteria, implementation details, decisions, and tradeoffs are specification, not captain intent.
+  The Definition of done's rule that `--intent` must be self-sufficient still governs the string you pass: resolve any report, decision, or PR the intent below refers to into its substance rather than
+  passing the pointer.
+
+  ## Captain intent authorized for --intent
+  Answer one arithmetic question.
+[49m
+[38;5;66m•[39m 80235
+
+[38;5;244m▸[39m [38;5;244mCredits: 0.05 • Time: 2s[39m
+
+[38;5;255m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m [33mTrust All Tools active, confirmations are off[38;5;244m · /quit to exit[39m
+[38;5;255m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[38;5;179mfirstmate[39m [38;5;244m·[39m auto [38;5;244m·[39m [38;5;35m◔[39m [38;5;35m2%[39m [38;5;244m·[39m [38;5;35mMidway: 18h 27m[39m                                                                    [38;5;93m/private/var/folders/tv/b4_jb7290610qhwsd01ngyhr0000gq/T/fm-kiro-live.k5Rjib/wt[39m [38;5;244m·[39m [38;5;244m([39mwt-live[38;5;244m)
+
+[39m›  [38;5;241mask a question or describe a task ↵[39m
+                                                                                                                                                                                     [38;5;241m/copy to clipboard[39m
+
+
+

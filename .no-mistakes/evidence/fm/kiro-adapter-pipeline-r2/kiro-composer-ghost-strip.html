@@ -1,0 +1,53 @@
+<!doctype html>
+<meta charset="utf-8"><title>Live kiro composer rows vs the product's composer verdict</title>
+<style>
+ body{background:#14161a;color:#dfe3e8;font:14px/1.55 -apple-system,Segoe UI,sans-serif;margin:0;padding:28px 32px}
+ h1{font-size:19px;margin:0 0 4px} h3{font-size:14px;margin:26px 0 8px;color:#9fd3ff}
+ p.lead{color:#a3abb5;max-width:74ch;margin:0 0 6px}
+ pre.term{background:#000;padding:12px 14px;border-radius:6px;overflow-x:auto;
+   font:13px/1.5 "SF Mono",Menlo,monospace;white-space:pre;border:1px solid #2a2f37}
+ table{border-collapse:collapse;margin-top:8px;font-size:13px}
+ th{text-align:left;color:#8d949e;font-weight:500;padding:3px 14px 3px 0;vertical-align:top}
+ td{padding:3px 0} code{color:#e5c07b}
+ .ok{color:#7ec699;font-weight:600} .bad{color:#e88}
+ footer{margin-top:30px;color:#767d86;font-size:12px;border-top:1px solid #262b32;padding-top:12px}
+</style>
+<h1>Live Kiro CLI composer rows, and what the product reads from them</h1>
+<p class="lead">Rows below are the real bytes tmux captured from a live <code>kiro-cli</code> crewmate that
+<code>bin/fm-spawn.sh</code> launched, re-rendered with their true colours. Each verdict came from driving
+<code>fm_tmux_composer_state</code> against that same running pane, first on this change and then with
+<code>bin/fm-composer-lib.sh</code> replaced by its base-commit version.</p>
+
+    <section>
+      <h3>Fresh idle composer</h3>
+      <pre class="term"><span style="color:#e8e8e8">›  </span><span style="color:rgb(98,98,98)">ask a question or describe a task ↵</span></pre>
+      <table>
+        <tr><th>rendered as</th><td><code>38;5;241 (xterm greyscale ramp, level 98)</code></td></tr>
+        <tr><th>fm_tmux_composer_state (this change)</th><td class="ok">empty</td></tr>
+        <tr><th>fm_tmux_composer_state (base da5e658)</th><td class="bad">pending</td></tr>
+        <tr><th>end-user effect</th><td>steer delivers immediately</td></tr>
+      </table>
+    </section>
+    <section>
+      <h3>Composer mid-turn</h3>
+      <pre class="term"><span style="color:#e8e8e8">›  </span><span style="color:rgb(98,98,98)">Kiro is working · Type to steer · Ctrl+S to queue</span></pre>
+      <table>
+        <tr><th>rendered as</th><td><code>38;5;241 (xterm greyscale ramp, level 98)</code></td></tr>
+        <tr><th>fm_tmux_composer_state (this change)</th><td class="ok">empty</td></tr>
+        <tr><th>fm_tmux_composer_state (base da5e658)</th><td class="bad">pending</td></tr>
+        <tr><th>end-user effect</th><td>submit acknowledged</td></tr>
+      </table>
+    </section>
+    <section>
+      <h3>Real typed input</h3>
+      <pre class="term"><span style="color:#e8e8e8">› this is real typed input</span></pre>
+      <table>
+        <tr><th>rendered as</th><td><code>no SGR colour (default foreground)</code></td></tr>
+        <tr><th>fm_tmux_composer_state (this change)</th><td class="ok">pending</td></tr>
+        <tr><th>fm_tmux_composer_state (base da5e658)</th><td class="ok">pending</td></tr>
+        <tr><th>end-user effect</th><td>never overwritten - guard holds</td></tr>
+      </table>
+    </section>
+<footer>kiro-cli 2.22.1-nightly.4 (<code>--agent-engine v2</code>) &middot; tmux 3.5a &middot; macOS 25.6.0 &middot;
+branch fm/kiro-adapter-pipeline-r2 @ 91c129e. A <code>pending</code> idle composer is what made every steer to a
+kiro worker defer forever; the greyscale-ramp luminance test is what turns it into <code>empty</code>.</footer>
