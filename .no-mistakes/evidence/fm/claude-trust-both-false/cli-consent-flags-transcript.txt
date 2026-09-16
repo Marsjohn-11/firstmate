@@ -1,0 +1,124 @@
+
+========================================================
+SCENARIO: 1. never-asked default pair (approved=false, warningShown=false) -> undecided path
+project = /private/tmp/fmct-live.iqKyb4/never-asked/project
+worktree= /private/tmp/fmct-live.iqKyb4/never-asked/wt
+
+store BEFORE:
+{
+  "hasCompletedOnboarding": true,
+  "projects": {
+    "<tmp>/never-asked/project": {
+      "hasTrustDialogAccepted": false,
+      "hasClaudeMdExternalIncludesApproved": false,
+      "hasClaudeMdExternalIncludesWarningShown": false,
+      "allowedTools": [
+        "Read"
+      ]
+    }
+  }
+}
+
+exit code: 0
+CLI output: trusted: /private/tmp/fmct-live.iqKyb4/never-asked/wt
+trusted (project root): /private/tmp/fmct-live.iqKyb4/never-asked/project
+store bytes: rewritten
+
+store AFTER:
+{
+  "hasCompletedOnboarding": true,
+  "projects": {
+    "<tmp>/never-asked/project": {
+      "hasTrustDialogAccepted": true,
+      "hasClaudeMdExternalIncludesApproved": false,
+      "hasClaudeMdExternalIncludesWarningShown": false,
+      "allowedTools": [
+        "Read"
+      ]
+    },
+    "<tmp>/never-asked/wt": {
+      "hasTrustDialogAccepted": true
+    }
+  }
+}
+
+========================================================
+SCENARIO: 2. ADVERSARIAL recorded decline (approved=false, warningShown=true) -> must refuse, store untouched
+project = /private/tmp/fmct-live.iqKyb4/declined/project
+worktree= /private/tmp/fmct-live.iqKyb4/declined/wt
+
+store BEFORE:
+{
+  "hasCompletedOnboarding": true,
+  "projects": {
+    "<tmp>/declined/project": {
+      "hasTrustDialogAccepted": true,
+      "hasClaudeMdExternalIncludesApproved": false,
+      "hasClaudeMdExternalIncludesWarningShown": true,
+      "allowedTools": [
+        "Read"
+      ]
+    }
+  }
+}
+
+exit code: 1
+CLI output: error: project entry for /private/tmp/fmct-live.iqKyb4/declined/project in /private/tmp/fmct-live.iqKyb4/declined/claude-config/.claude.json already declined external CLAUDE.md imports; refusing to override that consent
+error: refusing to pre-register Claude trust: could not record trust for '/private/tmp/fmct-live.iqKyb4/declined/wt' and project '/private/tmp/fmct-live.iqKyb4/declined/project' in '/private/tmp/fmct-live.iqKyb4/declined/claude-config/.claude.json'
+store bytes: UNCHANGED
+
+store AFTER:
+{
+  "hasCompletedOnboarding": true,
+  "projects": {
+    "<tmp>/declined/project": {
+      "hasTrustDialogAccepted": true,
+      "hasClaudeMdExternalIncludesApproved": false,
+      "hasClaudeMdExternalIncludesWarningShown": true,
+      "allowedTools": [
+        "Read"
+      ]
+    }
+  }
+}
+
+========================================================
+SCENARIO: 3. standing consent (approved=true) -> consent carried forward to both entries
+project = /private/tmp/fmct-live.iqKyb4/approved/project
+worktree= /private/tmp/fmct-live.iqKyb4/approved/wt
+
+store BEFORE:
+{
+  "hasCompletedOnboarding": true,
+  "projects": {
+    "<tmp>/approved/project": {
+      "hasTrustDialogAccepted": true,
+      "hasClaudeMdExternalIncludesApproved": true,
+      "hasClaudeMdExternalIncludesWarningShown": true
+    }
+  }
+}
+
+exit code: 0
+CLI output: trusted: /private/tmp/fmct-live.iqKyb4/approved/wt
+trusted (project root): /private/tmp/fmct-live.iqKyb4/approved/project
+store bytes: rewritten
+
+store AFTER:
+{
+  "hasCompletedOnboarding": true,
+  "projects": {
+    "<tmp>/approved/project": {
+      "hasTrustDialogAccepted": true,
+      "hasClaudeMdExternalIncludesApproved": true,
+      "hasClaudeMdExternalIncludesWarningShown": true
+    },
+    "<tmp>/approved/wt": {
+      "hasTrustDialogAccepted": true,
+      "hasClaudeMdExternalIncludesApproved": true,
+      "hasClaudeMdExternalIncludesWarningShown": true
+    }
+  }
+}
+
+base=/private/tmp/fmct-live.iqKyb4

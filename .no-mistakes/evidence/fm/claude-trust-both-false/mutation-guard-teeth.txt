@@ -1,0 +1,110 @@
+Guard-teeth evidence for tests/fm-claude-trust.test.sh
+======================================================
+Each block temporarily mutates bin/fm-claude-trust.sh (the real product script,
+restored immediately after) and runs the affected test in isolation against the
+mutated implementation. The harness at /tmp/fmct-harness symlinks the worktree's
+own bin/, so every run drives the real script.
+
+### MUTATION A: implementation deletes the never-asked import flags
+
+-- upstream test (checks '!== true') --
+ok - fm-claude-trust.sh: a never-asked default external-imports pair is not treated as a decline
+exit=0
+
+-- new test added by this change --
+not ok - the undecided approved flag was rewritten instead of left untouched (expected false, got undefined)
+exit=1
+
+-- real CLI under MUTATION A: the human's two consent flags disappear from their own store --
+store AFTER:
+{
+  "hasCompletedOnboarding": true,
+  "projects": {
+    "<tmp>/never-asked/project": {
+      "hasTrustDialogAccepted": true,
+      "allowedTools": [
+        "Read"
+      ]
+    },
+    "<tmp>/never-asked/wt": {
+      "hasTrustDialogAccepted": true
+    }
+  }
+}
+
+
+### MUTATION A': the pre-fix defect - a bare approved=false counts as a decline
+
+-- new test added by this change --
+not ok - approved=false with the warning never shown is undecided, not a decline: error: project entry for /private/var/folders/tv/b4_jb7290610qhwsd01ngyhr0000gq/T/fm-claude-trust.YMCrgu/import-false-uncorroborated/project in /private/var/folders/tv/b4_jb7290610qhwsd01ngyhr0000gq/T/fm-claude-trust.YMCrgu/import-false-uncorroborated/claude-config/.claude.json already declined external CLAUDE.md imports; refusing to override that consent
+error: refusing to pre-register Claude trust: could not record trust for '/private/var/folders/tv/b4_jb7290610qhwsd01ngyhr0000gq/T/fm-claude-trust.YMCrgu/import-false-uncorroborated/wt' and project '/private/var/folders/tv/b4_jb7290610qhwsd01ngyhr0000gq/T/fm-claude-trust.YMCrgu/import-false-uncorroborated/project' in '/private/var/folders/tv/b4_jb7290610qhwsd01ngyhr0000gq/T/fm-claude-trust.YMCrgu/import-false-uncorroborated/claude-config/.claude.json': expected exit 0, got 1
+exit=1
+
+-- real CLI, never-asked default store --
+}
+
+exit code: 1
+CLI output: error: project entry for /private/tmp/fmct-live.jpg3Gp/never-asked/project in /private/tmp/fmct-live.jpg3Gp/never-asked/claude-config/.claude.json already declined external CLAUDE.md imports; refusing to override that consent
+error: refusing to pre-register Claude trust: could not record trust for '/private/tmp/fmct-live.jpg3Gp/never-asked/wt' and project '/private/tmp/fmct-live.jpg3Gp/never-asked/project' in '/private/tmp/fmct-live.jpg3Gp/never-asked/claude-config/.claude.json'
+store bytes: UNCHANGED
+
+
+### MUTATION B: implementation never writes the project-root entry
+
+-- this test BEFORE the review fix (fixture seeded hasTrustDialogAccepted:true) --
+ok - fm-claude-trust.sh: warningShown is what separates a recorded decline from an undecided approved=false
+exit=0
+
+-- this test AFTER the review fix (fixture seeded hasTrustDialogAccepted:false) --
+not ok - the project-root entry was not trusted on the undecided path
+exit=1
+
+### MUTATION C: the recorded-decline refusal is removed entirely
+(does the surviving decline test still catch it after the duplicate half was cut?)
+
+-- test_project_root_entry_declined_external_imports_is_not_overridden --
+not ok - a project that already declined external imports must be refused: trusted: /private/var/folders/tv/b4_jb7290610qhwsd01ngyhr0000gq/T/fm-claude-trust.2h9y2q/project-decline/wt
+trusted (project root): /private/var/folders/tv/b4_jb7290610qhwsd01ngyhr0000gq/T/fm-claude-trust.2h9y2q/project-decline/project: expected exit 1, got 0
+exit=1
+
+-- real CLI on a store holding an explicit 'No, disable' answer --
+SCENARIO: 2. ADVERSARIAL recorded decline (approved=false, warningShown=true) -> must refuse, store untouched
+project = /private/tmp/fmct-live.G8H0DF/declined/project
+worktree= /private/tmp/fmct-live.G8H0DF/declined/wt
+
+store BEFORE:
+{
+  "hasCompletedOnboarding": true,
+  "projects": {
+    "<tmp>/declined/project": {
+      "hasTrustDialogAccepted": true,
+      "hasClaudeMdExternalIncludesApproved": false,
+      "hasClaudeMdExternalIncludesWarningShown": true,
+      "allowedTools": [
+        "Read"
+      ]
+    }
+  }
+}
+
+exit code: 0
+CLI output: trusted: /private/tmp/fmct-live.G8H0DF/declined/wt
+trusted (project root): /private/tmp/fmct-live.G8H0DF/declined/project
+store bytes: rewritten
+
+store AFTER:
+{
+  "hasCompletedOnboarding": true,
+  "projects": {
+    "<tmp>/declined/project": {
+      "hasTrustDialogAccepted": true,
+      "hasClaudeMdExternalIncludesApproved": false,
+      "hasClaudeMdExternalIncludesWarningShown": true,
+      "allowedTools": [
+        "Read"
+      ]
+    },
+    "<tmp>/declined/wt": {
+      "hasTrustDialogAccepted": true
+    }
+  }
