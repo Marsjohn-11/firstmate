@@ -231,12 +231,14 @@ fm_composer_normalize_trim_var() {  # <varname>
 # 38;2;158;158;158 on a truecolor pane and 38;5;247 - the identical grey, xterm
 # level 158 - on a pane with no COLORTERM, so testing only truecolour left kiro's
 # placeholder unstripped and every steer to that worker deferring forever. Only
-# indices that are GREY in the standard xterm-256 palette are tested, since only
-# those carry a fixed RGB: the 232-255 greyscale ramp (level 8 + (n-232)*10) and
-# the 6x6x6 cube's r==g==b diagonal (16, 59, 102, 145, 188, 231). A chromatic
-# index is kept untested rather than converted, and indices 0-15 stay untested
-# because every terminal theme remaps them. The base 30-37 / 90-97 foregrounds
-# still just end a dark run.
+# the 232-255 greyscale ramp (level 8 + (n-232)*10) is tested, because it is the
+# one index range whose RGB is fixed by definition rather than by a terminal
+# theme. The 6x6x6 cube's r==g==b diagonal is arithmetically grey too and stays
+# untested: no harness has been measured drawing ghost text there, and widening
+# the predicate is how the palette-dependence problem the 38;5 carve-out exists
+# for gets in. A chromatic index is kept untested rather than converted, and
+# indices 0-15 stay untested because every terminal theme remaps them. The base
+# 30-37 / 90-97 foregrounds still just end a dark run.
 # The dim/faint and dark-foreground states are tracked together as "de-emphasis";
 # codes are processed left to right within a sequence, so "ESC[0;2m" reads as dim.
 # LC_ALL=C makes awk walk bytes, so multibyte glyphs (e.g. ❯) and de-emphasised

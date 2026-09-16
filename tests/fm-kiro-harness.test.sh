@@ -222,8 +222,11 @@ test_kiro_composer_glyph_and_placeholder() {
   [ "$state" = empty ] || fail "a bare kiro › composer must read empty, got '$state'"
 
   # kiro's REAL idle composer row: a bright `›` glyph, then the placeholder and
-  # a `↵` submit hint, both drawn in truecolor near-gray 38;2;158;158;158
-  # (kiro-cli 2.21.5). Luminance 158 clears the shared 128 ghost ceiling, so
+  # a `↵` submit hint, both drawn in truecolor near-gray 38;2;158;158;158.
+  # That colour and its 256-colour encoding below were measured on kiro-cli
+  # 2.21.5 on macOS; the rest of this file's vendor facts come from the
+  # 2.21.4 Amazon Linux 2 verification (docs/verification/kiro.md).
+  # Luminance 158 clears the shared 128 ghost ceiling, so
   # only the near-achromatic ceiling strips this row - keep the colour as the
   # tool renders it so removing that ceiling turns this case red.
   row="› ${esc}[38;2;158;158;158mask a question or describe a task ↵${esc}[0m"
