@@ -13,7 +13,7 @@ Scope: V2 engine only (`--agent-engine v2`). The v3/KAS engine is out of scope a
 - Date: 2026-09-13.
 - Host: Amazon Linux 2 (Linux 5.10, x86_64).
 - Tool: `kiro-cli 2.21.4`, installed via toolbox at `~/.toolbox/bin/kiro-cli` (a bash sandbox shim that runs `aim sandbox --client kiro-cli`, whose descendant is the compiled bun/node binary).
-- Auth: a signed-in account; auth state lives in the XDG data dir `~/.local/share/kiro-cli/data.sqlite3`, not under `KIRO_HOME`.
+- Auth: a signed-in account. On this Amazon Linux 2 host auth state lives in the XDG data dir `~/.local/share/kiro-cli/data.sqlite3`, not under `KIRO_HOME`. That path does not exist on macOS, so both the location and the untouched-by-relocation premise resting on it are Amazon Linux 2 measurements only - see "What is NOT verified" for the macOS gap and what it costs.
 - Two measurements in this record rest on a later build: the idle composer's placeholder colour (`38;2;158;158;158`) and its 256-colour encoding (`38;5;247`) were measured on `kiro-cli 2.21.5` on macOS. Every other claim here was measured on 2.21.4 on the Amazon Linux 2 host above.
 
 ## Agent-config hooks are claude-shaped (V2)
@@ -47,7 +47,7 @@ $ kiro-cli chat --agent-engine v2 --agent /abs/path/to/config.json --no-interact
 [warn] failed to set agent '/abs/path/to/config.json': Internal error   # falls back to default
 ```
 
-`KIRO_HOME` relocates the global config root (agents + settings + sessions) but not auth:
+`KIRO_HOME` relocates the global config root (agents + settings + sessions) but not auth, measured on the Amazon Linux 2 host above:
 
 ```
 $ KIRO_HOME=/tmp/kh kiro-cli agent list
@@ -156,6 +156,7 @@ A settled-pane union negative also has to run after a tool-call turn settles, be
 ## What is NOT verified
 
 - The v3/KAS engine (out of scope; unsupported on AL2, hooks not yet at parity).
+- Where kiro carries auth on macOS, and so whether relocating `KIRO_HOME` leaves it intact there. The XDG path in Environment is an Amazon Linux 2 measurement; `~/.local/share/kiro-cli` does not exist on macOS, so the untouched-by-relocation premise the spawn launches on has no macOS evidence at all. It stays unestablished on purpose rather than by oversight: settling it means probing a credential store, and that store is the operator's alone and is not ours to inspect. The cost is concrete. A kiro worker spawned on macOS may hit an interactive auth prompt, and a prompt nobody is present to answer makes the harness unusable UNATTENDED on that platform - which is the only way this fleet runs it. Do not read the Amazon Linux 2 result as covering macOS.
 - Any StopFailure/SessionEnd-equivalent hook trigger (none found). On an abnormal turn end (a stream or API error, a model-side abort) the `stop` hook never fires, so the busy record stays open and the supervisor reads the worker as provably working - deferring instead of surfacing or retiring the endpoint - until the next `userPromptSubmit` re-opens the record. The rendered footer does not rescue it: it is a delivery guard only and the classifier has no kiro pane arm.
 - Whether kiro V2 hands a hook `command` string to a shell or splits it into argv. Nothing depends on it: both hook commands are single-token absolute paths to scripts the spawn generates under `state/<id>.kiro-home/hooks/`, so the same script runs either way, and the redirect, the `|| true` tolerance of a refused event and the turn-end `touch` all sit inside the script where the interpreter is fixed by its shebang. The portable regression executes each generated script directly rather than through `sh -c`, so a shape that only a shell could run cannot pass CI.
 - Whether a settled kiro pane can carry a stale `esc to cancel` row that the harness-less union matches. This is an inference from the token list and the delivery path, not an observation: kiro renders that token in its tool-call region, agy's `esc[[:space:]]+to[[:space:]]+cancel` alternative is in `FM_DELIVERY_BUSY_REGEX_DEFAULT`, both submit-core reads pass no harness, and a busy read is what lets `fm_composer_queued_enter_verdict` convert a proven `pending` composer to `empty` - so a stale row surviving into the folded tail would let an undelivered steer be recorded as delivered. No run has been observed doing this, and the guard's settled-pane negative runs against the harness-scoped signature rather than the union, so its recorded pass does not bear on it. Narrowing or harness-splitting the union would change agy's delivery semantics and is out of scope for this adapter.

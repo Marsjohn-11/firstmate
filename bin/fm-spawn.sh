@@ -327,8 +327,10 @@
 # into the worktree's own .kiro/, so - mirroring gemini - the spawn writes a
 # firstmate-owned per-task agent config under state/<id>.kiro-home/agents/ and
 # reaches it by relocating KIRO_HOME onto that dir on the launch command; the
-# captain's real ~/.kiro is never touched and auth (in the XDG data dir) is
-# unaffected. --agent is name-only (a path is rejected), and --trust-all-tools
+# captain's real ~/.kiro is never touched, and auth is unaffected on AL2 where
+# it lives in the XDG data dir - where macOS carries auth is unestablished, so
+# a macOS worker may hit an auth prompt (docs/verification/kiro.md owns that
+# gap). --agent is name-only (a path is rejected), and --trust-all-tools
 # would otherwise block on a modal, so the spawn seeds
 # chat.disableTrustAllConfirmation into that per-task home's settings. kiro is
 # crewmate/scout only and refused for --secondmate. The kiro-hook record is its
@@ -4068,8 +4070,9 @@ EOF
       # dir belongs to the project, and --agent is name-only so a config path is
       # not an option. The same per-task home carries a settings/cli.json seeding
       # chat.disableTrustAllConfirmation, which suppresses --trust-all-tools's
-      # otherwise blocking confirmation modal (verified: the modal is the only
-      # blocker; auth stays in the XDG data dir and is unaffected by KIRO_HOME).
+      # otherwise blocking confirmation modal (verified on AL2: the modal is the
+      # only blocker there, and auth stays in the XDG data dir unaffected by
+      # KIRO_HOME; macOS auth location is unestablished, docs/verification/kiro.md).
       #
       # Each hook command is a single-token absolute path to a generated script
       # under the same per-task home, so the hooks behave identically whether

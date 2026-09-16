@@ -30,7 +30,8 @@ Verified as a CREWMATE and SCOUT adapter only; `../../../../../bin/fm-spawn.sh` 
 `--agent` is name-only: a config path is rejected, and discovery is the global `KIRO_HOME/agents/` dir plus the workspace `<cwd>/.kiro/agents/` dir.
 The workspace dir is inside the disposable worktree and must never be written, so `../../../../../bin/fm-spawn.sh` writes a firstmate-owned per-task agent config at `state/<id>.kiro-home/agents/firstmate.json` and reaches it by relocating `KIRO_HOME` onto `state/<id>.kiro-home` on the launch command, the gemini shape (a dedicated per-task config outside the project, reached through a config-pointer).
 That same per-task home holds `settings/cli.json` seeding `chat.disableTrustAllConfirmation`, which suppresses the `--trust-all-tools` modal (the only blocker on a fresh launch).
-Relocating `KIRO_HOME` moves the whole global config root (agents, settings, sessions) but NOT auth, which lives in the XDG data dir (`~/.local/share/kiro-cli`) and is therefore unaffected, so the worker uses the operator's real sign-in while nothing in the captain's real `~/.kiro` is touched.
+Relocating `KIRO_HOME` moves the whole global config root (agents, settings, sessions), and on Amazon Linux 2 it leaves auth alone because auth lives in the XDG data dir (`~/.local/share/kiro-cli`), so the worker uses the operator's real sign-in while nothing in the captain's real `~/.kiro` is touched.
+That path does not exist on macOS and where auth lives there is unestablished, so the untouched-by-relocation premise does not carry to macOS; see Credential precondition below.
 Because the relocation is wholesale rather than gemini's additive single-file layer, the per-task home does not inherit the operator's global MCP servers, skills, or agents; the per-task agent config declares `tools: ["*"]` and the crewmate relies on built-in tools.
 Each hook `command` in that config is a single-token absolute path to a script the spawn generates beside it under `state/<id>.kiro-home/hooks/`, so a hook runs the same whether kiro execs the command directly or hands it to a shell; the busy event, its `|| true` tolerance of a refused stale generation, and the turn-end touch all live inside the script.
 No single token can carry whitespace under either interpretation, so a canonical kiro spawn refuses before launch when the resolved `state/<id>.kiro-home` path contains whitespace, naming that path and asking for a whitespace-free `FM_HOME` or `FM_STATE_OVERRIDE`; without the hooks kiro has no other state source, so a pane that could never clear its busy record is never started.
@@ -38,7 +39,9 @@ No single token can carry whitespace under either interpretation, so a canonical
 
 ## Credential precondition
 
-A verified kiro worker ran under a signed-in account with no key export.
+A verified kiro worker ran under a signed-in account with no key export, on Amazon Linux 2.
+macOS is unestablished: the Amazon Linux 2 auth path does not exist there, and where kiro carries auth on macOS is not something this adapter can determine, because determining it means probing a credential store that belongs to the operator.
+So a kiro worker spawned on macOS may hit an interactive auth prompt, which makes the harness unusable unattended on that platform; `../../../../../docs/verification/kiro.md` owns the gap and its cost.
 Treat any auth prompt or refusal as a credential blocker under `../../../../../AGENTS.md` section 9, fix the environment, and retire the endpoint rather than typing into it.
 
 ## Detection
