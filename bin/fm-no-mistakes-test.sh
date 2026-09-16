@@ -37,8 +37,8 @@
 # in FM_TEST_GATE_SUMMARY.skipped_gate. A required missing prerequisite still
 # makes its lane and this gate exit non-zero. The Herdr lane requires the Herdr
 # binary. Only the lane holding tests/fm-pi-primary-types.test.sh carries the Pi
-# typecheck requirement, and only on a host that has the Pi package installed;
-# a host without it records a named capability skip instead of a red lane.
+# typecheck requirement, and only on a host that has npm, tsc and the Pi package;
+# a host missing one records a named capability skip instead of a red lane.
 #
 # The --list-plan, --check-plan and --required-skips inspection modes execute no
 # tests.
@@ -187,14 +187,14 @@ PI_TYPES_TEST=tests/fm-pi-primary-types.test.sh
 PI_SKIP_TOKEN='Pi extension typecheck prerequisite not found'
 HERDR_SKIP_TOKEN='herdr not found'
 
-# The Pi typecheck prerequisites are only required where the Pi package is
-# installed, which is what CI does. A host without it skips by name instead.
-pi_package_installed() {
-  local dir=${FM_PI_PACKAGE_DIR:-}
-  if [ -z "$dir" ]; then
-    command -v npm >/dev/null 2>&1 || return 1
-    dir="$(npm root -g 2>/dev/null)/@earendil-works/pi-coding-agent"
-  fi
+# The Pi typecheck requirement only applies where every prerequisite the test
+# names is present, which is what CI installs. A host missing npm, tsc or the Pi
+# package skips by name instead.
+pi_prerequisites_available() {
+  local dir
+  command -v npm >/dev/null 2>&1 || return 1
+  command -v tsc >/dev/null 2>&1 || return 1
+  dir=${FM_PI_PACKAGE_DIR:-"$(npm root -g 2>/dev/null)/@earendil-works/pi-coding-agent"}
   [ -f "$dir/package.json" ]
 }
 
@@ -202,7 +202,7 @@ pi_required_lane() { # <plan>
   local lane
   lane=$(awk -F '\t' -v t="$PI_TYPES_TEST" '$2 == t { print $1; exit }' "$1")
   [ -n "$lane" ] || return 0
-  pi_package_installed || return 0
+  pi_prerequisites_available || return 0
   printf '%s\n' "$lane"
 }
 

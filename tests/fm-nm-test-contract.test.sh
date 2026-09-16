@@ -65,17 +65,35 @@ test_duplicate_target_fails_by_name() {
 }
 
 test_pi_requirement_is_scoped_to_its_lane_and_capable_hosts() {
-  local tmp plan pi_lane rows offenders
+  local tmp plan pi_lane rows offenders tool
   tmp=$(fm_test_tmproot fm-nm-test-required-skips)
   plan="$tmp/plan"
   "$GATE" --list-plan >"$plan"
   pi_lane=$(awk -F '\t' '$2 == "tests/fm-pi-primary-types.test.sh" { print $1; exit }' "$plan")
   [ -n "$pi_lane" ] || fail "no lane holds tests/fm-pi-primary-types.test.sh"
 
-  mkdir -p "$tmp/pi"
+  # A staged PATH decides which Pi prerequisites this host appears to have, so
+  # the contract holds whatever the developer's machine happens to carry.
+  mkdir -p "$tmp/bin" "$tmp/pi"
+  for tool in bash awk cut dirname sort; do
+    ln -s "$(command -v "$tool")" "$tmp/bin/$tool" || fail "could not stage $tool"
+  done
+  printf '#!/bin/sh\nexit 0\n' >"$tmp/bin/npm"
+  chmod +x "$tmp/bin/npm"
   printf '{"name":"@earendil-works/pi-coding-agent"}\n' >"$tmp/pi/package.json"
-  rows=$(FM_PI_PACKAGE_DIR="$tmp/pi" "$GATE" --required-skips "$plan") \
-    || fail "--required-skips failed on a host with the Pi package installed"
+
+  rows=$(PATH="$tmp/bin" FM_PI_PACKAGE_DIR="$tmp/pi" "$GATE" --required-skips "$plan") \
+    || fail "--required-skips failed on a host without tsc"
+  if printf '%s\n' "$rows" | grep -q 'Pi extension typecheck prerequisite'; then
+    fail "a host without tsc must skip by name, not fail its lane"
+  fi
+  assert_contains "$rows" "$(printf '%s\t%s' real-herdr-gated "herdr not found")" \
+    "Herdr requirement without tsc"
+
+  printf '#!/bin/sh\nexit 0\n' >"$tmp/bin/tsc"
+  chmod +x "$tmp/bin/tsc"
+  rows=$(PATH="$tmp/bin" FM_PI_PACKAGE_DIR="$tmp/pi" "$GATE" --required-skips "$plan") \
+    || fail "--required-skips failed on a host with every Pi prerequisite"
   assert_contains "$rows" \
     "$(printf '%s\t%s' "$pi_lane" "Pi extension typecheck prerequisite not found")" \
     "Pi requirement on its own lane"
@@ -87,7 +105,7 @@ test_pi_requirement_is_scoped_to_its_lane_and_capable_hosts() {
   [ -z "$offenders" ] \
     || fail "Pi requirement reached lanes without the Pi test: $offenders"
 
-  rows=$(FM_PI_PACKAGE_DIR="$tmp/absent" "$GATE" --required-skips "$plan") \
+  rows=$(PATH="$tmp/bin" FM_PI_PACKAGE_DIR="$tmp/absent" "$GATE" --required-skips "$plan") \
     || fail "--required-skips failed on a host without the Pi package"
   if printf '%s\n' "$rows" | grep -q 'Pi extension typecheck prerequisite'; then
     fail "a host without the Pi package must skip by name, not fail its lane"
