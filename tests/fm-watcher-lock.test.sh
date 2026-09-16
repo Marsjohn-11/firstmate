@@ -523,6 +523,84 @@ test_lock_reclaims_a_self_held_steal_mutex() {
   pass "a steal mutex abandoned by this process is reclaimed instead of wedging"
 }
 
+# A crashed stealer's nested mutex outlives it, and the kernel eventually hands
+# its pid to an unrelated process. Bare liveness then reads that residue as held
+# for as long as the recycled pid lives, so fm_lock_try_acquire fails identically
+# on every attempt and the unbounded fm_lock_acquire_wait above it spins while
+# still holding the primary lock - the same wedge the descent caused. The
+# recorded identity separates the two cases, so the residue is reclaimed when its
+# pid no longer answers to it and left alone when it does.
+test_lock_reclaims_a_steal_mutex_whose_pid_was_recycled() {
+  local dir state lockdir residue squatter foreign own dead rc
+  dead=$(dead_pid)
+
+  dir=$(make_case lock-steal-recycled-pid)
+  state="$dir/state"
+  lockdir="$state/.contend.lock"
+  residue="$lockdir.steal.steal"
+  sleep 30 &
+  squatter=$!
+  # The pid the residue records is alive, but as this test process, not as the
+  # crashed stealer whose identity the residue still carries.
+  foreign=$(bash -c '. "$1"; fm_pid_identity "$2"' _ "$LIB" "$$") \
+    || fail "could not compute a foreign pid identity"
+  [ -n "$foreign" ] || fail "empty foreign pid identity"
+  mkdir "$lockdir" "$residue"
+  printf '%s\n' "$dead" > "$lockdir/pid"
+  printf '%s\n' "$squatter" > "$residue/pid"
+  printf '%s\n' "$foreign" > "$residue/pid-identity"
+
+  rc=0
+  FM_LOCK_STALE_AFTER=0 FM_STATE_OVERRIDE="$state" bash -c '
+    . "$1"
+    fm_lock_try_acquire "$2"
+  ' _ "$LIB" "$lockdir" || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    kill -9 "$squatter" 2>/dev/null || true
+    wait "$squatter" 2>/dev/null || true
+    fail "recovery stayed blocked by nested-mutex residue whose pid was recycled (rc=$rc)"
+  fi
+  assert_absent "$residue" "residue whose recorded holder is gone outlived recovery"
+  own=$(cat "$lockdir/pid" 2>/dev/null || true)
+  [ "$own" != "$dead" ] || fail "the stale primary lock was not actually replaced"
+  is_live_non_zombie "$squatter" \
+    || fail "the unrelated process holding the recycled pid was signalled"
+  kill -9 "$squatter" 2>/dev/null || true
+  wait "$squatter" 2>/dev/null || true
+
+  # Control: an older revision running concurrently does hold a nested mutex
+  # while it descends, so residue whose live pid still answers to its recorded
+  # identity must survive and the claim must back off instead.
+  dir=$(make_case lock-steal-live-nested)
+  state="$dir/state"
+  lockdir="$state/.contend.lock"
+  residue="$lockdir.steal.steal"
+  sleep 30 &
+  squatter=$!
+  own=$(bash -c '. "$1"; fm_pid_identity "$2"' _ "$LIB" "$squatter") \
+    || fail "could not record the nested mutex holder's identity"
+  [ -n "$own" ] || fail "empty identity for the nested mutex holder"
+  mkdir "$lockdir" "$residue"
+  printf '%s\n' "$dead" > "$lockdir/pid"
+  printf '%s\n' "$squatter" > "$residue/pid"
+  printf '%s\n' "$own" > "$residue/pid-identity"
+
+  rc=0
+  FM_LOCK_STALE_AFTER=0 FM_STATE_OVERRIDE="$state" bash -c '
+    . "$1"
+    fm_lock_try_acquire "$2"
+  ' _ "$LIB" "$lockdir" || rc=$?
+  if [ "$rc" -eq 0 ]; then
+    kill -9 "$squatter" 2>/dev/null || true
+    wait "$squatter" 2>/dev/null || true
+    fail "a nested mutex whose live holder still matches its identity was taken"
+  fi
+  assert_present "$residue" "a live holder's nested mutex was pruned"
+  kill -9 "$squatter" 2>/dev/null || true
+  wait "$squatter" 2>/dev/null || true
+  pass "nested-mutex residue is reclaimed on a recycled pid and kept on a live holder"
+}
+
 # A crashed stealer leaves its steal mutex behind, and recovering that mutex with
 # the primary lock's own algorithm descends onto "<lock>.steal.steal" and keeps
 # descending. Every symlink creation goes through ln, so recording each link path
@@ -1435,6 +1513,7 @@ test_lock_empty_pid_uses_minimum_grace
 test_lock_late_claim_loses_after_recreate
 test_lock_paused_mid_acquire_claim_fails_during_steal
 test_lock_reclaims_a_self_held_steal_mutex
+test_lock_reclaims_a_steal_mutex_whose_pid_was_recycled
 test_lock_never_creates_a_nested_steal_mutex
 test_lock_stale_steal_recovery_stays_bounded
 test_autoarm_reclaim_refuses_when_the_steal_mutex_was_taken

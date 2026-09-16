@@ -462,12 +462,29 @@ fm_lock_owner_dir() {
   mktemp -d "${lock_abs}.owner.XXXXXX" 2>/dev/null
 }
 
+# Record the holder's process identity beside its pid, so a pid the kernel later
+# hands to an unrelated process cannot pass for the original holder. Best effort
+# by design: an identity that cannot be computed or stored leaves the file
+# absent, which reads as "identity unknown" and keeps the bare liveness test,
+# never as a reclaimable holder.
+fm_lock_record_owner_identity() {  # <ownerdir> <pid>
+  local ownerdir=$1 pid=$2 identity
+  identity=$(fm_pid_identity "$pid" 2>/dev/null || true)
+  if [ -z "$identity" ] \
+    || ! { printf '%s\n' "$identity" > "$ownerdir/pid-identity"; } 2>/dev/null \
+    || [ "$(cat "$ownerdir/pid-identity" 2>/dev/null || true)" != "$identity" ]; then
+    rm -f "$ownerdir/pid-identity" 2>/dev/null || true
+  fi
+  return 0
+}
+
 fm_lock_prepare_owner() {
   local ownerdir=$1 mypid back
   fm_current_pid mypid || return 1
   printf '%s\n' "$mypid" > "$ownerdir/pid" 2>/dev/null || return 1
   back=$(cat "$ownerdir/pid" 2>/dev/null || true)
-  [ "$back" = "$mypid" ]
+  [ "$back" = "$mypid" ] || return 1
+  fm_lock_record_owner_identity "$ownerdir" "$mypid"
 }
 
 fm_lock_link_owner() {
@@ -589,6 +606,23 @@ fm_lock_mid_acquire_is_fresh() {
   return 1
 }
 
+# True only when the lock records an identity for its holder pid and that pid's
+# CURRENT identity provably differs, which means the kernel recycled the pid onto
+# an unrelated process and the recorded holder is gone. A lock with no recorded
+# identity, an identity that cannot be recomputed, or an identity that still
+# matches all answer false, so an unproven holder always counts as live.
+# The proof is fm_pid_identity's process start time - one-second granularity on
+# the ps lstart fallback - plus the command string, the same evidence the watcher
+# and daemon locks already record.
+fm_lock_owner_pid_recycled() {  # <lockdir> <pid>
+  local lockdir=$1 pid=$2 recorded current
+  recorded=$(cat "$lockdir/pid-identity" 2>/dev/null || true)
+  [ -n "$recorded" ] || return 1
+  current=$(fm_pid_identity "$pid" 2>/dev/null) || return 1
+  [ -n "$current" ] || return 1
+  [ "$current" != "$recorded" ]
+}
+
 fm_lock_recheck_stale_owner() {
   local lockdir=$1 expected_owner=$2 expected_pid=$3 actual_pid
   if [ -n "$expected_owner" ]; then
@@ -598,7 +632,7 @@ fm_lock_recheck_stale_owner() {
   fi
   actual_pid=$(cat "$lockdir/pid" 2>/dev/null || true)
   [ "$actual_pid" = "$expected_pid" ] || return 1
-  if fm_pid_alive "$actual_pid"; then
+  if fm_pid_alive "$actual_pid" && ! fm_lock_owner_pid_recycled "$lockdir" "$actual_pid"; then
     return 1
   fi
   if fm_lock_mid_acquire_is_fresh "$lockdir" "$actual_pid"; then
@@ -941,9 +975,14 @@ _fm_lock_reclaim_if_stale() {  # <path>
 # pathname, burning four minutes of fork/exec before bash's stack gave out.
 #
 # So reclaim one stale holder in place instead of descending, in a bounded two
-# attempts. A nested mutex left by an older revision is pruned on the same stale
-# test, because no revision may legitimately hold one and its presence would
-# otherwise block every claim through fm_lock_claim_blocked_by_steal.
+# attempts. A nested mutex left by an older revision is pruned, because its mere
+# presence blocks every claim through fm_lock_claim_blocked_by_steal. That prune
+# stays behind the stale test, because an older revision running concurrently on
+# the same home does hold "<lock>.steal.steal" as a genuine mutex while it
+# descends, and pruning unconditionally would pull it out from under that
+# process. The stale
+# test counts a recycled pid as gone (fm_lock_owner_pid_recycled), so residue
+# whose holder crashed is reclaimed even once its pid names something else.
 fm_lock_steal_try_acquire() {  # <steal-path>
   local steal=$1 attempt=0 pid current
   fm_current_pid current || return 1
@@ -1097,12 +1136,18 @@ _fm_lock_acquire_wait_handoff() {  # <lockdir> <caller-pid>
   fi
   fm_current_pid current || { fm_lock_release "$lockdir"; return 1; }
   back=$(cat "$ownerdir/pid" 2>/dev/null || true)
+  # A recorded identity always describes the pid recorded beside it, so clear the
+  # helper's before the pid changes hands and record the caller's after. An
+  # absent identity is the safe intermediate, because it reads as unknown rather
+  # than as a stale holder.
+  rm -f "$ownerdir/pid-identity" 2>/dev/null || true
   if [ "$back" != "$current" ] \
     || ! printf '%s\n' "$caller_pid" > "$ownerdir/pid" 2>/dev/null \
     || [ "$(cat "$ownerdir/pid" 2>/dev/null || true)" != "$caller_pid" ]; then
     fm_lock_release "$lockdir"
     return 1
   fi
+  fm_lock_record_owner_identity "$ownerdir" "$caller_pid"
   trap - TERM INT
 }
 
