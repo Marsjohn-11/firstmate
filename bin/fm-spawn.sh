@@ -3615,12 +3615,12 @@ rovo_wait_for_ready() {
   while [ "$i" -lt "$max" ]; do
     pane=$(rovo_capture)
     # Lead with rovo's fresh-launch ASCII welcome banner (confirmed live), the
-    # same primary evidence kimi's own 'Welcome to Kimi Code!' match uses. The
-    # composer-empty fallback is WEAKER for rovo than for kimi: rovo's idle
-    # composer renders an inline placeholder chip (luminance ~163, above the
-    # ghost-strip threshold) that bin/fm-composer-lib.sh does not currently strip
-    # (see the deliberately-unfixed composer-ghost gap in rovo.md), so it can read
-    # non-empty - hence the banner is the primary signal.
+    # same primary evidence kimi's own 'Welcome to Kimi Code!' match uses.
+    # rovo's idle composer renders an inline placeholder chip that the
+    # near-achromatic ghost ceiling strips (luminance 162.9, spread 3 - see
+    # docs/verification/rovo.md), so the composer-empty fallback does read
+    # empty at idle. The banner stays primary because it proves a FRESH launch
+    # outright, where composer-empty only proves the composer is clear.
     if printf '%s\n' "$pane" | grep -Fq 'Welcome to Rovo!' ||
       rovo_composer_is_empty; then
       return 0
