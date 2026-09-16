@@ -50,7 +50,9 @@
 #                   after each script, fail the run if any output line contains
 #                   "skip: <token>" (e.g. --fail-on-gate-skip 'herdr not found').
 #                   The required Herdr CI lane uses this so a missing pin cannot
-#                   silently pass as a gate skip.
+#                   silently pass. The script remains counted as skipped_gate,
+#                   rather than as an assertion failure, while the run exits
+#                   non-zero.
 #   --jobs N        run the selected scripts with up to N concurrent workers.
 #                   Plain --changed and a plain list of script paths use
 #                   min(4, cpus) workers when multiple selected scripts are
@@ -108,8 +110,9 @@
 # --fail-on-gate-skip token appears, the measured duration exceeds
 # --max-wall-ms, timing-artifact finalization fails, or a concurrent worker
 # violates its isolation check. Other gate skips (first meaningful line
-# matching ^skip:) remain successful and are counted as skipped_gate; each one
-# is logged with its reason and recorded in the timing artifact.
+# matching ^skip:) remain successful. Both required and allowed gate skips are
+# counted as skipped_gate, logged with their reason, and recorded in the timing
+# artifact; required skips make the run red without inflating failed.
 #
 # expected_gate_skip classes name why a family is allowed to skip: herdr (the
 # pinned real-Herdr lane), optional-binary (a backend whose binary is optional),
@@ -2287,25 +2290,31 @@ family_bump() {
 
 record_script_result() {
   local script=$1 rc=$2 duration=$3 out=$4 end_iso=$5
-  local base family expected gate_skip gate_reason fail_delta
+  local base family expected gate_skip gate_reason fail_delta required_gate_skip
   base=$(basename "$script")
   family=$(family_for_basename "$base")
   expected=$(expected_gate_skip_for_family "$family")
 
-  if [ -n "$FAIL_ON_GATE_SKIP" ] && detect_gate_skip_token "$out" "$FAIL_ON_GATE_SKIP"; then
+  required_gate_skip=false
+  if [ "$rc" -eq 0 ] && [ -n "$FAIL_ON_GATE_SKIP" ] \
+    && detect_gate_skip_token "$out" "$FAIL_ON_GATE_SKIP"; then
     log "required gate skip token seen in $script: skip: $FAIL_ON_GATE_SKIP"
-    rc=1
+    required_gate_skip=true
   fi
 
   gate_skip=false
   gate_reason=
-  if [ "$rc" -eq 0 ] && detect_gate_skip "$out"; then
+  if [ "$rc" -eq 0 ] \
+    && { [ "$required_gate_skip" = true ] || detect_gate_skip "$out"; }; then
     gate_skip=true
     gate_reason=$(gate_skip_reason "$out")
     SKIPPED_GATE=$((SKIPPED_GATE + 1))
     # A capability skip is the runner's only record of what this host could not
     # exercise, so name it rather than leaving a silent green.
     log "gate skip: $script: ${gate_reason:-<no reason given>}"
+    if [ "$required_gate_skip" = true ]; then
+      AGG_RC=1
+    fi
   fi
 
   printf 'FM_TEST_END %s %s exit=%s duration_ms=%s gate_skip=%s\n' \

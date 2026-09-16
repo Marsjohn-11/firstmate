@@ -32,10 +32,11 @@
 # The command refuses a missing artifact, a lane count that differs from its
 # validated plan, an aggregate count that differs from discovery, or any failed
 # script.
-# Expected capability gate-skips remain distinct from passes and are reported
-# in FM_TEST_GATE_SUMMARY.skipped_gate.
-# The required Herdr lane fails if Herdr is absent, and portable lanes fail if
-# the installed Pi typecheck prerequisite is absent.
+# Capability gate-skips remain distinct from both passes and assertion failures
+# in FM_TEST_GATE_SUMMARY.skipped_gate. A required missing prerequisite still
+# makes its lane and this gate exit non-zero: the required Herdr lane refuses a
+# missing Herdr binary, and portable lanes refuse a missing installed Pi
+# typecheck prerequisite.
 #
 # The --list-plan and --check-plan inspection modes execute no tests.
 # --check-plan validates a supplied plan against current discovery so the

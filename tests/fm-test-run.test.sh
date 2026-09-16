@@ -955,10 +955,11 @@ assert record["gate_skip_reason"].startswith("live: "), record
 }
 
 test_fail_on_gate_skip_token() {
-  local tmp skip_f out rc
+  local tmp skip_f out json rc
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-fail-skip.XXXXXX")
   skip_f="$tmp/skip.test.sh"
   out="$tmp/out.txt"
+  json="$tmp/timing.json"
   cat >"$skip_f" <<'SH'
 #!/usr/bin/env bash
 echo "skip: herdr not found"
@@ -966,16 +967,29 @@ exit 0
 SH
   chmod +x "$skip_f"
   set +e
-  "$RUNNER" --fail-on-gate-skip 'herdr not found' "$skip_f" >"$out" 2>"$tmp/err.txt"
+  "$RUNNER" --json "$json" --fail-on-gate-skip 'herdr not found' \
+    "$skip_f" >"$out" 2>"$tmp/err.txt"
   rc=$?
   set -e
-  [ "$rc" -ne 0 ] || fail "fail-on-gate-skip must make herdr-not-found a hard failure"
-  grep -q 'FM_TEST_SUMMARY total=1 failed=1' "$out" \
-    || fail "summary must report failed=1 under fail-on-gate-skip: $(grep FM_TEST_SUMMARY "$out")"
+  [ "$rc" -ne 0 ] || fail "fail-on-gate-skip must make herdr-not-found fail the run"
+  grep -q 'FM_TEST_SUMMARY total=1 failed=0 skipped_gate=1' "$out" \
+    || fail "required skip must stay distinct from assertion failure: $(grep FM_TEST_SUMMARY "$out")"
+  grep -Eq '^FM_TEST_END .+ exit=0 duration_ms=[0-9]+ gate_skip=true$' "$out" \
+    || fail "required skip must retain its gate-skip outcome: $(grep '^FM_TEST_END' "$out")"
   grep -q 'required gate skip token' "$tmp/err.txt" \
     || fail "runner must log the required gate skip token"
+  python3 -c '
+import json, sys
+doc = json.load(open(sys.argv[1]))
+record = doc["scripts"][0]
+assert record["exit"] == 0, record
+assert record["gate_skip"] is True, record
+assert record["gate_skip_reason"] == "herdr not found", record
+assert doc["summary"]["failed"] == 0, doc["summary"]
+assert doc["summary"]["skipped_gate"] == 1, doc["summary"]
+' "$json" || { rm -rf "$tmp"; fail "required skip JSON outcome is wrong"; }
   rm -rf "$tmp"
-  pass "fail-on-gate-skip converts herdr-not-found into a hard failure"
+  pass "fail-on-gate-skip makes the run red without calling a skip a failure"
 }
 
 test_exclude_family() {
@@ -1646,8 +1660,8 @@ SH
   rc=$?
   set -e
   [ "$rc" -ne 0 ] || { rm -rf "$tmp"; fail "parallel stderr gate skip must hard-fail"; }
-  grep -q 'FM_TEST_SUMMARY total=1 failed=1' "$tmp/out5" \
-    || { rm -rf "$tmp"; fail "parallel stderr hard-fail summary wrong: $(grep FM_TEST_SUMMARY "$tmp/out5")"; }
+  grep -q 'FM_TEST_SUMMARY total=1 failed=0 skipped_gate=1' "$tmp/out5" \
+    || { rm -rf "$tmp"; fail "parallel required-skip summary wrong: $(grep FM_TEST_SUMMARY "$tmp/out5")"; }
 
   "$runner" --jobs 2 "$d" >"$tmp/out6" 2>"$tmp/err6" \
     || { rm -rf "$tmp"; fail "ordinary parallel stderr gate skip must remain successful"; }
