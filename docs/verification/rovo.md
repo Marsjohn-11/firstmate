@@ -30,7 +30,7 @@ Rovo CLI: 202609.1.2
 `fm-spawn.sh` builds `env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS <rovo-bin> run --yolo <model/effort flags>` - BARE, with no positional brief - wrapped by the shared `env -u CURSOR_AGENT -u CURSOR_INVOKED_AS` prefix every non-cursor harness gets.
 The brief is then typed in after the TUI comes up, the same launch-then-send shape kimi uses, through the same shared readers (`fm_backend_capture`, `fm_backend_composer_state`, `fm_backend_send_text_submit`):
 
-1. `rovo_wait_for_ready` polls for the `Welcome to Rovo!` banner (primary) or a composer-empty verdict (weaker fallback, see the composer-ghost-text gap below).
+1. `rovo_wait_for_ready` polls for the `Welcome to Rovo!` banner (primary, because it proves a fresh launch outright where composer-empty only proves the composer is clear) or a composer-empty verdict (fallback; the idle placeholder chip strips as ghost text, see "Composer ghost text" below).
 2. The pointer `Read the brief at <absolute-path> and follow it exactly.` is submitted via `fm_backend_send_text_submit`.
 3. `rovo_wait_for_delivery` confirms composer-empty AND either the echoed `Read the brief at` text or a nonzero `Context:` percentage (`context:[^%]*[1-9][^%]*%`, tolerant of the footer's bar glyph but anchored before the `%` so the `.../922K` denominator cannot false-positive).
 
@@ -206,7 +206,8 @@ $ herdr pane list --workspace w1 --session fm-lab-...
 
 A rovo pane was placed in that isolated workspace, launched bare (the same `env -u ... rovo run --yolo` template documented above), and `rovo_wait_for_ready` returned success on the `Welcome to Rovo!` banner.
 The typed pointer (`Read the brief at <path> and follow it exactly.`) was echoed into the pane, and rovo read a trivial no-op brief, ran a real `sleep 15` bash tool call, and replied `PONG` - the same launch-then-send shape already verified over tmux and a raw PTY, now also confirmed live over Herdr.
-`fm_backend_herdr_capture` correctly rendered the `Rovo is thinking...` busy line during the tool call (`fm_busy_rovo_tail_busy` matches that captured text), and the pane read idle with `PONG` visible once the tool call finished; `rovo_wait_for_delivery`'s own composer-empty conjunct did not settle within its poll window, consistent with the already-documented composer-ghost-text gap below rather than a new defect.
+`fm_backend_herdr_capture` correctly rendered the `Rovo is thinking...` busy line during the tool call (`fm_busy_rovo_tail_busy` matches that captured text), and the pane read idle with `PONG` visible once the tool call finished; `rovo_wait_for_delivery`'s own composer-empty conjunct did not settle within its poll window.
+That is the herdr poll-window limitation recorded under "Composer ghost text" above rather than a new defect, and the idle placeholder chip is not its cause, because the composer read non-empty mid-turn when real output is present, so the chromaticity fix does not address it.
 
 `fm_backend_agent_state` is the one signal this run disproves rather than confirms: it reported `dead` throughout - at the ready banner, mid-tool-call busy, and idle-with-`PONG` alike - even though rovo was demonstrably alive and responding the whole time.
 The cause is on Herdr's side, not firstmate's: `fm_backend_herdr_pane_agent_state` calls `herdr agent get <pane>`, which returned `{"error":{"code":"agent_not_found","message":"agent target w1:p1 not found"}}` for the live rovo pane, because `herdr integration status` lists no `rovo` entry at all (only `pi`, `omp`, `claude`, `codex`, `copilot`, `devin`, `droid`, `kimi`, `opencode`, `kilo`, `hermes`, `qodercli`, `qwen`, `cursor`, `mastracode`, `antigravity-cli`, and `grok` are known integrations on the installed Herdr build).
