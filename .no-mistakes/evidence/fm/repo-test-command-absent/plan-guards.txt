@@ -1,0 +1,24 @@
+### 1. Valid plan accepted
+FM_TEST_PLAN ok total=213 lanes=8
+exit=0
+
+### 2. Adversarial: drop one discovered test from the plan (zero lanes)
+portable-parallel-1	tests/fm-lint.test.sh
+fm-no-mistakes-test: discovered files assigned to zero lanes:
+tests/fm-lint.test.sh
+exit=1
+
+### 3. Adversarial: assign one test to two lanes
+portable-parallel-2	tests/fm-lint.test.sh
+fm-no-mistakes-test: files assigned to multiple lanes:
+tests/fm-lint.test.sh
+exit=1
+
+### 4. Adversarial: plan names a test that does not exist
+fm-no-mistakes-test: planned files absent from discovery:
+tests/fm-does-not-exist.test.sh
+exit=1
+
+### 5. Adversarial: malformed plan row
+fm-no-mistakes-test: invalid plan row: portable-parallel-1\ttests/a.test.sh\textra
+exit=1

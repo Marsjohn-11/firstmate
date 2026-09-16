@@ -1,0 +1,20 @@
+The Pi typecheck test is planned into lane: portable-parallel-1
+Rows below are the '<lane><TAB><required skip token>' pairs the gate hands its lanes.
+A lane with no row treats a capability skip as a named skip, not a failure.
+
+=== Host A: this machine as-is (npm present, tsc present, Pi package ABSENT) ===
+real-herdr-gated	herdr not found
+exit=0
+
+=== Host B: npm + Pi package present, tsc ABSENT ===
+real-herdr-gated	herdr not found
+exit=0
+
+=== Host C (CI-like): npm + tsc + Pi package ALL present ===
+portable-parallel-1	Pi extension typecheck prerequisite not found
+real-herdr-gated	herdr not found
+exit=0
+
+=== Host D: npm + tsc present, Pi package ABSENT ===
+real-herdr-gated	herdr not found
+exit=0

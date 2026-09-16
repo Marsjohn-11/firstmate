@@ -1,0 +1,24 @@
+### A required missing prerequisite: run goes RED but the skip is not counted as a failure
+fm-test-run: required gate skip token seen in /tmp/fm-skip-sem.ERrokg/a-skips.test.sh: skip: herdr not found
+fm-test-run: gate skip: /tmp/fm-skip-sem.ERrokg/a-skips.test.sh: herdr not found (no binary on this host)
+FM_TEST_END 2026-09-16T17:10:34Z /tmp/fm-skip-sem.ERrokg/a-skips.test.sh exit=0 duration_ms=150 gate_skip=true
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=1 duration_ms=552
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=150 failed=0
+runner exit=
+runner exit=1
+timing artifact summary: {"duration_ms": 276, "failed": 0, "skipped_gate": 1, "total": 1}
+script record: {"path": "/tmp/fm-skip-sem.ERrokg/a-skips.test.sh", "exit": 0, "gate_skip": true, "gate_skip_reason": "herdr not found (no binary on this host)"}
+
+### The same skip when NOT required: green, still named and counted as a gate skip
+fm-test-run: gate skip: /tmp/fm-skip-sem.ERrokg/a-skips.test.sh: herdr not found (no binary on this host)
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=1 duration_ms=396
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=78 failed=0
+runner exit=0
+
+### Three outcomes stay separable in one run: pass, gate skip, assertion failure
+fm-test-run: gate skip: /tmp/fm-skip-sem.ERrokg/a-skips.test.sh: herdr not found (no binary on this host)
+not ok - broken
+FM_TEST_SUMMARY total=3 failed=1 skipped_gate=1 duration_ms=939
+FM_TEST_SUMMARY_FAMILY family=unclassified count=3 duration_ms=173 failed=1
+summary: {"duration_ms": 939, "failed": 1, "skipped_gate": 1, "total": 3}
+passed = total - failed - skipped_gate = 1

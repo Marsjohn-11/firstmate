@@ -1,0 +1,10 @@
+### Adversarial: an inventory with zero tests must fail loudly, not report an empty green run
+(eval):7: no matches found: tests/*.test.sh
+fm-test-run: lane 'portable-serial-1of5' selected no tests
+fm-no-mistakes-test: lane 'portable-serial-1of5' selected zero tests
+exit=
+--list-plan exit=2
+gate exit=2
+gate stderr:
+fm-test-run: lane 'portable-serial-1of5' selected no tests
+fm-no-mistakes-test: lane 'portable-serial-1of5' selected zero tests

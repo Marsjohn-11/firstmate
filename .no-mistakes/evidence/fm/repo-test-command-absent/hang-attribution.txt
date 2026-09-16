@@ -1,0 +1,22 @@
+### A hanging test still produces attributable per-script output at the bound
+FM_TEST_BEGIN 2026-09-16T17:13:46Z /tmp/fm-hang.GHHp6O/i-quick.test.sh family=unclassified expected_gate_skip=none
+FM_TEST_END 2026-09-16T17:13:48Z /tmp/fm-hang.GHHp6O/i-quick.test.sh exit=0 duration_ms=938 gate_skip=false
+FM_TEST_BEGIN 2026-09-16T17:13:48Z /tmp/fm-hang.GHHp6O/h-hangs.test.sh family=unclassified expected_gate_skip=none
+FM_TEST_END 2026-09-16T17:13:52Z /tmp/fm-hang.GHHp6O/h-hangs.test.sh exit=124 duration_ms=3422 gate_skip=false
+FM_TEST_SUMMARY total=2 failed=1 skipped_gate=0 duration_ms=6168
+FM_TEST_SUMMARY_FAMILY family=unclassified count=2 duration_ms=4360 failed=1
+
+runner exit=1
+summary: {"duration_ms": 5607, "failed": 1, "skipped_gate": 0, "total": 2}
+record: {"path": "/tmp/fm-hang.GHHp6O/i-quick.test.sh", "exit": 0, "duration_ms": 492}
+record: {"path": "/tmp/fm-hang.GHHp6O/h-hangs.test.sh", "exit": 124, "duration_ms": 3562}
+
+### An internal wall bound also reports per-script boundaries before stopping
+FM_TEST_BEGIN 2026-09-16T17:14:00Z /tmp/fm-hang.GHHp6O/i-quick.test.sh family=unclassified expected_gate_skip=none
+FM_TEST_END 2026-09-16T17:14:02Z /tmp/fm-hang.GHHp6O/i-quick.test.sh exit=0 duration_ms=1159 gate_skip=false
+FM_TEST_BEGIN 2026-09-16T17:14:02Z /tmp/fm-hang.GHHp6O/h-hangs.test.sh family=unclassified expected_gate_skip=none
+FM_TEST_END 2026-09-16T17:15:03Z /tmp/fm-hang.GHHp6O/h-hangs.test.sh exit=124 duration_ms=60275 gate_skip=false
+FM_TEST_SUMMARY total=2 failed=1 skipped_gate=0 duration_ms=63337
+FM_TEST_SUMMARY_FAMILY family=unclassified count=2 duration_ms=61434 failed=1
+FM_TEST_BUDGET max_wall_ms=3000 duration_ms=63337
+fm-test-run: wall-clock budget exceeded: 63337ms > 3000ms for scripts;jobs=1
