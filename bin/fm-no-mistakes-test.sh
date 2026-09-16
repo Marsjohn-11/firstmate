@@ -6,6 +6,7 @@
 #   fm-no-mistakes-test.sh
 #   fm-no-mistakes-test.sh --list-plan
 #   fm-no-mistakes-test.sh --check-plan <path>
+#   fm-no-mistakes-test.sh --required-skips <path>
 #
 # The execution path derives its lanes from bin/fm-test-run.sh --list-lanes:
 # both portable parallel lanes, every portable-serial-<k>of<n> shard, and the
@@ -34,14 +35,18 @@
 # script.
 # Capability gate-skips remain distinct from both passes and assertion failures
 # in FM_TEST_GATE_SUMMARY.skipped_gate. A required missing prerequisite still
-# makes its lane and this gate exit non-zero: the required Herdr lane refuses a
-# missing Herdr binary, and portable lanes refuse a missing installed Pi
-# typecheck prerequisite.
+# makes its lane and this gate exit non-zero. The Herdr lane requires the Herdr
+# binary. Only the lane holding tests/fm-pi-primary-types.test.sh carries the Pi
+# typecheck requirement, and only on a host that has the Pi package installed;
+# a host without it records a named capability skip instead of a red lane.
 #
-# The --list-plan and --check-plan inspection modes execute no tests.
+# The --list-plan, --check-plan and --required-skips inspection modes execute no
+# tests.
 # --check-plan validates a supplied plan against current discovery so the
 # missing-file and duplicate-file refusals can be demonstrated without
 # weakening the real plan generator.
+# --required-skips prints the "<lane><TAB><required skip token>" rows the run
+# path would hand its lanes for a supplied plan.
 set -eu
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -178,8 +183,40 @@ validate_plan() { # <path>
   rm -rf "$tmp"
 }
 
-run_lane_process() { # <lane-dir> <patch> <head-sha> <lane> <planned-count>
-  local lane_dir=$1 patch=$2 head_sha=$3 lane=$4 lane_count=$5
+PI_TYPES_TEST=tests/fm-pi-primary-types.test.sh
+PI_SKIP_TOKEN='Pi extension typecheck prerequisite not found'
+HERDR_SKIP_TOKEN='herdr not found'
+
+# The Pi typecheck prerequisites are only required where the Pi package is
+# installed, which is what CI does. A host without it skips by name instead.
+pi_package_installed() {
+  local dir=${FM_PI_PACKAGE_DIR:-}
+  if [ -z "$dir" ]; then
+    command -v npm >/dev/null 2>&1 || return 1
+    dir="$(npm root -g 2>/dev/null)/@earendil-works/pi-coding-agent"
+  fi
+  [ -f "$dir/package.json" ]
+}
+
+pi_required_lane() { # <plan>
+  local lane
+  lane=$(awk -F '\t' -v t="$PI_TYPES_TEST" '$2 == t { print $1; exit }' "$1")
+  [ -n "$lane" ] || return 0
+  pi_package_installed || return 0
+  printf '%s\n' "$lane"
+}
+
+required_skip_for_lane() { # <lane> <pi-required-lane>
+  local lane=$1 pi_lane=$2
+  if [ "$lane" = real-herdr-gated ]; then
+    printf '%s\n' "$HERDR_SKIP_TOKEN"
+  elif [ -n "$pi_lane" ] && [ "$lane" = "$pi_lane" ]; then
+    printf '%s\n' "$PI_SKIP_TOKEN"
+  fi
+}
+
+run_lane_process() { # <lane-dir> <patch> <head-sha> <lane> <planned-count> <required-skip>
+  local lane_dir=$1 patch=$2 head_sha=$3 lane=$4 lane_count=$5 required_skip=$6
   local checkout log json prep_rc rc
   local -a lane_args
   set +e
@@ -194,14 +231,9 @@ run_lane_process() { # <lane-dir> <patch> <head-sha> <lane> <planned-count>
     prep_rc=$?
     if [ "$prep_rc" -eq 0 ]; then
       lane_args=(--lane "$lane" --per-script-timeout-secs 900 --json "$json")
-      case "$lane" in
-        real-herdr-gated)
-          lane_args+=(--fail-on-gate-skip 'herdr not found')
-          ;;
-        *)
-          lane_args+=(--fail-on-gate-skip 'Pi extension typecheck prerequisite not found')
-          ;;
-      esac
+      if [ -n "$required_skip" ]; then
+        lane_args+=(--fail-on-gate-skip "$required_skip")
+      fi
       (
         cd "$checkout" || exit 1
         env -u FM_TASK_ID -u FM_HOME -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_ROOT_OVERRIDE \
@@ -220,8 +252,8 @@ run_lane_process() { # <lane-dir> <patch> <head-sha> <lane> <planned-count>
 }
 
 if [ "${1:-}" = "--run-lane" ]; then
-  [ "$#" -eq 6 ] || die "--run-lane requires five internal arguments"
-  run_lane_process "$2" "$3" "$4" "$5" "$6"
+  [ "$#" -eq 7 ] || die "--run-lane requires six internal arguments"
+  run_lane_process "$2" "$3" "$4" "$5" "$6" "$7"
 fi
 
 while [ "$#" -gt 0 ]; do
@@ -235,6 +267,13 @@ while [ "$#" -gt 0 ]; do
       [ "$MODE" = run ] || die "choose only one inspection mode"
       [ "$#" -gt 1 ] || die "--check-plan requires a path"
       MODE=check
+      CHECK_PLAN=$2
+      shift 2
+      ;;
+    --required-skips)
+      [ "$MODE" = run ] || die "choose only one inspection mode"
+      [ "$#" -gt 1 ] || die "--required-skips requires a path"
+      MODE=skips
       CHECK_PLAN=$2
       shift 2
       ;;
@@ -260,6 +299,18 @@ fi
 if [ "$MODE" = check ]; then
   validate_plan "$CHECK_PLAN"
   exit $?
+fi
+
+if [ "$MODE" = skips ]; then
+  [ -f "$CHECK_PLAN" ] || die "plan not found: $CHECK_PLAN"
+  pi_lane=$(pi_required_lane "$CHECK_PLAN")
+  while IFS= read -r lane; do
+    [ -n "$lane" ] || continue
+    token=$(required_skip_for_lane "$lane" "$pi_lane")
+    [ -n "$token" ] || continue
+    printf '%s\t%s\n' "$lane" "$token"
+  done < <(cut -f1 "$CHECK_PLAN" | LC_ALL=C sort -u)
+  exit 0
 fi
 
 command -v git >/dev/null 2>&1 || die "git is required"
@@ -324,14 +375,17 @@ done < <(cut -f1 "$PLAN" | LC_ALL=C sort -u)
 printf 'FM_TEST_GATE_BEGIN commit=%s lanes=%s tests=%s %s\n' \
   "$HEAD_SHA" "${#LANES[@]}" "$(wc -l <"$PLAN" | tr -d ' ')" "$(load_snapshot)"
 
+PI_REQUIRED_LANE=$(pi_required_lane "$PLAN")
+
 lane_index=0
 for lane in "${LANES[@]}"; do
   lane_index=$((lane_index + 1))
   lane_dir="$RUN_ROOT/lane-$lane_index"
   lane_count=$(awk -F '\t' -v lane="$lane" '$1 == lane { n++ } END { print n + 0 }' "$PLAN")
+  required_skip=$(required_skip_for_lane "$lane" "$PI_REQUIRED_LANE")
   mkdir -p "$lane_dir/tmp"
   python3 "$LANE_GUARD" run "$0" --run-lane \
-    "$lane_dir" "$PATCH" "$HEAD_SHA" "$lane" "$lane_count" &
+    "$lane_dir" "$PATCH" "$HEAD_SHA" "$lane" "$lane_count" "$required_skip" &
   lane_pid=$!
   LANE_PIDS+=("$lane_pid")
   printf '%s\n' "$lane_pid" >>"$GROUPS_FILE"

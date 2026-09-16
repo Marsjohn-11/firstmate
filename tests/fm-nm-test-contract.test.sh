@@ -64,6 +64,39 @@ test_duplicate_target_fails_by_name() {
   pass "a test assigned to multiple lanes fails loudly by name"
 }
 
+test_pi_requirement_is_scoped_to_its_lane_and_capable_hosts() {
+  local tmp plan pi_lane rows offenders
+  tmp=$(fm_test_tmproot fm-nm-test-required-skips)
+  plan="$tmp/plan"
+  "$GATE" --list-plan >"$plan"
+  pi_lane=$(awk -F '\t' '$2 == "tests/fm-pi-primary-types.test.sh" { print $1; exit }' "$plan")
+  [ -n "$pi_lane" ] || fail "no lane holds tests/fm-pi-primary-types.test.sh"
+
+  mkdir -p "$tmp/pi"
+  printf '{"name":"@earendil-works/pi-coding-agent"}\n' >"$tmp/pi/package.json"
+  rows=$(FM_PI_PACKAGE_DIR="$tmp/pi" "$GATE" --required-skips "$plan") \
+    || fail "--required-skips failed on a host with the Pi package installed"
+  assert_contains "$rows" \
+    "$(printf '%s\t%s' "$pi_lane" "Pi extension typecheck prerequisite not found")" \
+    "Pi requirement on its own lane"
+  assert_contains "$rows" "$(printf '%s\t%s' real-herdr-gated "herdr not found")" \
+    "Herdr requirement on the Herdr lane"
+  offenders=$(printf '%s\n' "$rows" |
+    awk -F '\t' -v lane="$pi_lane" \
+      '$2 == "Pi extension typecheck prerequisite not found" && $1 != lane { print $1 }')
+  [ -z "$offenders" ] \
+    || fail "Pi requirement reached lanes without the Pi test: $offenders"
+
+  rows=$(FM_PI_PACKAGE_DIR="$tmp/absent" "$GATE" --required-skips "$plan") \
+    || fail "--required-skips failed on a host without the Pi package"
+  if printf '%s\n' "$rows" | grep -q 'Pi extension typecheck prerequisite'; then
+    fail "a host without the Pi package must skip by name, not fail its lane"
+  fi
+  assert_contains "$rows" "$(printf '%s\t%s' real-herdr-gated "herdr not found")" \
+    "Herdr requirement without the Pi package"
+  pass "the Pi typecheck requirement is scoped to its lane and to capable hosts"
+}
+
 test_abandoned_lane_process_group_is_reaped() {
   command -v python3 >/dev/null 2>&1 \
     || fail "python3 is required to verify abandoned lane cleanup"
@@ -115,4 +148,5 @@ test_nm_configures_complete_suite_gate
 test_plan_is_complete_and_disjoint
 test_missing_target_fails_by_name
 test_duplicate_target_fails_by_name
+test_pi_requirement_is_scoped_to_its_lane_and_capable_hosts
 test_abandoned_lane_process_group_is_reaped
