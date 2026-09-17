@@ -246,21 +246,52 @@ fm_composer_normalize_trim_var() {  # <varname>
 #     dark-foreground run. This assumes a DARK terminal theme, the firstmate
 #     fleet reality, where real typed input is bright and only de-emphasised UI
 #     is dark; the SGR-2 signal above stays theme-independent. A 256-colour
-#     foreground (38;5;n) is NOT luminance-tested - it is palette-dependent and
-#     no fleet harness uses it for ghost text, so it is kept (real text wins:
-#     under-stripping merely defers, which the max-defer alarm surfaces, while
-#     over-stripping would inject over real input).
+#     foreground (38;5;n) is luminance-tested only when the index is GREY in the
+#     standard xterm-256 palette, described below.
 # Raising FM_COMPOSER_GHOST_LUMA_MAX is not free: muse draws its `⟩` prompt glyph
 # in truecolor 38;2;90;160;255, luminance ~149.9 (verified, muse 0.1.0-R708.1),
 # the tightest margin over the 128 default in the fleet. Above ~150 that glyph is
 # stripped as ghost text, which is why the bare-glyph fallback below must also
 # recognise every agent glyph from the UNSTRIPPED plain row.
+#
+# A NEAR-ACHROMATIC truecolor run gets a higher ceiling instead, because that is
+# what separates ghost text from real input without needing to know the harness:
+#   FM_COMPOSER_GHOST_GRAY_LUMA_MAX (default 180) applies when
+#   FM_COMPOSER_GHOST_GRAY_SPREAD_MAX (default 12) covers the run's channel
+#   spread (max channel minus min channel); every other run keeps the 128 default.
+# The gray ceiling only ever RAISES the applicable ceiling. A near-gray run takes
+# the higher of the two, so an operator who raises FM_COMPOSER_GHOST_LUMA_MAX
+# above 180 still gets that wider strip on gray text as the knob documents.
+# The four measured cases this separates:
+#   kiro ghost      38;2;158;158;158  luminance 158.0  spread   0  -> stripped
+#   rovo ghost      38;2;162;163;165  luminance 162.9  spread   3  -> stripped
+#   rovo real text  38;2;206;207;210  luminance 207.0  spread   4  -> kept
+#   muse real glyph 38;2;90;160;255   luminance 149.9  spread 165  -> kept
+# Margins around 180 are 17 below (rovo's ghost at 162.9) and 27 above (rovo's
+# real text at 207.0). muse is strongly chromatic, so no luminance ceiling can
+# reach it - a structural property rather than a tuned margin, and the reason a
+# gray-only ceiling is safe where raising the shared default was not.
+# The SAME grey ceiling covers a 256-colour foreground, because a harness draws
+# the same grey in whichever encoding the terminal advertises: kiro emits
+# 38;2;158;158;158 on a truecolor pane and 38;5;247 - the identical grey, xterm
+# level 158 - on a pane with no COLORTERM, so testing only truecolour left kiro's
+# placeholder unstripped and every steer to that worker deferring forever. Only
+# the 232-255 greyscale ramp (level 8 + (n-232)*10) is tested, because it is the
+# one index range whose RGB is fixed by definition rather than by a terminal
+# theme. The 6x6x6 cube's r==g==b diagonal is arithmetically grey too and stays
+# untested: no harness has been measured drawing ghost text there, and widening
+# the predicate is how the palette-dependence problem the 38;5 carve-out exists
+# for gets in. A chromatic index is kept untested rather than converted, and
+# indices 0-15 stay untested because every terminal theme remaps them. The base
+# 30-37 / 90-97 foregrounds still just end a dark run.
 # The dim/faint and dark-foreground states are tracked together as "de-emphasis";
 # codes are processed left to right within a sequence, so "ESC[0;2m" reads as dim.
 # LC_ALL=C makes awk walk bytes, so multibyte glyphs (e.g. ❯) and de-emphasised
 # runs alike pass through or drop intact without locale-dependent classes.
 fm_composer_strip_ghost() {
-  LC_ALL=C awk -v lumamax="${FM_COMPOSER_GHOST_LUMA_MAX:-128}" '
+  LC_ALL=C awk -v lumamax="${FM_COMPOSER_GHOST_LUMA_MAX:-128}" \
+    -v graylumamax="${FM_COMPOSER_GHOST_GRAY_LUMA_MAX:-180}" \
+    -v grayspreadmax="${FM_COMPOSER_GHOST_GRAY_SPREAD_MAX:-12}" '
     function sgr_code(v, b) {
       b = v
       sub(/:.*/, "", b)
@@ -277,20 +308,56 @@ fm_composer_strip_ghost() {
       if (code == "2") return p + 4
       return p + 1
     }
+    # ceiling_for: the luminance ceiling that applies to one truecolor run.
+    # A NEAR-ACHROMATIC run (max channel minus min channel within
+    # grayspreadmax) takes the HIGHER of graylumamax and lumamax, so the gray
+    # ceiling only ever raises the applicable ceiling and never reduces an
+    # operator-set one. Anything more saturated keeps lumamax.
+    function ceiling_for(r, g, b,   hi, lo) {
+      hi = r; if (g > hi) hi = g; if (b > hi) hi = b
+      lo = r; if (g < lo) lo = g; if (b < lo) lo = b
+      if ((hi - lo) > grayspreadmax) return lumamax
+      return (graylumamax > lumamax) ? graylumamax : lumamax
+    }
+    # palette_gray_level: the channel level of a 256-colour index in the 232-255
+    # greyscale ramp, and -1 for EVERY other index. A ramp entry has
+    # r == g == b, so its level IS its luminance.
+    #
+    # The ramp alone is deliberate, not an oversight. It is the only index range
+    # whose RGB is fixed by definition rather than by a theme, so it needs no
+    # palette guessing. The 6x6x6 cube diagonal is arithmetically grey too, but
+    # it is NOT tested here: nothing has measured a harness drawing ghost text
+    # there, and widening this predicate is how the palette-dependence problem
+    # the 38;5 carve-out warns about gets in. The test asserting an index outside
+    # 232-255 is untouched exists to hold that line.
+    function palette_gray_level(n) {
+      if (n >= 232 && n <= 255) return 8 + (n - 232) * 10
+      return -1
+    }
+    function gray_is_dark(lv) {
+      return (lv >= 0 && lv < ceiling_for(lv, lv, lv)) ? 1 : 0
+    }
     # fg38_is_dark: 1 when the SGR 38 foreground starting at param p is a
-    # TRUECOLOR (38;2 / 38:2) whose luminance is below lumamax; 0 otherwise
-    # (a 38;5 palette colour, a bright truecolor, or a malformed run).
-    function fg38_is_dark(a, p, k, lumamax,   spec, nf, f, r, g, b) {
+    # TRUECOLOR (38;2 / 38:2) or a PALETTE GREY (38;5 / 38:5) whose luminance is
+    # below the ceiling that applies to it; 0 otherwise (a chromatic palette
+    # index, a bright colour, or a malformed run).
+    function fg38_is_dark(a, p, k,   spec, nf, f, r, g, b) {
       spec = a[p]
       if (index(spec, ":") > 0) {           # colon form: whole colour in a[p]
         nf = split(spec, f, ":")
+        if (f[2] == "5" && nf >= 3) return gray_is_dark(palette_gray_level(f[nf] + 0))
         if (f[2] != "2" || nf < 5) return 0
         r = f[nf - 2] + 0; g = f[nf - 1] + 0; b = f[nf] + 0
-        return ((299*r + 587*g + 114*b) / 1000 < lumamax) ? 1 : 0
+        return ((299*r + 587*g + 114*b) / 1000 < ceiling_for(r, g, b)) ? 1 : 0
       }
-      if (p + 1 > k || a[p + 1] != "2" || p + 4 > k) return 0
+      if (p + 1 > k) return 0
+      if (a[p + 1] == "5") {
+        if (p + 2 > k) return 0
+        return gray_is_dark(palette_gray_level(a[p + 2] + 0))
+      }
+      if (a[p + 1] != "2" || p + 4 > k) return 0
       r = a[p + 2] + 0; g = a[p + 3] + 0; b = a[p + 4] + 0
-      return ((299*r + 587*g + 114*b) / 1000 < lumamax) ? 1 : 0
+      return ((299*r + 587*g + 114*b) / 1000 < ceiling_for(r, g, b)) ? 1 : 0
     }
     {
       line = $0; out = ""; dim = 0; darkfg = 0; n = length(line); i = 1
@@ -311,7 +378,7 @@ fm_composer_strip_ghost() {
               for (p = 1; p <= k; p++) {
                 v = a[p]; code = sgr_code(v)
                 if (code == "38") {
-                  darkfg = fg38_is_dark(a, p, k, lumamax)
+                  darkfg = fg38_is_dark(a, p, k)
                   p = skip_color_payload(a, p, k)
                 } else if (code == "48" || code == "58") {
                   p = skip_color_payload(a, p, k)
@@ -352,7 +419,7 @@ fm_composer_strip_ghost() {
 # asking what a worker is doing, and the two must not be conflated.
 # Delivery-only rendered busy footers per harness. claude/codex: "esc to
 # interrupt"; opencode: "esc interrupt"; pi: "Working..."; omp: "Working…"; grok: "Ctrl+c:cancel"; agy: "esc to cancel";
-# devin: "esc twice to interrupt" and its "❭ Guide Devin while it works" working composer.
+# devin: "esc twice to interrupt" and its "❭ Guide Devin while it works" working composer; kiro: "Kiro is working".
 # Claude's current spinner has a rotating glyph and word, but every active-turn
 # line has an ellipsis followed by a parenthesized elapsed duration. Keep this
 # signature separate from the shared default because that shape is not generic
@@ -376,8 +443,14 @@ fm_composer_strip_ghost() {
 # agy's `esc to cancel` is part of the union for the same reason: an explicit
 # tmux agy endpoint reaches the submit core with no recorded harness, and its
 # bare `>` composer verdict is `unknown`, so the busy footer is the only
-# turn-started acknowledgement that path can read.
-FM_DELIVERY_BUSY_REGEX_DEFAULT='esc (to )?interrupt|Working(\.\.\.|…)|Ctrl\+c:cancel|ctrl\+c to stop|esc[[:space:]]+to[[:space:]]+cancel|esc twice to interrupt|^[[:space:]]*❭ Guide Devin while it works$'
+# turn-started acknowledgement that path can read. kiro's `Kiro is working` is
+# in the union for two reasons of its own: the footer renders ON the composer
+# row, so a mid-turn composer read is `pending` and only a busy read lets
+# fm_composer_queued_enter_verdict convert that to `empty`; and the submit core
+# takes its pre-typing baseline with no harness, so without the literal an
+# already-busy kiro pane reads `idle` and wrongly arms the idle-to-busy
+# confirmation.
+FM_DELIVERY_BUSY_REGEX_DEFAULT='esc (to )?interrupt|Working(\.\.\.|…)|Ctrl\+c:cancel|ctrl\+c to stop|esc[[:space:]]+to[[:space:]]+cancel|esc twice to interrupt|^[[:space:]]*❭ Guide Devin while it works$|Kiro is working'
 FM_DELIVERY_CLAUDE_BUSY_REGEX_DEFAULT='esc to interrupt|…[[:space:]]+\([0-9]+[smh]'
 # Devin 3000.11.1: the working composer and interrupt hint are independent
 # delivery signals. Neither is used as semantic worker-state evidence.
@@ -419,6 +492,16 @@ FM_DELIVERY_CURSOR_BUSY_REGEX_DEFAULT='ctrl\+c to stop'
 # acknowledgement. Delivery guard only; recorded worker state comes from the
 # agy-regex fold in bin/fm-busy-lib.sh.
 FM_DELIVERY_AGY_BUSY_REGEX_DEFAULT='esc[[:space:]]+to[[:space:]]+cancel'
+# kiro (Kiro CLI) renders its composer footer as `› Kiro is working · Type to
+# steer · Ctrl+S to queue` while a turn runs, and an idle footer of
+# `Trust All Tools active ... /quit to exit` or the `ask a question or describe
+# a task` placeholder otherwise (verified live, kiro-cli 2.21.4). The
+# harness-named `Kiro is working` literal is matched rather than the bare
+# `esc to cancel` token kiro also renders in its tool-call region and shares with
+# agy, so echoed worker output cannot fake an acknowledgement. Delivery guard
+# only; recorded worker state comes from the kiro-hook record in
+# bin/fm-busy-lib.sh, which never consults this footer.
+FM_DELIVERY_KIRO_BUSY_REGEX_DEFAULT='Kiro is working'
 FM_DELIVERY_KIMI_BUSY_REGEX_DEFAULT='^[[:space:]]*(🌑|🌒|🌓|🌔|🌕|🌖|🌗|🌘)[[:space:]]+·[[:space:]]+'
 
 fm_busy_lines_match() {  # [harness]
@@ -436,6 +519,7 @@ fm_busy_lines_match() {  # [harness]
       omp) regex=$FM_DELIVERY_OMP_BUSY_REGEX_DEFAULT ;;
       grok) regex=$FM_DELIVERY_GROK_BUSY_REGEX_DEFAULT ;;
       agy) regex=$FM_DELIVERY_AGY_BUSY_REGEX_DEFAULT ;;
+      kiro) regex=$FM_DELIVERY_KIRO_BUSY_REGEX_DEFAULT ;;
       kimi) regex=$FM_DELIVERY_KIMI_BUSY_REGEX_DEFAULT ;;
       cursor) regex=$FM_DELIVERY_CURSOR_BUSY_REGEX_DEFAULT ;;
       '') regex=$FM_DELIVERY_BUSY_REGEX_DEFAULT ;;
@@ -467,7 +551,10 @@ FM_COMPOSER_SHELL_PROMPT_GLYPHS=$(printf '%s\n' '>' '$' '%' '#')
 # `Add a follow-up` once a turn has completed (verified live on cursor-agent
 # 2026.08.11-e8db854). Devin renders the anchored `Ask Devin to build features,
 # fix bugs, or work on your code` as dim text after its `❭` glyph (verified
-# live, devin 3000.11.1). FM_COMPOSER_IDLE_RE overrides for an unverified harness;
+# live, devin 3000.11.1). kiro's bare `›` composer needs no entry: the ghost
+# strip removes its near-gray `ask a question or describe a task` placeholder,
+# so the bare-row path already reads the lone glyph as `empty`, and an entry
+# would change no verdict. FM_COMPOSER_IDLE_RE overrides for an unverified harness;
 # matching is case-insensitive.
 FM_COMPOSER_IDLE_RE_DEFAULT='^Type a message\.\.\.$|^Ask anything(\.\.\.|…)|^Plan, search, build anything$|^Add a follow-up$|^Ask Devin to build features, fix bugs, or work on your code$'
 
