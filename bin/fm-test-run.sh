@@ -738,6 +738,8 @@ tests/fm-herdr-version-floor-live-e2e.test.sh 72
 tests/fm-home-summary-refresh.test.sh 37264
 tests/fm-inactive-reconcile.test.sh 53178
 tests/fm-kimi-harness.test.sh 19151
+tests/fm-kiro-harness.test.sh 24667
+tests/fm-kiro-signals-live-e2e.test.sh 76
 tests/fm-lint-workflows.test.sh 785
 tests/fm-live-gate.test.sh 1755
 tests/fm-mail-check.test.sh 9162
