@@ -359,19 +359,39 @@ codex_cell() {
   printf '%s[38;2;%s;%s;%sm%s[48;2;57;57;57m%s%s[0m' "$ESC" "$1" "$1" "$1" "$ESC" "$2" "$ESC"
 }
 
+# real_cell <glyph>: the same cell shape drawn in rovo's measured real-text grey
+# (38;2;206;207;210, luminance 207.0), which the near-gray ceiling keeps. Used to
+# diverge a ghost row from a typed one without changing anything but the colour.
+real_cell() {
+  printf '%s[38;2;206;207;210m%s[48;2;57;57;57m%s%s[0m' "$ESC" "$ESC" "$1" "$ESC"
+}
+
+# tinted_cell <glyph>: a strongly chromatic starfield cell (38;2;120;190;255,
+# luminance 176.5, channel spread 135). Being chromatic it keeps the 128 ceiling
+# and survives the ghost strip at any gray ceiling, so the braille rule can be
+# tested on SHAPE alone.
+tinted_cell() {
+  printf '%s[38;2;120;190;255m%s[48;2;57;57;57m%s%s[0m' "$ESC" "$ESC" "$1" "$ESC"
+}
+
 test_matrix_codex_idle_starfield_furniture() {
   # Real idle codex-cli 0.154.0 (gpt-6-astra, fast mode) captured byte-for-byte
   # through Herdr (`pane read --format ansi`) from the first codex second mate:
   # an animated braille "starfield" on the row above the bold `›`, on the `›`
   # row behind the SGR-2 dim `Ask Codex to do anything` placeholder, and on
-  # the row below, then a bright model/path/title status footer. The cells are
-  # truecolor greys on BOTH sides of the 128 ghost-luma ceiling, so the
-  # brighter ones survive the ghost strip, and the rows below the glyph carry
-  # no structural edge. The bare shape therefore extended its wrap region over
-  # the two rows beneath the glyph and read the survivors as wrapped typed
-  # input: `pending`, which deferred every steering doorbell for that pane.
+  # the row below, then a bright model/path/title status footer. The rows below
+  # the glyph carry no structural edge, so the bare shape extended its wrap
+  # region over them and read the cells as wrapped typed input: `pending`,
+  # which deferred every steering doorbell for that pane.
+  #
+  # Every cell is a truecolor grey under the near-gray ghost ceiling, so the
+  # ghost strip now removes the whole starfield and this fixture proves the
+  # COLOUR half of the fix. The braille rule keeps its own chromatic fixture in
+  # test_braille_furniture_rule below, so its coverage no longer depends on
+  # these cells happening to be grey; do not restore near-gray cells there.
   local bg="${ESC}[48;2;57;57;57m" above glyph glyph2 below footer
   local screen screen2 plain plain2 ascii_screen stripped out
+  local real_above real_glyph real_below
   above="${ESC}[0m${bg}                         ${ESC}[0m$(codex_cell 82 ⢀)${bg}      ${ESC}[0m$(codex_cell 136 ⠂)${bg} ${ESC}[0m$(codex_cell 163 ⠄)${bg}     ${ESC}[0m$(codex_cell 118 ⠈)"
   glyph="${ESC}[0m${ESC}[1m${bg}›${ESC}[0m${bg} ${ESC}[0m${ESC}[2m${bg}Ask Codex to do anything${ESC}[0m$(codex_cell 117 ⡀)${bg}  ${ESC}[0m$(codex_cell 88 ⠈)${bg}       ${ESC}[0m$(codex_cell 156 ⠂)${bg}        ${ESC}[0m$(codex_cell 71 ⠁)$(codex_cell 161 ⠐)${bg} ${ESC}[0m$(codex_cell 165 ⠁)"
   # A second live sample of the same pane, minutes later: the animation had
@@ -384,23 +404,17 @@ test_matrix_codex_idle_starfield_furniture() {
   plain=$(printf '%s\n' "$screen" | fm_composer_strip_ansi)
   plain2=$(printf '%s\n' "$screen2" | fm_composer_strip_ansi)
 
-  # NON-VACUOUSNESS: the ghost strip really leaves braille survivors behind the
-  # placeholder and on the row below (cells above the luma ceiling), and the
+  # NON-VACUOUSNESS: the near-gray ceiling really does clear both starfield rows,
+  # leaving the glyph row as its bare glyph and the row below blank, and the
   # footer really is non-blank, edge-free content the wrap region would take.
   stripped=$(printf '%s\n' "$glyph" | fm_composer_strip_ghost)
   fm_composer_normalize_trim_var stripped
-  [ "$stripped" != '›' ] \
-    || fail "the glyph row's starfield cells must survive ghost stripping, or the furniture case is vacuous"
-  stripped=$(printf '%s\n' "$stripped" | fm_composer_strip_braille)
-  fm_composer_normalize_trim_var stripped
   [ "$stripped" = '›' ] \
-    || fail "everything surviving ghost stripping behind the glyph must be braille, got '$stripped'"
+    || fail "the near-gray ceiling must strip the whole glyph-row starfield, got '$stripped'"
   stripped=$(printf '%s\n' "$below" | fm_composer_strip_ghost)
   fm_composer_normalize_trim_var stripped
-  [ -n "$stripped" ] \
-    || fail "the row below the glyph must keep starfield cells after ghost stripping"
-  _fm_composer_row_is_braille_furniture "$stripped" \
-    || fail "the row below the glyph must be recognized as braille furniture"
+  [ -z "$stripped" ] \
+    || fail "the near-gray ceiling must strip the row below the glyph, got '$stripped'"
   fm_composer_row_has_edge '  gpt-6-astra high fast · ~/Projects/purser · Launch Purser desk brief' \
     && fail "fixture drift: the footer must carry no structural edge, or the boundary rule is untested"
 
@@ -418,13 +432,17 @@ test_matrix_codex_idle_starfield_furniture() {
   # region, so the strict blank-row posture keeps it unknown.
   assert_screen "codex 0.154 cursor on the starfield row" unknown "$CAPS_TMUX" "$screen" 4
 
-  # DIVERGENCE: the same screen with every starfield cell replaced by a letter
-  # is wrapped typed input and must stay pending, so the furniture verdict
-  # above cannot come from anything but the braille rule.
-  ascii_screen=$(printf '%s\n' "$screen" | LC_ALL=C sed 's/⢀/x/g; s/⠂/x/g; s/⠄/x/g; s/⠈/x/g; s/⡀/x/g; s/⠁/x/g; s/⠐/x/g; s/⠠/x/g')
-  case "$ascii_screen" in *'⠂'*|*'⠁'*) fail "fixture drift: the divergence screen still carries braille" ;; esac
-  assert_screen "starfield replaced by letters on herdr" pending "$CAPS_STYLED" "$ascii_screen"
-  assert_screen "starfield replaced by letters on tmux" pending "$CAPS_TMUX" "$ascii_screen" 3
+  # DIVERGENCE: the empty verdict above comes from the COLOUR of these cells, so
+  # redrawing the same positions as letters in rovo's measured real-text grey
+  # (206;207;210, luminance 207.0 - above the near-gray ceiling, so kept) leaves
+  # wrapped typed input that must stay pending.
+  real_above="${ESC}[0m${bg}        ${ESC}[0m$(real_cell x)${bg}      ${ESC}[0m$(real_cell x)"
+  real_glyph="${ESC}[0m${ESC}[1m${bg}›${ESC}[0m${bg} ${ESC}[0m${ESC}[2m${bg}Ask Codex to do anything${ESC}[0m$(real_cell x)${bg}  ${ESC}[0m$(real_cell x)"
+  real_below="${ESC}[0m${bg}        ${ESC}[0m$(real_cell x)${bg}    ${ESC}[0m$(real_cell x)"
+  ascii_screen=$'transcript line\n\n'"$real_above"$'\n'"$real_glyph"$'\n'"$real_below"$'\n'"$footer"
+  case "$ascii_screen" in *'⠂'*|*'⠁'*) fail "fixture drift: the divergence rows still carry braille" ;; esac
+  assert_screen "starfield redrawn as real-coloured letters on herdr" pending "$CAPS_STYLED" "$ascii_screen"
+  assert_screen "starfield redrawn as real-coloured letters on tmux" pending "$CAPS_TMUX" "$ascii_screen" 3
 
   # NEGATIVES that keep the rule from over-stripping:
   # (i) a real message wrapped below the `›` row, footer beneath, stays pending.
@@ -444,6 +462,48 @@ test_matrix_codex_idle_starfield_furniture() {
   assert_screen "codex footer alone on tmux" unknown "$CAPS_TMUX" $'transcript line\n\n'"$footer" 2
   assert_screen "starfield row alone on herdr" unknown "$CAPS_STYLED" $'transcript line\n\n'"$below"
   pass "matrix: codex 0.154's starfield rows are furniture; typed, mixed, and unanchored rows keep their verdicts"
+}
+
+test_braille_furniture_rule() {
+  # The braille rule classifies an animation row by SHAPE, so it owns a chromatic
+  # fixture rather than borrowing the codex capture's grey cells: those are below
+  # the near-gray ghost ceiling and never reach this rule, which would leave it
+  # proven only by a colour accident that any ceiling change could erase.
+  local bg="${ESC}[48;2;57;57;57m" glyph below footer screen letters stripped
+  glyph="${ESC}[0m${ESC}[1m${bg}›${ESC}[0m${bg} ${ESC}[0m${ESC}[2m${bg}Ask Codex to do anything${ESC}[0m$(tinted_cell ⡀)${bg}  ${ESC}[0m$(tinted_cell ⠈)${bg}   ${ESC}[0m$(tinted_cell ⠂)"
+  below="${ESC}[0m${bg}        ${ESC}[0m$(tinted_cell ⠐)${bg}    ${ESC}[0m$(tinted_cell ⠄)${bg}   ${ESC}[0m$(tinted_cell ⠠)"
+  footer="  ${ESC}[0m${ESC}[38;2;246;226;183mgpt-6-astra high fast${ESC}[0m${ESC}[2m · ${ESC}[0m${ESC}[38;2;171;223;167m~/Projects/purser${ESC}[0m"
+  screen=$'transcript line\n\n'"$glyph"$'\n'"$below"$'\n'"$footer"
+
+  # NON-VACUOUSNESS: chromatic cells really do survive the ghost strip on both
+  # rows, so the braille rule is what has to classify them.
+  stripped=$(printf '%s\n' "$glyph" | fm_composer_strip_ghost)
+  fm_composer_normalize_trim_var stripped
+  [ "$stripped" != '›' ] \
+    || fail "chromatic starfield cells must survive ghost stripping, or the furniture case is vacuous"
+  stripped=$(printf '%s\n' "$stripped" | fm_composer_strip_braille)
+  fm_composer_normalize_trim_var stripped
+  [ "$stripped" = '›' ] \
+    || fail "everything surviving ghost stripping behind the glyph must be braille, got '$stripped'"
+  stripped=$(printf '%s\n' "$below" | fm_composer_strip_ghost)
+  fm_composer_normalize_trim_var stripped
+  [ -n "$stripped" ] \
+    || fail "the row below the glyph must keep chromatic starfield cells after ghost stripping"
+  _fm_composer_row_is_braille_furniture "$stripped" \
+    || fail "the row below the glyph must be recognized as braille furniture"
+
+  # The verdict: survivors that are entirely braille are furniture, so the pane
+  # reads empty on a styled capture and on a cursor-anchored tmux read.
+  assert_screen "chromatic starfield on herdr" empty "$CAPS_STYLED" "$screen"
+  assert_screen "chromatic starfield on tmux" empty "$CAPS_TMUX" "$screen" 2
+
+  # DIVERGENCE: the same cells, same colour, letters instead of braille are
+  # wrapped typed input, so the empty verdict comes from shape and nothing else.
+  letters=$(printf '%s\n' "$screen" | LC_ALL=C sed 's/⡀/x/g; s/⠈/x/g; s/⠂/x/g; s/⠐/x/g; s/⠄/x/g; s/⠠/x/g')
+  case "$letters" in *'⠂'*|*'⠐'*) fail "fixture drift: the divergence screen still carries braille" ;; esac
+  assert_screen "chromatic starfield as letters on herdr" pending "$CAPS_STYLED" "$letters"
+  assert_screen "chromatic starfield as letters on tmux" pending "$CAPS_TMUX" "$letters" 2
+  pass "braille furniture is recognized by shape at any gray ceiling; the same cells as letters stay pending"
 }
 
 test_matrix_pi_separated_needs_identity() {
@@ -886,6 +946,7 @@ test_matrix_cursor_reverse_video_placeholder_remnant
 test_matrix_herdr_halfblock_rule_bounds_bare_wrap
 test_matrix_omp_status_row_bounds_bare_composer
 test_matrix_codex_idle_starfield_furniture
+test_braille_furniture_rule
 test_matrix_pi_separated_needs_identity
 test_matrix_opencode_leftbar_signals
 test_matrix_grok_titled_bottom_border
