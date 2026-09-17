@@ -1,0 +1,28 @@
+<!doctype html><meta charset="utf-8"><title>Kiro CLI idle composer: the placeholder is ghost text now, so a steer lands</title><style>body{background:#0d1117;color:#d8dee9;font:13px/1.45 "SF Mono",Menlo,monospace;padding:24px}h1{font:600 15px/1.4 -apple-system,system-ui,sans-serif;color:#e6edf3;margin:0 0 4px}p.note{font:12px/1.5 -apple-system,system-ui,sans-serif;color:#8b949e;margin:0 0 18px;max-width:70em}pre{background:#010409;border:1px solid #21262d;border-radius:6px;padding:14px 16px;overflow-x:auto;margin:0 0 20px}h2{font:600 12px/1.4 -apple-system,system-ui,sans-serif;color:#8b949e;text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px}</style><h1>Kiro CLI idle composer: the placeholder is ghost text now, so a steer lands</h1><p class="note">Captured live from a real <code>kiro-cli 2.22.1-nightly.4</code> crewmate pane launched by <code>bin/fm-spawn.sh</code> on macOS. Kiro draws its idle placeholder in the xterm-256 greyscale ramp (<code>ESC[38;5;241m</code>). Before this change the 256-colour path was never luminance-tested, so the placeholder survived stripping and the composer read <b>pending</b> - firstmate then skipped the doorbell and the steer deferred. After the change the ramp is tested, the placeholder strips to the bare agent glyph, and the composer reads <b>empty</b>.</p><h2>1. Live pane, real kiro-cli, as the operator sees it</h2><pre>  decisions, and tradeoffs are specification, not captain intent.
+  The Definition of done&#x27;s rule that `--intent` must be self-sufficient still
+  governs the string you pass: resolve any report, decision, or PR the intent
+  below refers to into its substance rather than passing the pointer.
+
+  ## Captain intent authorized for --intent
+  Reply with exactly the single word ACK and then stop. Do not call any tools,
+  do not read or write files.
+
+<span style="color:#5f8787">•</span> ACK
+
+<span style="color:#808080">▸</span> <span style="color:#808080">Credits: 0.01 • Time: 0s</span>
+
+<span style="color:#eeeeee">────────────────────────────────────────────────────────────────────────────────
+</span> <span style="color:#808000">Trust All Tools active, confirmations are off</span><span style="color:#808080"> · /quit to exit</span>
+<span style="color:#eeeeee">────────────────────────────────────────────────────────────────────────────────
+</span><span style="color:#d7af5f">firstmate</span> <span style="color:#808080">·</span> claude-haiku-4.5 <span style="color:#808080">·</span> <span style="color:#00af5f">◔</span> <span style="color:#00af5f">7%</span> <span style="color:#808080">·</span> <span style="color:#00af5f">Midway: 18h 38m</span>
+<span style="color:#8700ff">/private/tmp/fm-kiro-live/lab-ok/case/wt</span> <span style="color:#808080">·</span> <span style="color:#808080">(</span>wt-live<span style="color:#808080">)</span>
+
+›  <span style="color:#626262">ask a question or describe a task ↵</span>
+                                                             <span style="color:#626262">/copy to clipboard</span>
+
+
+
+</pre><h2>2. The composer row alone (raw, styled)</h2><pre>›  <span style="color:#626262">ask a question or describe a task ↵</span>
+</pre><h2>3. fm_composer_strip_ghost at base 795e5e4 - placeholder survives -&gt; verdict pending</h2><pre>›  ask a question or describe a task ↵
+</pre><h2>4. fm_composer_strip_ghost at target f01f924 - only the glyph remains -&gt; verdict empty</h2><pre>›  
+</pre>

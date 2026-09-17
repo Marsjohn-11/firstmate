@@ -1,0 +1,24 @@
+
+• Acting on the message:
+
+  STEERED
+
+  Now I'll move the handled file:
+● Shell mv
+  '/private/tmp/fm-kiro-live/lab-ok/case/home/state/kiro-live-ok.inbox/001.msg'
+  '/private/tmp/fm-kiro-live/lab-ok/case/home/state/kiro-live-ok.inbox/handled/'
+
+• Checking for additional messages:
+◔ Shell
+  esc to cancel
+
+────────────────────────────────────────────────────────────────────────────────
+ Trust All Tools active, confirmations are off · /quit to exit
+────────────────────────────────────────────────────────────────────────────────
+firstmate · claude-haiku-4.5 · ◔ 7% · Midway: 18h 36m
+/private/tmp/fm-kiro-live/lab-ok/case/wt · (wt-live)
+
+›  Kiro is working · Type to steer · Ctrl+S to queue
+
+
+

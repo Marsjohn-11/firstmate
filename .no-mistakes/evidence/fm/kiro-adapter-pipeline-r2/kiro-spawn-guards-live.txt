@@ -1,0 +1,40 @@
+bin/fm-spawn.sh guards, driven live against the REAL kiro-cli 2.22.1-nightly.4
+model catalog on macOS (no stub listing).
+
+1. Requested model absent from the real listing -> spawn refuses, nothing armed.
+   $ fm-spawn.sh kiro-live-badauth <proj> --harness kiro --model no-such-model
+   error: kiro model 'no-such-model' is not listed by 'kiro-cli --list-models';
+          choose a listed model_id or omit --model
+   exit 1; state/ holds no <id>.kiro-home, no <id>.busy-gen, no <id>.meta.
+
+2. Requested model present in the real listing -> spawn launches with it.
+   $ fm-spawn.sh kiro-live-ok <proj> --harness kiro --model claude-haiku-4.5 --effort xhigh
+   env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI env -u CLAUDECODE \
+     -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS \
+     KIRO_HOME='<state>/kiro-live-ok.kiro-home' '<bin>/kiro-cli' \
+     chat --agent-engine v2 --agent firstmate --model 'claude-haiku-4.5' \
+     --effort 'xhigh' --trust-all-tools "$(fm-operational-input.sh encode launch-brief < <brief>)"
+   exit 0; the worktree's own .kiro/ was never created.
+
+3. Unreachable listing establishes nothing -> launches unvalidated with a notice
+   (observed for real when the probe ran under a HOME with no kiro sign-in):
+   notice: 'kiro-cli --list-models' did not answer within 30s; launching with
+           --model 'no-such-model' unvalidated
+
+4. A state path containing whitespace refuses before any pane exists.
+   error: kiro hook scripts would live under '/private/tmp/fm-kiro-live/lab spaced/
+          case/home/state/kiro-space.kiro-home', whose path contains whitespace;
+          kiro hook commands must be a single unquoted token, so point FM_HOME or
+          FM_STATE_OVERRIDE at a whitespace-free path
+   exit 1.
+
+5. A kiro secondmate is refused.
+   $ fm-spawn.sh --secondmate sm-kiro <home> kiro
+   error: kiro is a verified crewmate/scout adapter only and cannot run a
+          secondmate; it has no primary supervision protocol. Select a harness
+          verified for secondmates.
+   exit 1.
+
+6. bin/fm-teardown.sh removes the per-task home.
+   before: <state>/kiro-live-ok.kiro-home exists
+   after:  No such file or directory      (teardown exit 0)

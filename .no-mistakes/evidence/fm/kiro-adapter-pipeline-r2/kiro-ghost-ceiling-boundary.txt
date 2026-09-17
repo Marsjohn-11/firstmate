@@ -1,0 +1,18 @@
+fm_composer_strip_ghost boundary, shipped bin/fm-composer-lib.sh (f01f924).
+'<stripped>' = treated as ghost furniture; 'TEXT' = kept as real input.
+
+kiro truecolor ghost    luma 158 spread 0        -> <stripped>
+rovo ghost              luma 163 spread 3        -> <stripped>
+rovo REAL text          luma 207 spread 4        -> TEXT
+muse REAL glyph         luma 150 spread 165      -> TEXT
+palette 241  greyscale ramp, level 98            -> <stripped>
+palette 247  greyscale ramp, level 158           -> <stripped>
+palette 253  greyscale ramp, level 218 (too bright) -> TEXT
+palette 145  6x6x6 grey diagonal (untested by design) -> TEXT
+palette 110  chromatic (untested by design)      -> TEXT
+palette 7    theme-remapped (untested by design) -> TEXT
+
+Delivery footer scoping, checked against the LIVE captured kiro panes:
+  kiro-live-pane-busy.ansi       -> acknowledges a submit
+  kiro-live-pane-idle.ansi       -> no acknowledgement
+  agy bare "esc to cancel"       -> no acknowledgement

@@ -1,0 +1,24 @@
+[48;5;255m  decisions, and tradeoffs are specification, not captain intent.
+  The Definition of done's rule that `--intent` must be self-sufficient still
+  governs the string you pass: resolve any report, decision, or PR the intent
+  below refers to into its substance rather than passing the pointer.
+
+  ## Captain intent authorized for --intent
+  Reply with exactly the single word ACK and then stop. Do not call any tools,
+  do not read or write files.
+[49m
+[38;5;66m•[39m ACK
+
+[38;5;244m▸[39m [38;5;244mCredits: 0.01 • Time: 0s[39m
+
+[38;5;255m────────────────────────────────────────────────────────────────────────────────
+[39m [33mTrust All Tools active, confirmations are off[38;5;244m · /quit to exit[39m
+[38;5;255m────────────────────────────────────────────────────────────────────────────────
+[38;5;179mfirstmate[39m [38;5;244m·[39m claude-haiku-4.5 [38;5;244m·[39m [38;5;35m◔[39m [38;5;35m7%[39m [38;5;244m·[39m [38;5;35mMidway: 18h 38m[39m
+[38;5;93m/private/tmp/fm-kiro-live/lab-ok/case/wt[39m [38;5;244m·[39m [38;5;244m([39mwt-live[38;5;244m)[39m
+
+›  [38;5;241mask a question or describe a task ↵[39m
+                                                             [38;5;241m/copy to clipboard[39m
+
+
+

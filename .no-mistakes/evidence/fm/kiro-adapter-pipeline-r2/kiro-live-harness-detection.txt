@@ -1,0 +1,38 @@
+Harness self-identification probed from INSIDE a live kiro-cli worker (macOS,
+toolbox install of kiro-cli 2.22.1-nightly.4).
+
+bin/fm-harness.sh detects kiro by ancestry: it walks up to eight parents and
+matches `ps -o comm=` exactly against `kiro-cli`. On this host that probe cannot
+run at all - kiro executes tool commands inside the aim sandbox, which denies
+/bin/ps:
+
+  harness_verdict=unknown
+  harness_ancestry=
+  self_pid=69612 ppid=69588
+  /bin/ps: Operation not permitted        (ps -o comm= -p $$      -> rc 126)
+  ps_total_lines=0                        (ps -A                  -> 0 rows)
+  /bin/ps: Operation not permitted        (ps -o comm= -p $PPID   -> rc 126)
+
+With an inherited CLAUDECODE=1 in that same sandbox the marker is then the only
+evidence there is, so the worker reports `claude`:
+
+  $ CLAUDECODE=1 bin/fm-harness.sh   ->  claude
+
+Seen from OUTSIDE the sandbox the process tree does carry the anchored name the
+arm looks for, so the arm's logic is not what fails here:
+
+  pane_current_command=toolbox-exec
+  62799 57178 /Users/marsjohn/.toolbox/bin/kiro-cli
+  62873 62799 aim
+  62941 62873 .../aim/1.0.5917.0/sandbox/launcher
+  66147 62941 .../kiro-cli/2.22.1-nightly.4-nightly/Kiro CLI.app/Contents/MacOS/kiro-cli
+  67105 66147 .../Kiro CLI.app/Contents/MacOS/kiro-cli-chat
+  67390 67105 toolbox
+
+Two macOS-only deviations from what the adapter's comments record as verified on
+Amazon Linux 2 / kiro-cli 2.21.4:
+  - tmux #{pane_current_command} reports `toolbox-exec`, not `kiro-cli`.
+  - the sandbox denies /bin/ps to tool commands, so no in-worker ancestry read
+    can succeed.
+Neither is reachable on a host where kiro-cli runs unsandboxed, which is the
+platform the adapter's record covers.
