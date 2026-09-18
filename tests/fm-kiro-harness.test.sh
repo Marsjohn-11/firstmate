@@ -214,7 +214,7 @@ test_kiro_record_is_the_only_state_source() {
 test_kiro_composer_glyph_and_placeholder() {
   local esc caps caps_plain row screen plain state stripped
   esc=$(printf '\033')
-  caps=$'styled=1\ncursor=1\nrows=6'
+  caps=$'styled=1\ncursor=1\nidentity=1\nrows=0'
   caps_plain=$'styled=0\nrows=6'
   # kiro's bare `›` composer (shared glyph with codex) is a genuine empty
   # composer.
