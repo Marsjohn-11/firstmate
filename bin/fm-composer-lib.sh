@@ -211,9 +211,13 @@ fm_composer_normalize_trim_var() {  # <varname>
 #
 # A NEAR-ACHROMATIC truecolor run gets a higher ceiling instead, because that is
 # what separates ghost text from real input without needing to know the harness:
-#   FM_COMPOSER_GHOST_GRAY_LUMA_MAX (default 180) applies when
-#   FM_COMPOSER_GHOST_GRAY_SPREAD_MAX (default 12) covers the run's channel
-#   spread (max channel minus min channel); every other run keeps the 128 default.
+#   FM_COMPOSER_GHOST_GRAY_LUMA_MAX (default 180) applies when the run's channel
+#   spread (max channel minus min channel) is within the fixed near-achromatic
+#   bound of 12; every other run keeps the 128 default.
+# That bound is a constant rather than a knob: the measured fleet spreads below
+# are 0, 3, 4 and 165, so every threshold from 5 to 164 classifies the whole
+# fleet identically and there is nothing for an operator to tune. Widening or
+# narrowing the strip is FM_COMPOSER_GHOST_GRAY_LUMA_MAX's job.
 # The gray ceiling only ever RAISES the applicable ceiling. A near-gray run takes
 # the higher of the two, so an operator who raises FM_COMPOSER_GHOST_LUMA_MAX
 # above 180 still gets that wider strip on gray text as the knob documents.
@@ -246,7 +250,7 @@ fm_composer_normalize_trim_var() {  # <varname>
 fm_composer_strip_ghost() {
   LC_ALL=C awk -v lumamax="${FM_COMPOSER_GHOST_LUMA_MAX:-128}" \
     -v graylumamax="${FM_COMPOSER_GHOST_GRAY_LUMA_MAX:-180}" \
-    -v grayspreadmax="${FM_COMPOSER_GHOST_GRAY_SPREAD_MAX:-12}" '
+    -v grayspreadmax=12 '
     function sgr_code(v, b) {
       b = v
       sub(/:.*/, "", b)
@@ -264,7 +268,7 @@ fm_composer_strip_ghost() {
       return p + 1
     }
     # ceiling_for: the luminance ceiling that applies to one truecolor run.
-    # A NEAR-ACHROMATIC run (max channel minus min channel within
+    # A NEAR-ACHROMATIC run (max channel minus min channel within the fixed
     # grayspreadmax) takes the HIGHER of graylumamax and lumamax, so the gray
     # ceiling only ever raises the applicable ceiling and never reduces an
     # operator-set one. Anything more saturated keeps lumamax.

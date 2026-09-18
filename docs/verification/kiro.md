@@ -14,7 +14,7 @@ Scope: V2 engine only (`--agent-engine v2`). The v3/KAS engine is out of scope a
 - Host: Amazon Linux 2 (Linux 5.10, x86_64).
 - Tool: `kiro-cli 2.21.4`, installed via toolbox at `~/.toolbox/bin/kiro-cli` (a bash sandbox shim that runs `aim sandbox --client kiro-cli`, whose descendant is the compiled bun/node binary).
 - Auth: a signed-in account. On this Amazon Linux 2 host auth state lives in the XDG data dir `~/.local/share/kiro-cli/data.sqlite3`, not under `KIRO_HOME`. That path does not exist on macOS, so both the location and the untouched-by-relocation premise resting on it are Amazon Linux 2 measurements only - see "What is NOT verified" for the macOS gap and what it costs.
-- Two measurements in this record rest on a later build: the idle composer's placeholder colour (`38;2;158;158;158`) and its 256-colour encoding (`38;5;247`) were measured on `kiro-cli 2.21.5` on macOS. Every other claim here was measured on 2.21.4 on the Amazon Linux 2 host above.
+- Three measurements in this record rest on a later build: the idle composer's placeholder colour (`38;2;158;158;158`) and its 256-colour encoding (`38;5;247`) were measured on `kiro-cli 2.21.5` on macOS, and the `--agent` name-collision precedence was measured on `kiro-cli 2.22.2-nightly.2` on macOS. Every other claim here was measured on 2.21.4 on the Amazon Linux 2 host above.
 
 ## Agent-config hooks are claude-shaped (V2)
 
@@ -56,6 +56,28 @@ Global:    /tmp/kh/agents          # relocated
 ```
 
 So the spawn writes `state/<id>.kiro-home/agents/firstmate.json` (the hook config) plus the two hook scripts it names under `state/<id>.kiro-home/hooks/`, and reaches them with `KIRO_HOME=state/<id>.kiro-home --agent firstmate`, never writing into the worktree's own `.kiro/`.
+
+Because the name resolves from two directories, a target repository can define an agent of the same name, so the precedence between them decides which config a launch actually gets.
+On a name collision THE WORKSPACE COPY WINS, measured 2026-09-17 on macOS against `kiro-cli 2.22.2-nightly.2`, which is a later build than the 2.21.4 Amazon Linux 2 host the rest of this record uses, so read this as a 2.22.2-nightly.2 measurement and not as covered by the AL2 run.
+The setup was a scratch workspace holding `.kiro/agents/firstmate.json` (the WORKSPACE COPY, standing in for a target repo shipping its own firstmate agent) and a relocated `KIRO_HOME` whose `agents/firstmate.json` is the firstmate-owned config (the HOME COPY).
+
+```
+$ cd <scratch>/ws && KIRO_HOME=<scratch>/kirohome kiro-cli agent list
+WARNING: Agent conflict for firstmate. Using workspace version.
+Workspace: <scratch>/ws/.kiro/agents
+Global: <scratch>/kirohome/agents
+firstmate    Workspace    WORKSPACE COPY - a target repo shipping its own firstmate agent
+```
+
+The control run, same setup with the workspace copy removed, resolves to the relocated home instead:
+
+```
+firstmate    Global    HOME COPY - the firstmate-owned per-task config
+```
+
+A target repository that ships `.kiro/agents/firstmate.json` therefore shadows the firstmate-owned per-task config, and because that shadowing config carries no hooks, the busy record the spawn seeds is never closed by a turn-end and the supervisor reads that worker as provably working indefinitely.
+kiro prints the conflict WARNING on the pane, so the collision is visible there, but nothing in firstmate's own durable state records it.
+The launch is deliberately unchanged: this record exists so the failure is a known quantity rather than an unexamined one.
 
 ## Trust modal and its suppression setting
 
@@ -120,7 +142,8 @@ A real idle kiro composer used to classify as `pending`, and `fm_task_inbox_ring
 kiro draws its idle placeholder in truecolor `38;2;158;158;158`, luminance 158.0, above the 128 `FM_COMPOSER_GHOST_LUMA_MAX` default, so `fm_composer_strip_ghost` left it in place and it read as real typed content.
 rovo had the same defect from the same cause at luminance 162.9, recorded in `rovo.md`, so this was never a kiro-only problem.
 
-The fix applies a higher ceiling only to NEAR-ACHROMATIC truecolor runs, `FM_COMPOSER_GHOST_GRAY_LUMA_MAX` (default 180) within `FM_COMPOSER_GHOST_GRAY_SPREAD_MAX` (default 12) of channel spread, and keeps 128 for anything more saturated.
+The fix applies a higher ceiling only to NEAR-ACHROMATIC truecolor runs, `FM_COMPOSER_GHOST_GRAY_LUMA_MAX` (default 180) within a fixed channel spread of 12, and keeps 128 for anything more saturated.
+The spread bound is a constant, not a knob: the four measured spreads below are 0, 3, 4 and 165, so every threshold from 5 to 164 classifies the whole measured fleet identically.
 That separates all four measured cases without threading a harness argument through the shared composer entry points: kiro's ghost at spread 0 and rovo's at spread 3 strip, rovo's real typed text is also near-gray but separated by luminance at 207.0 and is kept, and muse's real prompt glyph at spread 165 is strongly chromatic and unreachable by any luminance ceiling.
 `bin/fm-composer-lib.sh`'s ghost-strip comment owns the measured values and both margins.
 
