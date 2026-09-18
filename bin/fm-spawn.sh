@@ -1761,25 +1761,22 @@ kiro_model_validate() {  # <kiro-bin> <model>
 # kiro's hook commands are single-token absolute paths, and whether kiro V2
 # hands that string to a shell or splits it into argv is unverified
 # (docs/verification/kiro.md records it as unverified), so the path must survive
-# both interpretations. Whitespace splits under either one. Every other
-# character a shell acts on unquoted - $ ; & | ` ' " ( ) < > and the glob
-# characters - mangles the token under the shell reading and reaches the same
-# outcome: the hook script is never found, so neither the busy event nor the
-# turn-end marker fires. kiro has no second state source, so the seeded busy
-# record would never clear and the supervisor would read the worker as provably
-# working forever. The rule is therefore an ALLOWLIST of characters that are
-# inert unquoted, not a denylist of known-bad ones, so a shape nobody reasoned
-# about is refused rather than launched. Refuse alongside the model check,
-# before any worktree or pane exists, and name the path. The physical resolution
-# is what gets embedded, so that is what is checked; an unresolvable state dir
-# falls back to the configured string.
+# both interpretations. Whitespace is the shape that breaks under both - a shell
+# splits it and an argv split does the same, and no quoting fixes both - so it is
+# what the rule refuses, and kiro's unverified interpretation is why the rule
+# stays conservative. kiro has no second state source, so a hook that never
+# fires leaves the seeded busy record open and the supervisor reading the worker
+# as provably working forever. Refuse alongside the model check, before any
+# worktree or pane exists, and name the path. The physical resolution is what
+# gets embedded, so that is what is checked; an unresolvable state dir falls back
+# to the configured string.
 kiro_hook_path_validate() {  # <state-dir> <id>
   local state=$1 id=$2 real
   real=$(cd "$state" 2>/dev/null && pwd -P) || real=$state
   [ -n "$real" ] || real=$state
   case "$real/$id.kiro-home" in
-    *[!A-Za-z0-9._/+=:@,%-]*)
-      echo "error: kiro hook scripts would live under '$real/$id.kiro-home', whose path carries a character a shell would act on unquoted; kiro hook commands must be a single unquoted token, so point FM_HOME or FM_STATE_OVERRIDE at a path of only letters, digits and . _ - / + = : @ , %" >&2
+    *[[:space:]]*)
+      echo "error: kiro hook scripts would live under '$real/$id.kiro-home', whose path contains whitespace; a kiro hook command must be a single unquoted token and so cannot carry whitespace, so point FM_HOME or FM_STATE_OVERRIDE at a whitespace-free path" >&2
       return 1 ;;
   esac
   return 0

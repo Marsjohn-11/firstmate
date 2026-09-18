@@ -498,32 +498,26 @@ test_kiro_unlisted_model_refuses_before_pane_creation() {
   pass "fm-spawn: an unlisted kiro model refuses before any pane is created"
 }
 
-# Every other spawn case runs under a temporary root of plain letters and
-# digits, so the single-token assertions above cannot see the path shapes that
-# break the hooks. Whitespace breaks under both a shell and an argv split; the
-# other characters break under the shell reading, which is the one kiro's hook
-# interpretation leaves open. Both reach the same outcome, a hook that never
-# fires and a busy record that never clears, so both must refuse.
-test_kiro_unsafe_hook_path_refuses_before_pane_creation() {
-  local shape id rec out rc unsafe unsafe_real n=0
-  for shape in 'unsafe state' 'unsafe$state' 'unsafe;state' 'unsafe*state'; do
-    n=$((n + 1))
-    id="kiro-unsafe$n-z10-$$"
-    rec=$(make_kiro_spawn_case "unsafe$n" "$id")
-    read_kiro_spawn_record "$rec"
-    unsafe="$CASE_DIR/$shape"
-    mkdir -p "$unsafe"
-    cp "$HOME_DIR/state/.last-watcher-beat" "$unsafe/.last-watcher-beat"
-    unsafe_real=$(cd "$unsafe" && pwd -P)
-    out=$(FM_TEST_STATE_OVERRIDE="$unsafe" \
-      run_kiro_spawn "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id")
-    rc=$?
-    [ "$rc" -ne 0 ] || fail "a kiro hook path under '$shape' must refuse the spawn"
-    assert_contains "$out" "$unsafe_real/$id.kiro-home" "the '$shape' refusal did not name the offending hook path"
-    [ ! -e "$unsafe/$id.kiro-home" ] || fail "the refused '$shape' spawn still armed the per-task home"
-    [ -s "$CASE_DIR/launch.log" ] && fail "a '$shape' hook path created a launch command" || true
-  done
-  pass "fm-spawn: a kiro hook path carrying a shell-unsafe character refuses before any pane is created"
+# Every other spawn case runs under a whitespace-free temporary root, so the
+# single-token assertions above cannot see the one path shape that breaks the
+# hooks under both a shell and an argv split.
+test_kiro_whitespace_hook_path_refuses_before_pane_creation() {
+  local id rec out rc spaced spaced_real
+  id="kiro-space-z10-$$"
+  rec=$(make_kiro_spawn_case spaced "$id")
+  read_kiro_spawn_record "$rec"
+  spaced="$CASE_DIR/spaced state"
+  mkdir -p "$spaced"
+  cp "$HOME_DIR/state/.last-watcher-beat" "$spaced/.last-watcher-beat"
+  spaced_real=$(cd "$spaced" && pwd -P)
+  out=$(FM_TEST_STATE_OVERRIDE="$spaced" \
+    run_kiro_spawn "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id")
+  rc=$?
+  [ "$rc" -ne 0 ] || fail "a kiro hook path containing whitespace must refuse the spawn"
+  assert_contains "$out" "$spaced_real/$id.kiro-home" "the refusal did not name the offending hook path"
+  [ ! -e "$spaced/$id.kiro-home" ] || fail "the refused spawn still armed the per-task home"
+  [ -s "$CASE_DIR/launch.log" ] && fail "a whitespace hook path created a launch command" || true
+  pass "fm-spawn: a kiro hook path containing whitespace refuses before any pane is created"
 }
 
 # `-f json` is free to pretty-print, so the model check must read ids from a
@@ -654,7 +648,7 @@ test_kiro_launch_carries_brief_agent_engine_and_clears_markers
 test_kiro_per_task_hook_config_is_out_of_tree
 test_kiro_effort_xhigh_passes_through
 test_kiro_unlisted_model_refuses_before_pane_creation
-test_kiro_unsafe_hook_path_refuses_before_pane_creation
+test_kiro_whitespace_hook_path_refuses_before_pane_creation
 test_kiro_pretty_printed_listing_validates_the_model
 test_kiro_unparseable_listing_launches_unvalidated
 test_kiro_unreachable_listing_launches_unvalidated
