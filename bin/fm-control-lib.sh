@@ -267,8 +267,10 @@ fm_control_harness_wiring_paths() {  # <harness> <worktree> <state-dir> <id>
     # kiro's busy-state and turn-end hooks live in a firstmate-owned per-task
     # agent config the launch reaches through a relocated KIRO_HOME, at
     # <state>/<id>.kiro-home/agents/firstmate.json, whose two hook commands are
-    # generated scripts beside it under hooks/. All three carry the incarnation's
-    # gen, so all three are retired; the sibling settings/sessions carry no gen
+    # generated scripts beside it under hooks/. The two scripts embed the
+    # incarnation's gen; the agent config carries no gen but NAMES those scripts,
+    # so it goes stale by reference the moment a relaunch mints a new generation.
+    # All three are therefore retired; the sibling settings/sessions carry no gen
     # and are cleared wholesale by teardown's rm -rf of <id>.kiro-home. Nothing
     # is written into the worktree, whose own .kiro/ belongs to the project, and
     # nothing in the captain's real ~/.kiro is touched.

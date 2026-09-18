@@ -397,13 +397,24 @@ fm_composer_strip_ghost() {
 # agy's `esc to cancel` is part of the union for the same reason: an explicit
 # tmux agy endpoint reaches the submit core with no recorded harness, and its
 # bare `>` composer verdict is `unknown`, so the busy footer is the only
-# turn-started acknowledgement that path can read. kiro's `Kiro is working` is
-# in the union for two reasons of its own: the footer renders ON the composer
-# row, so a mid-turn composer read is `pending` and only a busy read lets
-# fm_composer_queued_enter_verdict convert that to `empty`; and the submit core
-# takes its pre-typing baseline with no harness, so without the literal an
-# already-busy kiro pane reads `idle` and wrongly arms the idle-to-busy
-# confirmation.
+# turn-started acknowledgement that path can read. kiro renders its footer as
+# `› Kiro is working · Type to steer · Ctrl+S to queue` while a turn runs, and an
+# idle footer of `Trust All Tools active ... /quit to exit` or the `ask a
+# question or describe a task` placeholder otherwise (verified live, kiro-cli
+# 2.21.4). The harness-named `Kiro is working` literal is what the union carries,
+# rather than the bare `esc to cancel` token kiro also renders in its tool-call
+# region and shares with agy, so echoed worker output cannot fake an
+# acknowledgement. kiro is in the union for two reasons of its own: the footer
+# renders ON the composer row, so a mid-turn composer read is `pending` and only
+# a busy read lets fm_composer_queued_enter_verdict convert that to `empty`; and
+# the submit core takes its pre-typing baseline with no harness, so without the
+# literal an already-busy kiro pane reads `idle` and wrongly arms the
+# idle-to-busy confirmation. kiro declares no per-harness signature, because the
+# union is its only delivery consumer: away-mode injection reads the primary
+# harness and pending-reply observation reads a secondmate's, and kiro is a
+# crewmate/scout adapter that can be neither. Its recorded worker state comes
+# from the kiro-hook record in bin/fm-busy-lib.sh, which never consults this
+# footer.
 FM_DELIVERY_BUSY_REGEX_DEFAULT='esc (to )?interrupt|Working(\.\.\.|…)|Ctrl\+c:cancel|ctrl\+c to stop|esc[[:space:]]+to[[:space:]]+cancel|Kiro is working'
 FM_DELIVERY_CLAUDE_BUSY_REGEX_DEFAULT='esc to interrupt|…[[:space:]]+\([0-9]+[smh]'
 FM_DELIVERY_CODEX_BUSY_REGEX_DEFAULT='esc to interrupt'
@@ -443,16 +454,6 @@ FM_DELIVERY_CURSOR_BUSY_REGEX_DEFAULT='ctrl\+c to stop'
 # acknowledgement. Delivery guard only; recorded worker state comes from the
 # agy-regex fold in bin/fm-busy-lib.sh.
 FM_DELIVERY_AGY_BUSY_REGEX_DEFAULT='esc[[:space:]]+to[[:space:]]+cancel'
-# kiro (Kiro CLI) renders its composer footer as `› Kiro is working · Type to
-# steer · Ctrl+S to queue` while a turn runs, and an idle footer of
-# `Trust All Tools active ... /quit to exit` or the `ask a question or describe
-# a task` placeholder otherwise (verified live, kiro-cli 2.21.4). The
-# harness-named `Kiro is working` literal is matched rather than the bare
-# `esc to cancel` token kiro also renders in its tool-call region and shares with
-# agy, so echoed worker output cannot fake an acknowledgement. Delivery guard
-# only; recorded worker state comes from the kiro-hook record in
-# bin/fm-busy-lib.sh, which never consults this footer.
-FM_DELIVERY_KIRO_BUSY_REGEX_DEFAULT='Kiro is working'
 FM_DELIVERY_KIMI_BUSY_REGEX_DEFAULT='^[[:space:]]*(🌑|🌒|🌓|🌔|🌕|🌖|🌗|🌘)[[:space:]]+·[[:space:]]+'
 
 fm_busy_lines_match() {  # [harness]
@@ -469,7 +470,6 @@ fm_busy_lines_match() {  # [harness]
       omp) regex=$FM_DELIVERY_OMP_BUSY_REGEX_DEFAULT ;;
       grok) regex=$FM_DELIVERY_GROK_BUSY_REGEX_DEFAULT ;;
       agy) regex=$FM_DELIVERY_AGY_BUSY_REGEX_DEFAULT ;;
-      kiro) regex=$FM_DELIVERY_KIRO_BUSY_REGEX_DEFAULT ;;
       kimi) regex=$FM_DELIVERY_KIMI_BUSY_REGEX_DEFAULT ;;
       cursor) regex=$FM_DELIVERY_CURSOR_BUSY_REGEX_DEFAULT ;;
       '') regex=$FM_DELIVERY_BUSY_REGEX_DEFAULT ;;

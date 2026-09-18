@@ -121,14 +121,17 @@ capture() {
   "$REAL_TMUX" -L "$SOCKET" capture-pane -p -t "$TARGET" -S -200 2>/dev/null || true
 }
 
-# The real consumer of kiro's footer: the delivery guard the submit-ack and
-# pending-reply observation paths read. Consumes a screen on stdin and folds it
-# the way those callers do - blank lines dropped, last 12 kept - so a footer
-# left behind in the 200-line scrollback cannot satisfy the match.
+# The real consumer of kiro's footer: the harness-less delivery union the submit
+# cores read, which is what actually decides whether a steer landed. It is called
+# with no harness for that reason - kiro declares no harness-scoped signature,
+# and the submit core has no recorded harness for the pane. Consumes a screen on
+# stdin and folds it the way that caller does - blank lines dropped, last 12
+# kept - so a footer left behind in the 200-line scrollback cannot satisfy the
+# match.
 kiro_footer_busy() {
   local visible
   visible=$(grep -v '^[[:space:]]*$' | tail -12)
-  printf '%s\0' "$visible" | fm_busy_lines_match kiro
+  printf '%s\0' "$visible" | fm_busy_lines_match
 }
 
 # The launch prompt asks for a computed answer (12345+67890=80235) so the awaited
@@ -174,6 +177,13 @@ for _ in $(seq 1 240); do
 done
 [ -n "$busy_live" ] || fail "the kiro delivery guard never matched the real kiro turn in flight"
 pass "the real kiro busy footer matches the kiro delivery guard in flight"
+
+# The /quit exit proof below is a DIFFERENCE against this baseline, so an empty
+# baseline would let the first readable command - kiro-cli itself, still running -
+# satisfy it and report the exit proven. Require the baseline here, while the turn
+# is provably in flight, rather than letting the later comparison degrade.
+[ -n "$KIRO_COMM" ] \
+  || fail "tmux read no #{pane_current_command} for the live kiro pane, so the /quit exit has no baseline to differ from"
 
 # The anchored `kiro-cli` name, read while the turn was provably in flight, is
 # the whole of kiro's detection surface: bin/fm-harness.sh and
