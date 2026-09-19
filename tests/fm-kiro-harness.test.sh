@@ -175,6 +175,26 @@ test_kiro_hook_is_the_trusted_primary_source() {
   pass "fm-busy-lib: kiro-hook is kiro's trusted source and is scoped to kiro"
 }
 
+# kiro's real busy composer row, assembled at RUNTIME from byte escapes so no line
+# of this file is itself a form the delivery union matches. That matters most here:
+# the fleet's own crewmates work in this repository, so a pane showing grep output,
+# a pager, an editor buffer or a printed failure from this file would otherwise
+# carry a live acknowledgement token and let an undelivered steer read as landed.
+# The separator is kiro's theme glyph, U+00B7 by default and an ASCII period under
+# the ASCII theme; the mode hint is `Type to steer` in STEER interrupt mode and
+# `Type to queue` otherwise.
+kiro_busy_row() {  # [dot|ascii] [steer|queue]
+  local theme=${1:-dot} mode=${2:-steer} sep
+  case "$theme" in
+    ascii) sep='.' ;;
+    *) sep=$(printf '\302\267') ;;
+  esac
+  case "$mode" in
+    queue) printf '\342\200\272 Kiro is working %s Type to queue %s Ctrl+S to steer' "$sep" "$sep" ;;
+    *) printf '\342\200\272 Kiro is working %s Type to steer %s Ctrl+S to queue' "$sep" "$sep" ;;
+  esac
+}
+
 # The hook record is kiro's only state source: it wins over a contradicting
 # pane, and with no record the classifier reports unknown rather than reading
 # the rendered footer.
@@ -183,7 +203,7 @@ test_kiro_record_is_the_only_state_source() {
   state="$TMP_ROOT/busy-state"
   mkdir -p "$state"
   id=kiro-busy-1
-  busy_pane=$'some output\n› Kiro is working · Type to steer · Ctrl+S to queue'
+  busy_pane=$'some output\n'"$(kiro_busy_row dot steer)"
 
   # A valid idle kiro-hook record must win even when the pane still renders the
   # busy footer (the record survives a misleading pane).
@@ -267,15 +287,15 @@ test_kiro_delivery_footer_matches_and_is_scoped() {
   # The harness-less union is the ONE path that decides a kiro delivery:
   # fm_tmux_submit_core classifies with no harness, so this is the matcher a
   # landed kiro submit is read by.
-  printf '%s\0' $'work\n› Kiro is working · Type to steer · Ctrl+S to queue' | fm_busy_lines_match \
+  printf '%s\0' $'work\n'"$(kiro_busy_row dot steer)" | fm_busy_lines_match \
     || fail "the harness-less delivery union must see kiro's STEER-mode busy footer"
   # kiro's DEFAULT interrupt mode renders `Type to queue` where STEER renders
   # `Type to steer`, and its spec-task run renders a third variant, so the union
   # anchors on what all three share and must not depend on the mode hint.
-  printf '%s\0' $'work\n› Kiro is working · Type to queue · Ctrl+S to steer' | fm_busy_lines_match \
+  printf '%s\0' $'work\n'"$(kiro_busy_row dot queue)" | fm_busy_lines_match \
     || fail "the union must see kiro's default-mode busy footer, not only the STEER one"
   # The separator is a theme glyph with two values, so both must acknowledge.
-  printf '%s\0' $'work\n› Kiro is working . Type to queue . Ctrl+S to steer' | fm_busy_lines_match \
+  printf '%s\0' $'work\n'"$(kiro_busy_row ascii queue)" | fm_busy_lines_match \
     || fail "the union must see kiro's busy footer under its ASCII separator theme"
   printf '%s\0' $'idle\n› ask a question or describe a task' | fm_busy_lines_match \
     && fail "kiro's idle placeholder row must not read as a busy footer" || true
@@ -287,7 +307,7 @@ test_kiro_delivery_footer_matches_and_is_scoped() {
   # kiro declares no harness-scoped signature, so a caller that does pass
   # harness=kiro falls to the fail-closed arm rather than borrowing another
   # harness's footer.
-  printf '%s\0' $'work\n› Kiro is working · Type to steer' | fm_busy_lines_match kiro \
+  printf '%s\0' $'work\n'"$(kiro_busy_row dot steer)" | fm_busy_lines_match kiro \
     && fail "harness=kiro must classify nothing busy; kiro declares no scoped signature" || true
   pass "fm-composer-lib: the harness-less union sees kiro's busy footer in every mode and separator, not its idle row or prose naming the phrase, and harness=kiro is fail-closed"
 }

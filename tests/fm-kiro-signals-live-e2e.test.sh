@@ -314,24 +314,27 @@ for _ in $(seq 1 240); do
 done
 [ -n "$tool_region_seen" ] \
   || fail "the kiro tool-call turn never rendered the shared 'esc to cancel' tool-region row, so a settled pane proves nothing about a residual one"
-# The settle point is decided on kiro_delivery_tail, and the placeholder alone does
-# not decide it: the placeholder from the earlier settle survives in this pane's
-# history, so while the turn's own output is shorter than the fold it is still among
-# those rows and a placeholder-only test breaks mid-turn, then reads a legitimately
-# busy pane as a residual row. Requiring the busy phrase to be gone as well is what
-# makes the settle real. The tool-region row is deliberately NOT part of the settle
-# condition, because its presence among those rows is the very thing the assertion
-# measures.
+# The settle point is the placeholder being the LAST non-blank row of
+# kiro_delivery_tail, which is what proves the composer has returned to rest. Merely
+# appearing somewhere in the fold does not: the placeholder from the earlier settle
+# survives in this pane's history and is still within 12 non-blank rows while the
+# turn's own output is shorter than that, so a presence test breaks mid-turn and then
+# reads a legitimately busy pane as a residual row. Testing the last row instead does
+# not depend on what else survives in the fold, which is why the busy footer is not
+# part of the condition either - it renders during the turn, strictly later than that
+# stale placeholder, so any premise admitting the placeholder admits the footer too
+# and a footer-absence arm could hold for the whole budget against a healthy kiro.
+# The tool-region row is likewise excluded, because its presence among those rows is
+# the very thing the assertion measures.
 tool_settled=
 for _ in $(seq 1 240); do
-  case "$(kiro_delivery_tail)" in
-    *"Kiro is working"*) ;;
+  case "$(kiro_delivery_tail | tail -1)" in
     *"ask a question or describe a task"*) tool_settled=1; break ;;
   esac
   sleep 0.5
 done
 [ -n "$tool_settled" ] \
-  || fail "the kiro composer never settled to its idle placeholder in the rows the delivery read consults after the tool-call turn"
+  || fail "the kiro composer never came to rest on its idle placeholder as the last row the delivery read consults after the tool-call turn"
 if fm_pane_is_busy "$TARGET"; then
   fail "a settled kiro pane that ran a tool call still matches the harness-less delivery union, so a residual 'esc to cancel' row reaches the rows the submit core reads and an undelivered steer would be recorded as delivered; delivery tail was: $(kiro_delivery_tail | tr '\n' '|')"
 fi

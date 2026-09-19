@@ -420,11 +420,17 @@ fm_composer_strip_ghost() {
 # The anchoring exists because a harness-named literal resists generic worker
 # output but not output ABOUT kiro. The literal alone cannot close that hole: any
 # pattern that matches a live pane also matches prose quoting the same row. What
-# closes it is that no tracked file reproduces a matchable form of the row - this
-# comment, the kiro reference page, and the verification record all describe the
-# footer instead of spelling it. The portable fixtures in
-# tests/fm-kiro-harness.test.sh are the deliberate exception, since a positive
-# case needs the real row. kiro is in the union for two reasons of its own: the footer
+# closes it is that no tracked file in this repository contains a matchable form -
+# this comment, the kiro reference page and the verification record describe the
+# footer without spelling it, and the portable fixtures in
+# tests/fm-kiro-harness.test.sh assemble it at runtime from byte escapes. That
+# invariant is the whole defense, so check it (grep -E for the union's kiro
+# alternative) rather than assuming it, and never state it as closed without
+# looking: a false closure claim is worse than an open hole, because it stops the
+# next reader checking. This repository is the worst possible place for the hazard,
+# since the fleet's own crewmates work in it - a pane showing grep output, a pager,
+# an editor buffer or a printed test failure would carry a live acknowledgement
+# token. kiro is in the union for two reasons of its own: the footer
 # renders ON the composer row, so a mid-turn composer read is `pending` and only
 # a busy read lets fm_composer_queued_enter_verdict convert that to `empty`; and
 # the submit core takes its pre-typing baseline with no harness, so without the
