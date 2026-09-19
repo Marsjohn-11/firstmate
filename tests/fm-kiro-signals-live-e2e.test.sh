@@ -7,6 +7,11 @@
 # resume line. Opt-in because it submits real prompts (no echo provider exists
 # for kiro). v3/KAS is explicitly out of scope and never exercised here.
 #
+# It also measures the one thing the token list alone cannot settle: whether a
+# settled pane that ran a tool call still carries a `esc to cancel` row the
+# harness-less delivery union matches, which would let an undelivered steer be
+# recorded as delivered.
+#
 # Run this deliberately, never from inside a validation step. Each scenario waits
 # on real model turns, so the runtime is unbounded by construction and a
 # step-capped agent invocation cannot contain it - one attempt spent 64 minutes
@@ -105,6 +110,10 @@ EOF
 . "$ROOT/bin/fm-busy-lib.sh"
 # shellcheck source=/dev/null
 . "$ROOT/bin/fm-composer-lib.sh"
+# fm_pane_is_busy is the delivery read the submit cores make. The post-tool-call
+# union negative below calls it directly rather than folding a capture itself.
+# shellcheck source=/dev/null
+. "$ROOT/bin/fm-tmux-lib.sh"
 # shellcheck source=/dev/null
 . "$ROOT/bin/fm-backend.sh"
 fm_backend_source tmux || fail "could not source the tmux backend"
@@ -268,6 +277,46 @@ done
 [ -n "$idle_settled" ] || fail "the kiro composer never settled to its idle placeholder after the reply"
 printf '%s' "$screen" | kiro_footer_busy \
   && fail "the settled kiro footer still matches the busy signature" || true
+
+# The same negative again, this time after a turn that actually RAN A TOOL CALL.
+# kiro draws a bare `esc to cancel` row in its tool-call region, which is also
+# agy's alternative in the harness-less union FM_DELIVERY_BUSY_REGEX_DEFAULT that
+# both submit cores read with no harness. A row from a finished tool call that
+# survives into the folded tail would let fm_composer_queued_enter_verdict convert
+# a structurally proven `pending` composer to `empty`, recording an undelivered
+# steer as delivered. The settle above cannot see that, because no tool call
+# precedes it.
+#
+# The read is fm_pane_is_busy itself - the call fm_tmux_submit_core makes, with no
+# harness - so the assertion consults the rows the delivery path consults rather
+# than a fold restated here.
+"$REAL_TMUX" -L "$SOCKET" send-keys -t "$TARGET" -l \
+  "run the shell command: echo fm-kiro-tool-probe" \
+  || fail "could not type the kiro tool-call prompt"
+"$REAL_TMUX" -L "$SOCKET" send-keys -t "$TARGET" Enter \
+  || fail "could not submit the kiro tool-call prompt"
+# The tool region must be observed rendering that row, or its absence at settle
+# proves nothing. Matched through the shared declaration of the alternative, never
+# a copy of it, so a token kiro renames is a failure here rather than a silent pass.
+tool_region_seen=
+for _ in $(seq 1 240); do
+  screen=$(capture)
+  printf '%s' "$screen" | grep -qiE "$FM_DELIVERY_AGY_BUSY_REGEX_DEFAULT" && { tool_region_seen=1; break; }
+  sleep 0.5
+done
+[ -n "$tool_region_seen" ] \
+  || fail "the kiro tool-call turn never rendered the shared 'esc to cancel' tool-region row, so a settled pane proves nothing about a residual one"
+tool_settled=
+for _ in $(seq 1 240); do
+  case "$(capture)" in *"ask a question or describe a task"*) tool_settled=1; break ;; esac
+  sleep 0.5
+done
+[ -n "$tool_settled" ] \
+  || fail "the kiro composer never settled to its idle placeholder after the tool-call turn"
+if fm_pane_is_busy "$TARGET"; then
+  fail "a settled kiro pane that ran a tool call still matches the harness-less delivery union, so a residual 'esc to cancel' row reaches the rows the submit core reads and an undelivered steer would be recorded as delivered; delivery tail was: $("$REAL_TMUX" -L "$SOCKET" capture-pane -p -t "$TARGET" -S -40 2>/dev/null | grep -v '^[[:space:]]*$' | tail -12 | tr '\n' '|')"
+fi
+pass "a settled kiro pane that ran a tool call reads clear of the harness-less delivery union"
 
 # Interrupt a genuinely long turn with exactly one Escape and require the
 # Cancelled row it prints.

@@ -76,8 +76,11 @@ firstmate    Global    HOME COPY - the firstmate-owned per-task config
 ```
 
 A target repository that ships `.kiro/agents/firstmate.json` therefore shadows the firstmate-owned per-task config, and because that shadowing config carries no hooks, the busy record the spawn seeds is never closed by a turn-end and the supervisor reads that worker as provably working indefinitely.
-kiro prints the conflict WARNING on the pane, so the collision is visible there, but nothing in firstmate's own durable state records it.
-The launch is deliberately unchanged: this record exists so the failure is a known quantity rather than an unexamined one.
+kiro prints the conflict WARNING on the pane, which nothing in firstmate reads, so a pane-only warning is not a signal the fleet can act on.
+The spawn therefore refuses instead, before any launch, when the resolved worktree holds that file, naming it and asking for it to be renamed or removed (`kiro_workspace_agent_validate` in `bin/fm-spawn.sh`, pinned by `tests/fm-kiro-harness.test.sh`).
+That is the same rule the whitespace hook path takes: kiro has no second state source, so a pane that could never clear its busy record is never started, and the refusal reaches firstmate's own caller rather than the pane.
+The refusal runs once the worktree is known and before the temp root, the retired relaunch wiring or the busy record exist, so it strands nothing.
+Renaming the per-task agent to a name a repository cannot plausibly ship would remove the collision rather than refuse it, and is follow-up work: the JSON `name`, the filename, and `--agent` have to move together.
 
 ## Trust modal and its suppression setting
 
@@ -127,12 +130,13 @@ The listing is a remote fetch, so the probe runs with stdin detached under the s
 ## Live guard result
 
 `FM_KIRO_SIGNALS_LIVE=1 tests/fm-kiro-signals-live-e2e.test.sh` passed on 2026-09-13 against kiro-cli 2.21.4: the busy footer matched in flight, the launch prompt was answered, both V2 hooks fired per turn, a single Escape cancelled a long turn, and `/quit` stopped the process and printed its resume-id line.
-Four parts of the guard changed after that run, so its recorded pass is evidence for the vendor facts above and not for what the guard checks today.
+Five parts of the guard changed after that run, so its recorded pass is evidence for the vendor facts above and not for what the guard checks today.
 Its footer matcher now folds the captured screen and calls the harness-less delivery union `fm_busy_lines_match` instead of a classifier helper the adapter no longer has, so every one of its footer reads exercises the path that actually decides a steer.
 Its hook commands are now single-token absolute paths to generated scripts, the shape the spawn emits, where the recorded run used bare `touch` commands, so the trigger firing is what the markers now prove.
 It now reads the live pane's foreground process group while the turn is in flight and fails unless some comm or argv[0] basename in that group is exactly `kiro-cli`, `fm_backend_agent_state tmux` reads `alive`, and `fm-harness.sh ancestry` returns `comm kiro` for one of that group's pids.
 It deliberately does not assert `#{pane_current_command}`, which reports the launcher's name wherever kiro-cli sits behind a wrapper, and captures that field only as the `/quit` exit baseline, where the exit now requires a readable command that differs from the captured one instead of accepting any non-matching value.
-Re-running the guard on the Linux desk where the real tool lives is what would prove all four.
+It now submits a tool-call turn of its own and, once that turn settles to the idle placeholder, requires `fm_pane_is_busy` with no harness to read the pane as not busy, so the residual-row question below is asked of the delivery read itself.
+Re-running the guard on the Linux desk where the real tool lives is what would prove all five.
 
 ## Steering a kiro worker: fixed
 
@@ -166,17 +170,21 @@ The verdict is portably reproducible from a real capture, so it never needed the
 The descriptor tmux passes is `styled=1 cursor=1 identity=1 rows=0`, not `rows=6`; the earlier `empty` measurement used a descriptor tmux does not send and was therefore not evidence about the real pane.
 Restoring the absent kiro entry to the fleet-wide idle-placeholder set still changes no verdict, which remains measured, so that omission stays correct.
 
-Three of the guard's other assertions are weaker than the vendor surface its header names, and strengthening them is not attempted here.
+Two of the guard's other assertions are weaker than the vendor surface its header names, and strengthening them is not attempted here.
 Its resume-line check passes whether or not `--resume-id` appears, so a release that drops that line leaves the guard green.
 It never asserts the `›` composer glyph, so a glyph change - which would flip every bare-row kiro composer read from `empty` to `unknown` and make steer delivery defer - would not redden it.
-Its settled-pane negative now runs against the harness-less union that decides a steer, but at a settle point no tool call precedes, so no recorded run yet proves a pane that ran a tool call settles clear of the union's shared `esc to cancel` alternative.
 
 Four traps make that strengthening its own piece of work rather than a small edit, each observed in a rejected attempt at all three at once.
 A leading-glyph test written with a shell `?` pattern compares one BYTE, so it rejects kiro's real composer row under any non-UTF-8 locale and reddens a correct tree; `fm_composer_leading_agent_glyph_var` in `../../bin/fm-composer-lib.sh` is locale-safe and already reaches the shared glyph set.
 An assertion the live guard makes inline rather than through a shared predicate leaves the portable negatives proving a predicate no live assertion runs.
 A portable negative whose command ends in `|| true` swallows both outcomes and asserts nothing.
 A resume-line hard fail placed after the process is gone can redden on a healthy tool, because a full-screen TUI exit restores the normal screen and leaves no captured output to match - the sibling rovo guard reads a durable PTY transcript instead.
-A settled-pane union negative also has to run after a tool-call turn settles, because `esc to cancel` renders in the tool-call region and cannot be present at a settle point no tool call precedes.
+
+The same traps shape the post-tool-call union negative, which is why it is built the way it is.
+It submits its own tool-call turn, because `esc to cancel` renders in the tool-call region and cannot be present at a settle point no tool call precedes.
+It first requires that row to appear mid-turn, matched through `FM_DELIVERY_AGY_BUSY_REGEX_DEFAULT` rather than a copy of the token, so a turn kiro answered without tools fails the assertion instead of satisfying it vacuously.
+It then calls `fm_pane_is_busy` with no harness - the read `fm_tmux_submit_core` makes - rather than folding a capture itself, so it cannot pass against rows the delivery path would not consult.
+Its failure names the folded delivery tail it read, alongside the harness and version every failure in the guard carries.
 
 ## What is NOT verified
 
@@ -184,6 +192,6 @@ A settled-pane union negative also has to run after a tool-call turn settles, be
 - Where kiro carries auth on macOS, and so whether relocating `KIRO_HOME` leaves it intact there. The XDG path in Environment is an Amazon Linux 2 measurement; `~/.local/share/kiro-cli` does not exist on macOS, so the untouched-by-relocation premise the spawn launches on has no macOS evidence at all. It stays unestablished on purpose rather than by oversight: settling it means probing a credential store, and that store is the operator's alone and is not ours to inspect. The cost is concrete. A kiro worker spawned on macOS may hit an interactive auth prompt, and a prompt nobody is present to answer makes the harness unusable UNATTENDED on that platform - which is the only way this fleet runs it. Do not read the Amazon Linux 2 result as covering macOS.
 - Any StopFailure/SessionEnd-equivalent hook trigger (none found). On an abnormal turn end (a stream or API error, a model-side abort) the `stop` hook never fires, so the busy record stays open and the supervisor reads the worker as provably working - deferring instead of surfacing or retiring the endpoint - until the next `userPromptSubmit` re-opens the record. The rendered footer does not rescue it: it is a delivery guard only and the classifier has no kiro pane arm.
 - Whether kiro V2 hands a hook `command` string to a shell or splits it into argv. Nothing depends on it: both hook commands are single-token absolute paths to scripts the spawn generates under `state/<id>.kiro-home/hooks/`, so the same script runs either way, and the redirect, the `|| true` tolerance of a refused event and the turn-end `touch` all sit inside the script where the interpreter is fixed by its shebang. The portable regression executes each generated script directly rather than through `sh -c`, so a shape that only a shell could run cannot pass CI.
-- Whether a settled kiro pane can carry a stale `esc to cancel` row that the harness-less union matches. This is an inference from the token list and the delivery path, not an observation: kiro renders that token in its tool-call region, agy's `esc[[:space:]]+to[[:space:]]+cancel` alternative is in `FM_DELIVERY_BUSY_REGEX_DEFAULT`, both submit-core reads pass no harness, and a busy read is what lets `fm_composer_queued_enter_verdict` convert a proven `pending` composer to `empty` - so a stale row surviving into the folded tail would let an undelivered steer be recorded as delivered. No run has been observed doing this: the guard's settled-pane negative now runs against the union, but at a settle point with no preceding tool call, so it cannot yet see a stale row. Narrowing or harness-splitting the union would change agy's delivery semantics and is out of scope for this adapter.
+- Whether a settled kiro pane can carry a stale `esc to cancel` row that the harness-less union matches. This is still an inference from the token list and the delivery path rather than an observation: kiro renders that token in its tool-call region, agy's `esc[[:space:]]+to[[:space:]]+cancel` alternative is in `FM_DELIVERY_BUSY_REGEX_DEFAULT`, both submit-core reads pass no harness, and a busy read is what lets `fm_composer_queued_enter_verdict` convert a proven `pending` composer to `empty` - so a stale row surviving into the folded tail would let an undelivered steer be recorded as delivered. The assertion that now checks it is the post-tool-call union negative in `tests/fm-kiro-signals-live-e2e.test.sh`, described under "Live guard result" above; it submits a tool-call turn, requires the tool-region row to render, and then requires `fm_pane_is_busy` to read the settled pane as not busy. Running that guard on the Linux desk is what turns the inference into a measurement, and until then this stays here. If it does go red, the fix is not this adapter's: narrowing or harness-splitting `FM_DELIVERY_BUSY_REGEX_DEFAULT` changes agy's delivery semantics, so the remedy is a captain-level decision about the shared union.
 - Primary or secondmate operation: no supervision protocol exists, and `bin/fm-spawn.sh` refuses a secondmate launch.
 - Backends other than tmux for the rendered surface (the portable regression drives the signals apart with real processes; the live guard exercises tmux).

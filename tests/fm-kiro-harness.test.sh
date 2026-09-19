@@ -22,7 +22,10 @@
 #      state/<id>.kiro-home/agents/firstmate.json and reaches it by relocating
 #      KIRO_HOME (since --agent is name-only), seeding
 #      chat.disableTrustAllConfirmation into that home so --trust-all-tools does
-#      not block on its modal. Teardown removes the whole per-task home.
+#      not block on its modal. Teardown removes the whole per-task home. Because
+#      the name also resolves from the worktree and the workspace copy wins, a
+#      worktree that already defines a firstmate agent refuses the spawn rather
+#      than launching a worker whose hooks another config has shadowed.
 #   4. The launch carries the brief as a positional prompt on --agent-engine v2
 #      with --agent, --trust-all-tools, --model, and --effort; a requested model
 #      a reachable --list-models omits refuses loudly, while a hung, unreachable
@@ -520,6 +523,39 @@ test_kiro_whitespace_hook_path_refuses_before_pane_creation() {
   pass "fm-spawn: a kiro hook path containing whitespace refuses before any pane is created"
 }
 
+# --agent is name-only and the workspace copy wins the name collision, so a
+# project that ships its own firstmate agent leaves the launched worker with no
+# hooks and a busy record nothing can close.
+test_kiro_workspace_agent_collision_refuses_before_pane_creation() {
+  local id rec out rc shadow
+  id="kiro-shadow-z11-$$"
+  rec=$(make_kiro_spawn_case shadow "$id")
+  read_kiro_spawn_record "$rec"
+  # The project SHIPS the colliding config, which is the real shape: it reaches the
+  # pooled worktree through the base refresh and leaves that worktree clean, where
+  # an untracked copy would be refused earlier as uncommitted work.
+  mkdir -p "$PROJ_DIR/.kiro/agents"
+  printf '%s\n' '{"name":"firstmate","description":"a target repo shipping its own firstmate agent","tools":["*"]}' \
+    > "$PROJ_DIR/.kiro/agents/firstmate.json"
+  git -C "$PROJ_DIR" add .kiro/agents/firstmate.json \
+    || fail "could not stage the shipped agent config"
+  git -C "$PROJ_DIR" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' \
+    commit -qm 'ship a firstmate agent config' \
+    || fail "could not commit the shipped agent config"
+  git -C "$PROJ_DIR" push -q origin main \
+    || fail "could not publish the shipped agent config to origin"
+  shadow="$WT_DIR/.kiro/agents/firstmate.json"
+  out=$(run_kiro_spawn "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id")
+  rc=$?
+  [ -f "$shadow" ] || fail "the base refresh did not bring the shipped agent config into the worktree"
+  [ "$rc" -ne 0 ] || fail "a worktree agent config named firstmate must refuse the spawn"
+  assert_contains "$out" "$shadow" "the refusal did not name the shadowing agent config"
+  [ ! -e "$HOME_DIR/state/$id.kiro-home" ] || fail "the refused spawn still armed the per-task home"
+  [ ! -e "$HOME_DIR/state/$id.busy-gen" ] || fail "the refused spawn still armed a busy generation"
+  [ -s "$CASE_DIR/launch.log" ] && fail "a shadowed agent name created a launch command" || true
+  pass "fm-spawn: a worktree agent config named firstmate refuses before any pane is created"
+}
+
 # `-f json` is free to pretty-print, so the model check must read ids from a
 # whitespaced listing too. Without that a valid model would hit the refusal
 # branch and no kiro spawn could carry --model at all.
@@ -649,6 +685,7 @@ test_kiro_per_task_hook_config_is_out_of_tree
 test_kiro_effort_xhigh_passes_through
 test_kiro_unlisted_model_refuses_before_pane_creation
 test_kiro_whitespace_hook_path_refuses_before_pane_creation
+test_kiro_workspace_agent_collision_refuses_before_pane_creation
 test_kiro_pretty_printed_listing_validates_the_model
 test_kiro_unparseable_listing_launches_unvalidated
 test_kiro_unreachable_listing_launches_unvalidated

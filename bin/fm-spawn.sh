@@ -1782,6 +1782,28 @@ kiro_hook_path_validate() {  # <state-dir> <id>
   return 0
 }
 
+# --agent is name-only, and kiro resolves that name from the relocated
+# KIRO_HOME/agents/ AND the worktree's own .kiro/agents/, with the WORKSPACE copy
+# winning on a collision (measured on kiro-cli 2.22.2-nightly.2,
+# docs/verification/kiro.md). A project that ships .kiro/agents/firstmate.json
+# therefore shadows the per-task config carrying the hooks, and a shadowing config
+# has none, so neither hook fires. That is the same failure the whitespace rule
+# above refuses, reached through the name instead of the path: kiro has no second
+# state source, so the seeded busy record never closes and the supervisor reads the
+# worker as provably working forever. kiro announces the conflict on the pane only,
+# which nothing in firstmate reads, so the refusal happens here instead and names
+# the file to move. Checked once the worktree is known, before the temp root, the
+# retired relaunch wiring or the busy record exist.
+kiro_workspace_agent_validate() {  # <worktree>
+  local wt=$1 shadow
+  shadow="$wt/.kiro/agents/firstmate.json"
+  if [ -e "$shadow" ] || [ -L "$shadow" ]; then
+    echo "error: '$shadow' defines an agent named firstmate, which kiro resolves ahead of the per-task config holding this worker's busy-state hooks, so neither hook would fire and the busy record the spawn seeds could never close; rename or remove that file to run a kiro worker in this worktree, or select a different verified harness" >&2
+    return 1
+  fi
+  return 0
+}
+
 # The verified launch command per adapter. The knowledge half of each adapter
 # (busy-state source, exit command, dialogs, quirks) lives in the harness-adapters skill.
 launch_template() {
@@ -3907,6 +3929,12 @@ agy)
     else
       echo "warning: could not pre-register agy workspace trust for $WT; the launch will answer the folder-trust dialog in window $T instead" >&2
     fi
+  fi
+  ;;
+kiro)
+  # A raw launch carries no --agent, so no name can be shadowed.
+  if [ "$RAW_LAUNCH" -eq 0 ]; then
+    kiro_workspace_agent_validate "$WT" || exit 1
   fi
   ;;
 esac
