@@ -143,6 +143,14 @@ kiro_footer_busy() {
   printf '%s\0' "$visible" | fm_busy_lines_match
 }
 
+# The rows a delivery read actually consults: fm_pane_busy_state's own 40-row
+# window, folded the same way. Used where a decision must be made about the live
+# tail rather than about this pane's scrollback.
+kiro_delivery_tail() {
+  "$REAL_TMUX" -L "$SOCKET" capture-pane -p -t "$TARGET" -S -40 2>/dev/null \
+    | grep -v '^[[:space:]]*$' | tail -12
+}
+
 # The launch prompt asks for a computed answer (12345+67890=80235) so the awaited
 # token never appears in the echoed launch line itself.
 "$REAL_TMUX" -L "$SOCKET" send-keys -t "$TARGET" -l \
@@ -306,15 +314,21 @@ for _ in $(seq 1 240); do
 done
 [ -n "$tool_region_seen" ] \
   || fail "the kiro tool-call turn never rendered the shared 'esc to cancel' tool-region row, so a settled pane proves nothing about a residual one"
+# The settle point is decided on kiro_delivery_tail, not on the 200-row capture:
+# the placeholder from the earlier settle is still in this pane's scrollback, so a
+# raw match would break on the first poll while the turn is in flight and then read
+# a legitimately busy pane as a residual row. The tool-region row is deliberately
+# NOT part of the settle condition, because its presence among those rows is the
+# very thing the assertion measures.
 tool_settled=
 for _ in $(seq 1 240); do
-  case "$(capture)" in *"ask a question or describe a task"*) tool_settled=1; break ;; esac
+  case "$(kiro_delivery_tail)" in *"ask a question or describe a task"*) tool_settled=1; break ;; esac
   sleep 0.5
 done
 [ -n "$tool_settled" ] \
-  || fail "the kiro composer never settled to its idle placeholder after the tool-call turn"
+  || fail "the kiro composer never settled to its idle placeholder in the rows the delivery read consults after the tool-call turn"
 if fm_pane_is_busy "$TARGET"; then
-  fail "a settled kiro pane that ran a tool call still matches the harness-less delivery union, so a residual 'esc to cancel' row reaches the rows the submit core reads and an undelivered steer would be recorded as delivered; delivery tail was: $("$REAL_TMUX" -L "$SOCKET" capture-pane -p -t "$TARGET" -S -40 2>/dev/null | grep -v '^[[:space:]]*$' | tail -12 | tr '\n' '|')"
+  fail "a settled kiro pane that ran a tool call still matches the harness-less delivery union, so a residual 'esc to cancel' row reaches the rows the submit core reads and an undelivered steer would be recorded as delivered; delivery tail was: $(kiro_delivery_tail | tr '\n' '|')"
 fi
 pass "a settled kiro pane that ran a tool call reads clear of the harness-less delivery union"
 
