@@ -314,15 +314,20 @@ for _ in $(seq 1 240); do
 done
 [ -n "$tool_region_seen" ] \
   || fail "the kiro tool-call turn never rendered the shared 'esc to cancel' tool-region row, so a settled pane proves nothing about a residual one"
-# The settle point is decided on kiro_delivery_tail, not on the 200-row capture:
-# the placeholder from the earlier settle is still in this pane's scrollback, so a
-# raw match would break on the first poll while the turn is in flight and then read
-# a legitimately busy pane as a residual row. The tool-region row is deliberately
-# NOT part of the settle condition, because its presence among those rows is the
-# very thing the assertion measures.
+# The settle point is decided on kiro_delivery_tail, and the placeholder alone does
+# not decide it: the placeholder from the earlier settle survives in this pane's
+# history, so while the turn's own output is shorter than the fold it is still among
+# those rows and a placeholder-only test breaks mid-turn, then reads a legitimately
+# busy pane as a residual row. Requiring the busy phrase to be gone as well is what
+# makes the settle real. The tool-region row is deliberately NOT part of the settle
+# condition, because its presence among those rows is the very thing the assertion
+# measures.
 tool_settled=
 for _ in $(seq 1 240); do
-  case "$(kiro_delivery_tail)" in *"ask a question or describe a task"*) tool_settled=1; break ;; esac
+  case "$(kiro_delivery_tail)" in
+    *"Kiro is working"*) ;;
+    *"ask a question or describe a task"*) tool_settled=1; break ;;
+  esac
   sleep 0.5
 done
 [ -n "$tool_settled" ] \

@@ -267,21 +267,29 @@ test_kiro_delivery_footer_matches_and_is_scoped() {
   # The harness-less union is the ONE path that decides a kiro delivery:
   # fm_tmux_submit_core classifies with no harness, so this is the matcher a
   # landed kiro submit is read by.
-  printf '%s\0' $'work\n› Kiro is working · Type to steer' | fm_busy_lines_match \
-    || fail "the harness-less delivery union must see a kiro busy footer"
+  printf '%s\0' $'work\n› Kiro is working · Type to steer · Ctrl+S to queue' | fm_busy_lines_match \
+    || fail "the harness-less delivery union must see kiro's STEER-mode busy footer"
+  # kiro's DEFAULT interrupt mode renders `Type to queue` where STEER renders
+  # `Type to steer`, and its spec-task run renders a third variant, so the union
+  # anchors on what all three share and must not depend on the mode hint.
+  printf '%s\0' $'work\n› Kiro is working · Type to queue · Ctrl+S to steer' | fm_busy_lines_match \
+    || fail "the union must see kiro's default-mode busy footer, not only the STEER one"
+  # The separator is a theme glyph with two values, so both must acknowledge.
+  printf '%s\0' $'work\n› Kiro is working . Type to queue . Ctrl+S to steer' | fm_busy_lines_match \
+    || fail "the union must see kiro's busy footer under its ASCII separator theme"
   printf '%s\0' $'idle\n› ask a question or describe a task' | fm_busy_lines_match \
     && fail "kiro's idle placeholder row must not read as a busy footer" || true
-  # The union requires the footer's separator, so worker output that merely names
-  # the phrase - this repository's own kiro docs, quoted or grepped onto a pane -
-  # cannot acknowledge a submit that never landed.
-  printf '%s\0' $'| Rendered tail | Busy composer footer is `Kiro is working`' | fm_busy_lines_match \
-    && fail "the bare Kiro is working phrase must not read as a busy footer" || true
+  # The union requires the separator, so worker output that merely names the phrase
+  # - prose about kiro, quoted or grepped onto a pane - cannot acknowledge a submit
+  # that never landed.
+  printf '%s\0' $'the busy row opens with `Kiro is working`, then a separator' | fm_busy_lines_match \
+    && fail "prose naming the bare Kiro is working phrase must not read as a busy footer" || true
   # kiro declares no harness-scoped signature, so a caller that does pass
   # harness=kiro falls to the fail-closed arm rather than borrowing another
   # harness's footer.
   printf '%s\0' $'work\n› Kiro is working · Type to steer' | fm_busy_lines_match kiro \
     && fail "harness=kiro must classify nothing busy; kiro declares no scoped signature" || true
-  pass "fm-composer-lib: the harness-less union sees kiro's anchored busy footer, not its idle row or the bare phrase, and harness=kiro is fail-closed"
+  pass "fm-composer-lib: the harness-less union sees kiro's busy footer in every mode and separator, not its idle row or prose naming the phrase, and harness=kiro is fail-closed"
 }
 
 # --- Spawn (real fm-spawn driven by a fake tmux) ----------------------------

@@ -401,22 +401,30 @@ fm_composer_strip_ghost() {
 # agy's `esc to cancel` is part of the union for the same reason: an explicit
 # tmux agy endpoint reaches the submit core with no recorded harness, and its
 # bare `>` composer verdict is `unknown`, so the busy footer is the only
-# turn-started acknowledgement that path can read. kiro renders its footer as
-# `› Kiro is working · Type to steer · Ctrl+S to queue` while a turn runs, and an
-# idle footer of `Trust All Tools active ... /quit to exit` or the `ask a
-# question or describe a task` placeholder otherwise (verified live, kiro-cli
-# 2.21.4). What the union carries is the ANCHORED form of that footer - the
-# harness-named phrase plus its `· Type to steer` separator - rather than the bare
-# `esc to cancel` token kiro also renders in its tool-call region and shares with
-# agy. A harness-named literal resists generic worker output but not output ABOUT
-# kiro, and the bare phrase appears verbatim in this repository's own kiro
-# reference page and verification record, so a worker that greps or quotes them
-# puts an acknowledgement token on its own pane. Anchoring narrows that surface
-# rather than closing it: those same files also spell the full footer. The
-# remaining exposure is the safe direction of the tradeoff. A pane narrow enough to
-# truncate the separator loses the acknowledgement and DEFERS the steer, which is
-# visible and retried, where a false positive records an undelivered steer as
-# delivered and loses it silently. kiro is in the union for two reasons of its own: the footer
+# turn-started acknowledgement that path can read. kiro's busy composer row opens
+# with the harness-named phrase `Kiro is working`, then a separator glyph, then a
+# mode hint, and its idle footer is `Trust All Tools active ... /quit to exit` or
+# the `ask a question or describe a task` placeholder (verified live, kiro-cli
+# 2.21.4). What the union carries is that phrase plus whitespace plus the
+# separator, and nothing beyond it, rather than the bare `esc to cancel` token
+# kiro also renders in its tool-call region and shares with agy.
+# The anchor comes from kiro's own footer template, read out of the
+# `kiro-cli-chat` binary on kiro-cli 2.22.2-nightly.2 (macOS), which builds three
+# variants: `Type to queue` for a spec-task run, `Type to steer` then a toggle hint
+# in STEER interrupt mode, and `Type to queue` then a toggle hint otherwise. All
+# three share only the phrase, whitespace, and the separator, so the mode hint is
+# deliberately NOT required - requiring `Type to steer` would miss the DEFAULT
+# mode entirely. The separator is a theme glyph with two values, U+00B7 and an
+# ASCII period, so both are accepted as an alternation of literal bytes rather
+# than a bracket range, which GNU grep rejects between multibyte endpoints.
+# The anchoring exists because a harness-named literal resists generic worker
+# output but not output ABOUT kiro. The literal alone cannot close that hole: any
+# pattern that matches a live pane also matches prose quoting the same row. What
+# closes it is that no tracked file reproduces a matchable form of the row - this
+# comment, the kiro reference page, and the verification record all describe the
+# footer instead of spelling it. The portable fixtures in
+# tests/fm-kiro-harness.test.sh are the deliberate exception, since a positive
+# case needs the real row. kiro is in the union for two reasons of its own: the footer
 # renders ON the composer row, so a mid-turn composer read is `pending` and only
 # a busy read lets fm_composer_queued_enter_verdict convert that to `empty`; and
 # the submit core takes its pre-typing baseline with no harness, so without the
@@ -427,7 +435,7 @@ fm_composer_strip_ghost() {
 # crewmate/scout adapter that can be neither. Its recorded worker state comes
 # from the kiro-hook record in bin/fm-busy-lib.sh, which never consults this
 # footer.
-FM_DELIVERY_BUSY_REGEX_DEFAULT='esc (to )?interrupt|Working(\.\.\.|…)|Ctrl\+c:cancel|ctrl\+c to stop|esc[[:space:]]+to[[:space:]]+cancel|Kiro is working[[:space:]]+·[[:space:]]+Type to steer'
+FM_DELIVERY_BUSY_REGEX_DEFAULT='esc (to )?interrupt|Working(\.\.\.|…)|Ctrl\+c:cancel|ctrl\+c to stop|esc[[:space:]]+to[[:space:]]+cancel|Kiro is working[[:space:]]+(·|\.)'
 FM_DELIVERY_CLAUDE_BUSY_REGEX_DEFAULT='esc to interrupt|…[[:space:]]+\([0-9]+[smh]'
 FM_DELIVERY_CODEX_BUSY_REGEX_DEFAULT='esc to interrupt'
 FM_DELIVERY_OPENCODE_BUSY_REGEX_DEFAULT='esc interrupt'
