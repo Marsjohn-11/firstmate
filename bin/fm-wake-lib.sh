@@ -1139,7 +1139,9 @@ _fm_lock_reap_stale_holder() {  # <path>
 # interrupted its critical section) is reclaimed like fm_lock_try_acquire's
 # self-held branch. The stale test counts a recycled pid as gone
 # (fm_lock_owner_pid_recycled), so residue whose holder crashed is reclaimed
-# even once its pid names something else.
+# even once its pid names something else. A nested mutex without pid-identity
+# cannot be reclaimed after its pid is recycled; this revision never creates
+# nested mutexes.
 fm_lock_try_acquire_steal_mutex() {  # <steal-lock>
   local lockdir=$1 current
   FM_LOCK_OWNER_DIR=
