@@ -613,6 +613,90 @@ test_lock_reclaims_a_steal_mutex_whose_pid_was_recycled() {
   pass "a steal mutex is reclaimed on a recycled pid and kept on a live holder"
 }
 
+# Leave a real primary lock behind, held by a process that then exits, and point
+# its recorded pid at a live unrelated process - the shape the kernel produces
+# once it recycles a crashed holder's pid. The ownerdir keeps the crashed
+# holder's identity, so only the identity test can tell the two apart.
+seed_recycled_primary_lock() {  # <lockdir> <pid-to-record> [identity-pid]
+  local lockdir=$1 record=$2 identity_pid=${3:-} identity
+  bash -c '. "$1"; fm_lock_try_create "$2"' _ "$LIB" "$lockdir" \
+    || fail "could not create a primary lock to abandon"
+  [ -L "$lockdir" ] || fail "abandoned primary lock is not an owner symlink"
+  [ -s "$lockdir/pid-identity" ] \
+    || fail "abandoned primary lock recorded no holder identity"
+  printf '%s\n' "$record" > "$lockdir/pid" \
+    || fail "could not point the primary lock at the recycled pid"
+  if [ -n "$identity_pid" ]; then
+    identity=$(bash -c '. "$1"; fm_pid_identity "$2"' _ "$LIB" "$identity_pid") \
+      || fail "could not compute the holder's identity"
+    [ -n "$identity" ] || fail "empty identity for the primary lock holder"
+    printf '%s\n' "$identity" > "$lockdir/pid-identity" \
+      || fail "could not record the primary lock holder's identity"
+  fi
+}
+
+# The recycled-pid wedge reaches the PRIMARY lock too, not only its steal mutex.
+# A crashed holder's lock outlives it and the kernel eventually hands its pid to
+# an unrelated process; bare liveness then reads the lock as held for as long as
+# that pid lives, so fm_lock_try_acquire refuses identically on every attempt and
+# the unbounded fm_lock_acquire_wait above it spins at 0.1s. That spin runs on the
+# watcher-down marker lock from watcher_cleanup, which still holds .watch.lock and
+# blocks successor takeover. The recorded identity separates the two cases, so the
+# lock is reclaimed when its pid no longer answers to it and left alone when it does.
+test_lock_reclaims_a_primary_lock_whose_pid_was_recycled() {
+  local dir state lockdir squatter own rc
+  dir=$(make_case lock-primary-recycled-pid)
+  state="$dir/state"
+  lockdir="$state/.contend.lock"
+  sleep 30 &
+  squatter=$!
+  seed_recycled_primary_lock "$lockdir" "$squatter"
+
+  rc=0
+  FM_LOCK_STALE_AFTER=0 FM_STATE_OVERRIDE="$state" bash -c '
+    . "$1"
+    fm_lock_try_acquire "$2"
+  ' _ "$LIB" "$lockdir" || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    kill -9 "$squatter" 2>/dev/null || true
+    wait "$squatter" 2>/dev/null || true
+    fail "recovery stayed blocked by a primary lock whose pid was recycled (rc=$rc)"
+  fi
+  own=$(cat "$lockdir/pid" 2>/dev/null || true)
+  [ "$own" != "$squatter" ] \
+    || fail "the recycled-pid primary lock was not actually replaced"
+  assert_absent "$lockdir.steal" "the recovery mutex outlived a successful reclaim"
+  is_live_non_zombie "$squatter" \
+    || fail "the unrelated process holding the recycled pid was signalled"
+  kill -9 "$squatter" 2>/dev/null || true
+  wait "$squatter" 2>/dev/null || true
+
+  # Control: a live holder whose pid still answers to its recorded identity
+  # genuinely holds the lock, so the claim must back off and leave it untouched.
+  dir=$(make_case lock-primary-live-holder)
+  state="$dir/state"
+  lockdir="$state/.contend.lock"
+  sleep 30 &
+  squatter=$!
+  seed_recycled_primary_lock "$lockdir" "$squatter" "$squatter"
+
+  rc=0
+  FM_LOCK_STALE_AFTER=0 FM_STATE_OVERRIDE="$state" bash -c '
+    . "$1"
+    fm_lock_try_acquire "$2"
+  ' _ "$LIB" "$lockdir" || rc=$?
+  if [ "$rc" -eq 0 ]; then
+    kill -9 "$squatter" 2>/dev/null || true
+    wait "$squatter" 2>/dev/null || true
+    fail "a primary lock whose live holder still matches its identity was taken"
+  fi
+  own=$(cat "$lockdir/pid" 2>/dev/null || true)
+  [ "$own" = "$squatter" ] || fail "a live holder's lock pid was clobbered (got '$own')"
+  kill -9 "$squatter" 2>/dev/null || true
+  wait "$squatter" 2>/dev/null || true
+  pass "a primary lock is reclaimed on a recycled pid and kept on a live holder"
+}
+
 # A crashed stealer leaves its steal mutex behind, and recovering that mutex with
 # the primary lock's own algorithm descends onto "<lock>.steal.steal" and keeps
 # descending. Every symlink creation goes through ln, so recording each link path
@@ -1526,6 +1610,7 @@ test_lock_late_claim_loses_after_recreate
 test_lock_paused_mid_acquire_claim_fails_during_steal
 test_lock_reclaims_a_self_held_steal_mutex
 test_lock_reclaims_a_steal_mutex_whose_pid_was_recycled
+test_lock_reclaims_a_primary_lock_whose_pid_was_recycled
 test_lock_never_creates_a_nested_steal_mutex
 test_lock_stale_steal_recovery_stays_bounded
 test_autoarm_reclaim_refuses_when_the_steal_mutex_was_taken
