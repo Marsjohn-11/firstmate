@@ -980,9 +980,8 @@ _fm_lock_reclaim_if_stale() {  # <path>
 # stays behind the stale test, because an older revision running concurrently on
 # the same home does hold "<lock>.steal.steal" as a genuine mutex while it
 # descends, and pruning unconditionally would pull it out from under that
-# process. The stale
-# test counts a recycled pid as gone (fm_lock_owner_pid_recycled), so residue
-# whose holder crashed is reclaimed even once its pid names something else.
+# process. A depth-2 mutex without pid-identity cannot be reclaimed after its
+# pid is recycled; this revision never creates depth-2 mutexes.
 fm_lock_steal_try_acquire() {  # <steal-path>
   local steal=$1 attempt=0 pid current
   fm_current_pid current || return 1
