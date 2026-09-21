@@ -561,6 +561,34 @@ ok - unacknowledged recovery is announced at most once per generation and the su
 FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=59357
 ```
 
+The beacon-progress contract was measured on 2026-09-21 in a 38-task home whose watcher cycles ran 300-1000s each.
+A live watcher holding its singleton lock with a 143-second-old beacon was sampled read-only:
+
+```sh
+sample <watcher-pid> 2
+```
+
+Observed top-of-stack distribution over 1754 samples:
+
+```text
+read  (in libsystem_kernel.dylib)        1377
+__wait4  (in libsystem_kernel.dylib)      247
+__fork  (in libsystem_kernel.dylib)        42
+```
+
+That watcher was forking and reading subshells continuously, so a stale beacon with a live pid is cycle length, not a wedge.
+`state/.watch-cycle-exits.log` from the same home recorded `beacon_age` between 305 and 967 seconds on every one of its last twenty closes, each paired with arms that refused to attach and exited nonzero while naming that live watcher's own pid.
+
+```sh
+bin/fm-test-run.sh tests/fm-watcher-lock.test.sh
+```
+
+Observed output for the case this evidence supports:
+
+```text
+ok - a watcher stays beacon-fresh and healthy throughout a sweep longer than the stale grace
+```
+
 Deterministic entry points:
 
 ```sh
