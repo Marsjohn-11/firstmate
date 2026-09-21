@@ -251,24 +251,32 @@ test_guard_warnings() {
 }
 
 test_lock_single_winner_under_concurrency() {
-  local dir state lockdir marker i pids pid wins
+  local dir state lockdir marker attempts contenders i pids pid wins
   dir=$(make_case lock-concurrency)
   state="$dir/state"
   lockdir="$state/.contend.lock"
   marker="$dir/wins"
+  attempts="$dir/attempts"
+  contenders=40
   : > "$marker"
+  : > "$attempts"
   pids=
   i=1
-  while [ "$i" -le 40 ]; do
+  while [ "$i" -le "$contenders" ]; do
     FM_STATE_OVERRIDE="$state" bash -c '
       . "$1"
-      if fm_lock_try_acquire "$2"; then
-        printf "%s\n" "$$" >> "$3"
-        # Stay alive so the held lock names a live pid for the whole window;
-        # otherwise a late contender could legitimately reclaim a dead-pid lock.
-        sleep 1
+      if fm_lock_try_acquire "$2"; then won=1; printf "%s\n" "$$" >> "$3"; else won=0; fi
+      printf "%s\n" "$$" >> "$4"
+      # The winner holds until every contender has had its attempt. A fixed
+      # sleep expires before the last fork starts on a loaded host, and the
+      # abandoned lock then names a dead pid that a late contender reclaims as
+      # genuinely stale - a second win that says nothing about exclusion.
+      if [ "$won" = 1 ]; then
+        while [ "$(awk "END { print NR }" "$4")" -lt "$5" ] && [ "$SECONDS" -lt 60 ]; do
+          sleep 0.1
+        done
       fi
-    ' _ "$LIB" "$lockdir" "$marker" &
+    ' _ "$LIB" "$lockdir" "$marker" "$attempts" "$contenders" &
     pids="$pids $!"
     i=$((i + 1))
   done
