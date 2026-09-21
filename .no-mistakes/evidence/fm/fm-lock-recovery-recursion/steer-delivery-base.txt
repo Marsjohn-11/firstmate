@@ -1,0 +1,15 @@
+label=base-broken bin=/tmp/fmlivetest/base/bin
+seeded: stale .seq.lock (dead pid 999999) + 40 stacked stale steal mutexes
+RESULT: fm-send did NOT finish within 60s (still running)
+records written under build.inbox:
+/Users/marsjohn/.no-mistakes/evidence/01M30G5WGZN31Y0S7BBXB4Y1C2/steer-over-steal-residue-drive.sh: line 99: 96414 Killed: 9               env PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$HOME_DIR" FM_HOM
+doorbell line typed into the pane: none
+fm-send output (first 6 lines):
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ●  WATCHER DOWN - SUPERVISION IS OFF
+  | ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  | ●  This is a supervision warning only; the requested message WILL still be sent.
+  | ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+basename ENAMETOOLONG lines in fm-send output: 192
+VERDICT: steer NOT delivered

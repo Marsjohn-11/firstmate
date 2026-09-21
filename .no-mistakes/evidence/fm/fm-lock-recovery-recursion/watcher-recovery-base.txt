@@ -1,0 +1,22 @@
+label=base-broken bin=/tmp/fmlivetest/base/bin
+seeded: stale .watch.lock (dead pid 999999) + 40 stacked stale steal mutexes
+longest residue component: 289 bytes
+RESULT: watcher NEVER took the singleton lock within 45s (holder pid recorded: 999999)
+watcher process cpu time after the attempt: 0:02.11
+deepest .steal residue left under state/: depth 40
+nested mutex .watch.lock.steal.steal present: yes
+watcher stderr/stdout (first 12 lines):
+  | basename: /tmp/fmlivetest/run-base-broken/state/.watch.lock.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.stea
+  | basename: /tmp/fmlivetest/run-base-broken/state/.watch.lock.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.stea
+  | basename: /tmp/fmlivetest/run-base-broken/state/.watch.lock.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.stea
+  | basename: /tmp/fmlivetest/run-base-broken/state/.watch.lock.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.stea
+  | basename: /tmp/fmlivetest/run-base-broken/state/.watch.lock.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.stea
+  | basename: /tmp/fmlivetest/run-base-broken/state/.watch.lock.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.stea
+  | basename: /tmp/fmlivetest/run-base-broken/state/.watch.lock.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.stea
+  | basename: /tmp/fmlivetest/run-base-broken/state/.watch.lock.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.stea
+  | basename: /tmp/fmlivetest/run-base-broken/state/.watch.lock.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.stea
+  | basename: /tmp/fmlivetest/run-base-broken/state/.watch.lock.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.stea
+  | basename: /tmp/fmlivetest/run-base-broken/state/.watch.lock.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.stea
+  | basename: /tmp/fmlivetest/run-base-broken/state/.watch.lock.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.stea
+basename ENAMETOOLONG in watcher output: 93
+/Users/marsjohn/.no-mistakes/evidence/01M30G5WGZN31Y0S7BBXB4Y1C2/watcher-steal-residue-drive.sh: line 83: 10816 Terminated: 15          PATH="$FAKEBIN:$PATH" FM_STATE_OVERRIDE="$STATE" FM_LOCK_STALE_A

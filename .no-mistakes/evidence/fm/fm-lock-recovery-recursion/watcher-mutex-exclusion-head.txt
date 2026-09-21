@@ -1,0 +1,25 @@
+case=live-holder bin=/Users/marsjohn/.no-mistakes/worktrees/45849cd9dd00/01M30G5WGZN31Y0S7BBXB4Y1C2/bin expect=refuse
+seeded: .watch.lock pid=999999  steal mutex pid=70903  unrelated live pid=70903
+RESULT: watcher claimed the singleton lock: no (after 20s)
+lock pid now: 999999
+steal mutex still present: yes
+unrelated live process still running: yes
+VERDICT: pass
+--- exit=0 ---
+case=recycled bin=/Users/marsjohn/.no-mistakes/worktrees/45849cd9dd00/01M30G5WGZN31Y0S7BBXB4Y1C2/bin expect=claim
+seeded: .watch.lock pid=999999  steal mutex pid=85222  unrelated live pid=85222
+RESULT: watcher claimed the singleton lock: yes (after 5s)
+lock pid now: 85439
+steal mutex still present: no
+unrelated live process still running: yes
+/Users/marsjohn/.no-mistakes/evidence/01M30G5WGZN31Y0S7BBXB4Y1C2/watcher-mutex-exclusion-drive.sh: line 95: 85439 Terminated: 15          PATH="$FAKEBIN:$PATH" FM_STATE_OVERRIDE="$STATE" FM_LOCK_STALE_AFTER=0 FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$BIN/fm-watch.sh" > "$RUN/watch.out" 2>&1
+VERDICT: pass
+--- exit=0 ---
+case=primary bin=/Users/marsjohn/.no-mistakes/worktrees/45849cd9dd00/01M30G5WGZN31Y0S7BBXB4Y1C2/bin expect=refuse
+seeded: .watch.lock pid=91687  steal mutex pid=absent  unrelated live pid=91687
+RESULT: watcher claimed the singleton lock: no (after 20s)
+lock pid now: 91687
+steal mutex still present: no
+unrelated live process still running: yes
+VERDICT: pass
+--- exit=0 ---

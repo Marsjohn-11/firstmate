@@ -1,0 +1,8 @@
+rep=1 winners=1 attempts=40
+rep=2 winners=1 attempts=40
+rep=3 winners=1 attempts=40
+rep=4 winners=1 attempts=40
+rep=5 winners=1 attempts=40
+rep=6 winners=1 attempts=40
+rep=7 winners=1 attempts=40
+rep=8 winners=1 attempts=40

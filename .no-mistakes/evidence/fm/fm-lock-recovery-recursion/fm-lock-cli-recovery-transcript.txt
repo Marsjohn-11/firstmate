@@ -1,0 +1,61 @@
+### Live product surface: bin/fm-lock.sh (the per-home firstmate session-lock CLI)
+### Each home below has a stale claim lock plus the recovery-mutex residue a crashed stealer leaves.
+
+================ 1. BASE dee119b (before the fix): 40 stacked stale recovery mutexes ================
+lab=/tmp/fm-lock-lab.prefix.edFRtq tree=/tmp/fm-base-dee119b seeded_stale_steal_levels=40 dead_pid=68908
+--- fm-lock.sh stdout/stderr (first 6 lines) ---
+basename: /tmp/fm-lock-lab.prefix.edFRtq/state/.lock.acquire.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.s
+basename: /tmp/fm-lock-lab.prefix.edFRtq/state/.lock.acquire.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.s
+basename: /tmp/fm-lock-lab.prefix.edFRtq/state/.lock.acquire.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.s
+basename: /tmp/fm-lock-lab.prefix.edFRtq/state/.lock.acquire.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.s
+basename: /tmp/fm-lock-lab.prefix.edFRtq/state/.lock.acquire.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.s
+basename: /tmp/fm-lock-lab.prefix.edFRtq/state/.lock.acquire.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.steal.s
+--- outcome ---
+exit=124 elapsed_s=45
+verdict=TIMED_OUT_WEDGED (no claim, operator blocked)
+deepest_steal_depth_left_on_disk=40
+session_lock_line1=<none>
+lab_dir=/tmp/fm-lock-lab.prefix.edFRtq
+
+================ 2. HEAD 528a607 (after the fix): identical home ================
+lab=/tmp/fm-lock-lab.postfix.OOwYLT tree=/Users/marsjohn/.no-mistakes/worktrees/45849cd9dd00/01M30G5WGZN31Y0S7BBXB4Y1C2 seeded_stale_steal_levels=40 dead_pid=12101
+--- fm-lock.sh stdout/stderr (first 6 lines) ---
+lock acquired: harness pid 15152
+--- outcome ---
+exit=0 elapsed_s=3
+deepest_steal_depth_left_on_disk=40
+session_lock_line1=15152
+lab_dir=/tmp/fm-lock-lab.postfix.OOwYLT
+
+================ 3. HEAD: recovery mutex whose crashed holder's pid was recycled onto a live process ================
+lab=/tmp/fm-recycled-lab.recycled.QJ7mdg mode=recycled unrelated_live_pid=13906
+seeded: recovery mutex records RECYCLED pid 13906 (identity is the crashed stealer's)
+--- fm-lock.sh output ---
+lock acquired: harness pid 15152
+exit=0 elapsed_s=2
+verdict=CLAIM_TAKEN session_lock_line1=15152
+recovery_mutex_still_present=no
+unrelated_process_unharmed=yes
+lab_dir=/tmp/fm-recycled-lab.recycled.QJ7mdg
+
+================ 4. HEAD adversarial: recovery mutex genuinely held by that live process (must NOT be stolen) ================
+lab=/tmp/fm-recycled-lab.liveholder.9SD5SW mode=liveholder unrelated_live_pid=15165
+seeded: recovery mutex held by LIVE pid 15165 whose identity matches
+--- fm-lock.sh output ---
+Terminated: 15
+exit=124 elapsed_s=15
+verdict=CLI_BLOCKED (no claim taken)
+recovery_mutex_still_present=yes
+unrelated_process_unharmed=yes
+lab_dir=/tmp/fm-recycled-lab.liveholder.9SD5SW
+
+================ 5. HEAD adversarial: PRIMARY lock with a recycled holder pid (documented limit: still counts as live) ================
+lab=/tmp/fm-recycled-lab.primary.vngFYM mode=primary unrelated_live_pid=22402
+seeded: primary lock records recycled pid 22402, identity=Sun Sep 20 18:42:09 2026     bash -c . "...
+--- fm-lock.sh output ---
+
+exit=124 elapsed_s=15
+verdict=CLI_BLOCKED (no claim taken)
+primary_lock_still_present=yes
+unrelated_process_unharmed=yes
+lab_dir=/tmp/fm-recycled-lab.primary.vngFYM

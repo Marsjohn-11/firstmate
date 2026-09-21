@@ -1,0 +1,11 @@
+label=head-fixed bin=/Users/marsjohn/.no-mistakes/worktrees/45849cd9dd00/01M30G5WGZN31Y0S7BBXB4Y1C2/bin
+seeded: stale .watch.lock (dead pid 999999) + 40 stacked stale steal mutexes
+longest residue component: 288 bytes
+RESULT: watcher took the singleton lock in 3s (pid 99447)
+watcher process cpu time after the attempt: 0:00.18
+deepest .steal residue left under state/: depth 40
+nested mutex .watch.lock.steal.steal present: no
+watcher stderr/stdout (first 12 lines):
+basename ENAMETOOLONG in watcher output: 0
+0
+/Users/marsjohn/.no-mistakes/evidence/01M30G5WGZN31Y0S7BBXB4Y1C2/watcher-steal-residue-drive.sh: line 83: 99447 Terminated: 15          PATH="$FAKEBIN:$PATH" FM_STATE_OVERRIDE="$STATE" FM_LOCK_STALE_AFTER=0 FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$BIN/fm-watch.sh" > "$RUN/watch.out" 2>&1

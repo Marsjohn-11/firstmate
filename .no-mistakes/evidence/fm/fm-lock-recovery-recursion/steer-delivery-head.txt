@@ -1,0 +1,20 @@
+label=head-fixed bin=/Users/marsjohn/.no-mistakes/worktrees/45849cd9dd00/01M30G5WGZN31Y0S7BBXB4Y1C2/bin
+seeded: stale .seq.lock (dead pid 999999) + 40 stacked stale steal mutexes
+RESULT: fm-send exited 0 after 6s
+records written under build.inbox:
+  | /tmp/fmlivetest/steer-head-fixed/home/state/build.inbox/001.msg
+record 001.msg:
+  | schema=fm-task-inbox.v1
+  | at=2026-09-21T01:58:58Z
+  | --
+  | captain steer over stacked residuedoorbell line typed into the pane: none
+fm-send output (first 6 lines):
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ●  WATCHER DOWN - SUPERVISION IS OFF
+  | ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  | ●  This is a supervision warning only; the requested message WILL still be sent.
+  | ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+basename ENAMETOOLONG lines in fm-send output: 0
+0
+VERDICT: steer delivered durably
