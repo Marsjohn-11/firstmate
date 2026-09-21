@@ -123,11 +123,12 @@ fm_path_age() {
 }
 
 # fm_poll_derived_grace [poll-seconds]
-# Default guard-grace derivation: max(300, poll + 60). A watcher touches its
-# liveness beacon once per poll cycle, so a fixed 300s grace stops correctly
-# bounding staleness once the poll cadence reaches or exceeds it; growing the
-# default with the cadence while keeping the historical 300s floor for the
-# common short-poll case fixes that without a caller-specific constant.
+# Default guard-grace derivation: max(300, poll + 60). A watcher's longest gap
+# between beacon touches is its longest single step, which on a home with few
+# registered checks is its terminal poll wait, so a fixed 300s grace stops
+# correctly bounding staleness once the poll cadence reaches or exceeds it;
+# growing the default with the cadence while keeping the historical 300s floor
+# for the common short-poll case fixes that without a caller-specific constant.
 # Defaults to $FM_POLL (fm-watch.sh's own poll env var) when no argument is
 # given, so a caller with no independent notion of the poll cadence still
 # derives the same default fm-watch.sh itself would use.
@@ -944,8 +945,12 @@ _fm_recovery_marker_arm_check() {
 
 # Apply the owner-documented announced-episode arm transition atomically with
 # the queue read. Handling successors must not call this transition.
+#
+# The reopen keeps the episode's own generation. A harness that re-arms only
+# between turns reaches this at every turn boundary, so minting a fresh one
+# would invalidate the acknowledgement the handling turn was already given.
 _fm_recovery_marker_reopen_announced() {
-  local marker=$1 lock
+  local marker=$1 lock generation
   lock="${marker}.lock"
   fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || return 1
   if ! fm_lock_acquire_wait "$lock"; then
@@ -959,8 +964,9 @@ _fm_recovery_marker_reopen_announced() {
   fi
   case "$FM_RECOVERY_MARKER_TOKEN" in
     announced:*)
+      generation=${FM_RECOVERY_MARKER_TOKEN##*:}
       if [ -s "$FM_WAKE_QUEUE" ] \
-        && ! _fm_recovery_marker_write_locked "$marker" downtime ""; then
+        && ! _fm_recovery_marker_write_locked "$marker" downtime "$generation"; then
         fm_lock_release "$lock"
         fm_lock_release "$FM_WAKE_QUEUE_LOCK"
         return 1
