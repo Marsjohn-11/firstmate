@@ -670,8 +670,11 @@ fm_lock_owner_pid_recycled() {  # <lockdir> <pid>
   [ "$current" != "$recorded" ]
 }
 
-fm_lock_recheck_stale_owner() {
-  local lockdir=$1 expected_owner=$2 expected_pid=$3 actual_pid
+# A live holder pid counts as still holding the lock unless the caller passes
+# recycled_gone=true and the pid proves recycled. Only steal-mutex recovery opts
+# in, so a primary lock's verdict rests on bare liveness.
+fm_lock_recheck_stale_owner() {  # <lockdir> <expected-owner> <expected-pid> [recycled_gone]
+  local lockdir=$1 expected_owner=$2 expected_pid=$3 recycled_gone=${4:-false} actual_pid
   if [ -n "$expected_owner" ]; then
     fm_lock_points_to_owner "$lockdir" "$expected_owner" || return 1
   elif [ -e "$lockdir" ] || [ -L "$lockdir" ]; then
@@ -679,8 +682,9 @@ fm_lock_recheck_stale_owner() {
   fi
   actual_pid=$(cat "$lockdir/pid" 2>/dev/null || true)
   [ "$actual_pid" = "$expected_pid" ] || return 1
-  if fm_pid_alive "$actual_pid" && ! fm_lock_owner_pid_recycled "$lockdir" "$actual_pid"; then
-    return 1
+  if fm_pid_alive "$actual_pid"; then
+    [ "$recycled_gone" = true ] || return 1
+    fm_lock_owner_pid_recycled "$lockdir" "$actual_pid" || return 1
   fi
   if fm_lock_mid_acquire_is_fresh "$lockdir" "$actual_pid"; then
     return 1
@@ -1079,6 +1083,7 @@ fm_recovery_marker_reopen_announced() {
 # successor's link. A reaper that died after winning leaves its tombstone; a
 # later reaper re-elects itself by renaming that dead reaper's tombstone, and a
 # reaper whose own election a trap interrupted resumes it from its tombstone.
+# Only steal-mutex recovery calls this, so a recycled holder pid counts as gone.
 fm_lock_reap_dead_link() {
   local lockdir=$1 owner pid token tomb current
   [ -L "$lockdir" ] || return 1
@@ -1086,7 +1091,7 @@ fm_lock_reap_dead_link() {
   fm_current_pid current || return 1
   if [ -d "$owner" ]; then
     pid=$(cat "$owner/pid" 2>/dev/null || true)
-    fm_lock_recheck_stale_owner "$lockdir" "$owner" "$pid" || return 1
+    fm_lock_recheck_stale_owner "$lockdir" "$owner" "$pid" true || return 1
     token=$owner
   else
     token=
@@ -1111,12 +1116,13 @@ fm_lock_reap_dead_link() {
 
 # Remove a stale holder that is not a link lock, such as a directory lock left
 # by an older revision. Link locks go through fm_lock_reap_dead_link instead,
-# whose tombstone election keeps competing reapers off a successor's link.
+# whose tombstone election keeps competing reapers off a successor's link. Only
+# steal-mutex recovery calls this, so a recycled holder pid counts as gone.
 _fm_lock_reclaim_if_stale() {  # <path>
   local path=$1 pid
   [ -e "$path" ] && [ ! -L "$path" ] || return 1
   pid=$(cat "$path/pid" 2>/dev/null || true)
-  fm_lock_recheck_stale_owner "$path" '' "$pid" || return 1
+  fm_lock_recheck_stale_owner "$path" '' "$pid" true || return 1
   fm_lock_remove_path "$path"
 }
 
