@@ -623,8 +623,11 @@ fm_lock_owner_pid_recycled() {  # <lockdir> <pid>
   [ "$current" != "$recorded" ]
 }
 
-fm_lock_recheck_stale_owner() {
-  local lockdir=$1 expected_owner=$2 expected_pid=$3 actual_pid
+# A live holder pid counts as still holding the lock unless the caller passes
+# recycled_gone=true and the pid proves recycled. Only steal-mutex recovery opts
+# in, so a primary lock's verdict rests on bare liveness.
+fm_lock_recheck_stale_owner() {  # <lockdir> <expected-owner> <expected-pid> [recycled_gone]
+  local lockdir=$1 expected_owner=$2 expected_pid=$3 recycled_gone=${4:-false} actual_pid
   if [ -n "$expected_owner" ]; then
     fm_lock_points_to_owner "$lockdir" "$expected_owner" || return 1
   elif [ -e "$lockdir" ] || [ -L "$lockdir" ]; then
@@ -632,8 +635,9 @@ fm_lock_recheck_stale_owner() {
   fi
   actual_pid=$(cat "$lockdir/pid" 2>/dev/null || true)
   [ "$actual_pid" = "$expected_pid" ] || return 1
-  if fm_pid_alive "$actual_pid" && ! fm_lock_owner_pid_recycled "$lockdir" "$actual_pid"; then
-    return 1
+  if fm_pid_alive "$actual_pid"; then
+    [ "$recycled_gone" = true ] || return 1
+    fm_lock_owner_pid_recycled "$lockdir" "$actual_pid" || return 1
   fi
   if fm_lock_mid_acquire_is_fresh "$lockdir" "$actual_pid"; then
     return 1
@@ -950,8 +954,10 @@ fm_recovery_marker_reopen_announced() {
   fm_recovery_transition "$1" reopen-announced
 }
 
-# Remove <path> only when its recorded holder is provably gone, reusing the same
-# owner/pid/liveness/freshness recheck the primary lock's recovery uses.
+# Remove <path> only when its recorded holder is provably gone, reusing the
+# primary lock's owner/pid/liveness/freshness recheck and additionally counting a
+# recycled holder pid as gone. Steal-mutex recovery is the only caller, so that
+# extra leg never reaches a primary lock's verdict.
 _fm_lock_reclaim_if_stale() {  # <path>
   local path=$1 owner='' pid
   [ -e "$path" ] || [ -L "$path" ] || return 1
@@ -959,7 +965,7 @@ _fm_lock_reclaim_if_stale() {  # <path>
     owner=$(fm_lock_link_owner "$path" 2>/dev/null || true)
   fi
   pid=$(cat "$path/pid" 2>/dev/null || true)
-  fm_lock_recheck_stale_owner "$path" "$owner" "$pid" || return 1
+  fm_lock_recheck_stale_owner "$path" "$owner" "$pid" true || return 1
   fm_lock_remove_path "$path"
 }
 

@@ -613,6 +613,59 @@ test_lock_reclaims_a_steal_mutex_whose_pid_was_recycled() {
   pass "a steal mutex is reclaimed on a recycled pid and kept on a live holder"
 }
 
+# Recycled-pid detection belongs to steal-mutex recovery alone. A primary lock's
+# pre-removal verdict must rest on bare liveness, because the reclaim that follows
+# it deletes the lock after a marker publish that can block without re-proving
+# steal-mutex ownership, which would let a rival's fresh claim be deleted. Both
+# callers of fm_lock_recheck_stale_owner are exercised against one fixture - a
+# recorded holder whose pid is alive as an unrelated process and whose recorded
+# identity no longer matches - so the two verdicts must disagree.
+test_recycled_pid_verdict_is_steal_mutex_only() {
+  local dir state lockdir squatter out rc=0
+  dir=$(make_case recycled-verdict-scope)
+  state="$dir/state"
+  lockdir="$state/.contend.lock"
+  sleep 30 &
+  squatter=$!
+  bash -c '. "$1"; fm_lock_try_create "$2"' _ "$LIB" "$lockdir" \
+    || fail "could not create a lock to abandon"
+  [ -L "$lockdir" ] || fail "abandoned lock is not an owner symlink"
+  [ -s "$lockdir/pid-identity" ] || fail "abandoned lock recorded no holder identity"
+  printf '%s\n' "$squatter" > "$lockdir/pid" \
+    || fail "could not point the lock at the recycled pid"
+
+  out=$(FM_LOCK_STALE_AFTER=0 FM_STATE_OVERRIDE="$state" bash -c '
+    . "$1"
+    owner=$(fm_lock_link_owner "$2") || exit 20
+    pid=$(cat "$2/pid" 2>/dev/null || true)
+    [ -n "$pid" ] || exit 21
+    if fm_lock_recheck_stale_owner "$2" "$owner" "$pid"; then
+      primary=stale
+    else
+      primary=live
+    fi
+    if fm_lock_recheck_stale_owner "$2" "$owner" "$pid" true; then
+      steal=stale
+    else
+      steal=live
+    fi
+    printf "primary=%s steal=%s\n" "$primary" "$steal"
+  ' _ "$LIB" "$lockdir") || rc=$?
+  kill -9 "$squatter" 2>/dev/null || true
+  wait "$squatter" 2>/dev/null || true
+  [ "$rc" -eq 0 ] || fail "recycled-verdict fixture failed to set up (rc=$rc): ${out:-no output}"
+  case "$out" in
+    *"primary=live"*) ;;
+    *) fail "a primary lock's verdict consulted the recycled-pid predicate: $out" ;;
+  esac
+  case "$out" in
+    *"steal=stale"*) ;;
+    *) fail "steal-mutex recovery lost its recycled-pid detection: $out" ;;
+  esac
+  assert_present "$lockdir" "the live-verdict recheck removed the lock"
+  pass "recycled-pid detection applies to steal-mutex recovery and not to a primary lock"
+}
+
 # A crashed stealer leaves its steal mutex behind, and recovering that mutex with
 # the primary lock's own algorithm descends onto "<lock>.steal.steal" and keeps
 # descending. Every symlink creation goes through ln, so recording each link path
@@ -1526,6 +1579,7 @@ test_lock_late_claim_loses_after_recreate
 test_lock_paused_mid_acquire_claim_fails_during_steal
 test_lock_reclaims_a_self_held_steal_mutex
 test_lock_reclaims_a_steal_mutex_whose_pid_was_recycled
+test_recycled_pid_verdict_is_steal_mutex_only
 test_lock_never_creates_a_nested_steal_mutex
 test_lock_stale_steal_recovery_stays_bounded
 test_autoarm_reclaim_refuses_when_the_steal_mutex_was_taken
