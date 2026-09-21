@@ -1036,7 +1036,16 @@ fm_lock_try_acquire() {
     FM_LOCK_HELD_PID=$(cat "$lockdir/pid" 2>/dev/null || true)
     return 1
   fi
-  if fm_pid_alive "$pid" && ! fm_lock_owner_pid_recycled "$lockdir" "$pid"; then
+  # Known limitation. A holder pid the kernel has recycled onto an unrelated
+  # process still counts as live here, so a primary lock left behind by a crashed
+  # holder is never reclaimed once its pid names something else, and callers
+  # waiting through fm_lock_acquire_wait spin for as long as that pid lives.
+  # Applying fm_lock_owner_pid_recycled at this gate does not close that shape on
+  # its own. The reclaim below removes the lock after _fm_recovery_marker_publish,
+  # which can block for an unbounded wait, so a rival that takes the steal mutex
+  # inside that window has its fresh claim deleted. Closing this safely requires
+  # the removal to re-prove steal-mutex ownership first.
+  if fm_pid_alive "$pid"; then
     FM_LOCK_HELD_PID=$pid
     return 1
   fi
@@ -1054,7 +1063,7 @@ fm_lock_try_acquire() {
   steal_owner=${FM_LOCK_OWNER_DIR:-}
 
   cur=$(cat "$lockdir/pid" 2>/dev/null || true)
-  if fm_pid_alive "$cur" && ! fm_lock_owner_pid_recycled "$lockdir" "$cur"; then
+  if fm_pid_alive "$cur"; then
     fm_lock_release "$steal"
     FM_LOCK_HELD_PID=$cur
     FM_LOCK_OWNER_DIR=
