@@ -1568,9 +1568,10 @@ fm_autoarm_claim_open() {  # <state-dir> [grace]
 #
 # Healthy means outcome=rewake with no exhausted-failure marker, bound to the
 # current session-lock pid and current watcher recovery generation. The rewake
-# ledger must also be at least as new as the last watcher beacon: a later beacon
-# proves another between-turns watcher cycle has begun, so the rewake belongs to
-# an earlier handling turn.
+# ledger must also be at least as new as the last watcher beacon. The beacon
+# advances many times within one cycle, so a later beacon proves the watcher
+# cycle already running when the epoch was written has made progress since, and
+# this rewake no longer describes the current mid-turn state.
 #
 # A missing generation, a failed or exhausted episode, an open arming claim, a
 # changed or dead session lock, a moved recovery generation, or an absent/later
