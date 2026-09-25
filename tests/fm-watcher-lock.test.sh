@@ -1347,7 +1347,7 @@ test_stopped_watcher_is_live_but_stale_then_exit_is_classified() {
 # to attach to a live pid with a stale beacon, and the guard reported
 # supervision as hung. The beacon must advance at each proven-progress point.
 test_beacon_stays_fresh_through_a_long_check_sweep() {
-  local dir state fakebin checks grace child i age worst first last span
+  local dir state fakebin checks grace child i age worst span sweeps
   local unhealthy_age=
   dir=$(make_case beacon-through-sweep)
   state="$dir/state"
@@ -1401,13 +1401,20 @@ test_beacon_stays_fresh_through_a_long_check_sweep() {
   done
   kill -TERM "$child" 2>/dev/null || true
   wait "$child" 2>/dev/null || true
-  first=$(head -1 "$checks" 2>/dev/null || true)
-  last=$(tail -1 "$checks" 2>/dev/null || true)
-  [ -n "$first" ] && [ -n "$last" ] || fail "no check ran during the sweep window"
-  span=$((last - first))
-  # Without this the case could pass vacuously on a sweep shorter than grace.
+  # One sweep is ten consecutive log entries, because the watcher's check loop is
+  # a single pass over every registered check and each one appends its start time
+  # once. Measuring head-to-tail instead would span every sweep plus the gaps
+  # between them, clearing the grace no matter how long any single sweep took -
+  # and that is the vacuity this guard exists to reject. Take the longest aligned
+  # group of ten, and ignore a trailing partial group from the sweep TERM cut off.
+  sweeps=$(awk 'NR % 10 == 1 { start = $1 } NR % 10 == 0 { complete++ } END { print complete + 0 }' "$checks")
+  span=$(awk '
+    NR % 10 == 1 { start = $1 }
+    NR % 10 == 0 { d = $1 - start; if (d > max) max = d }
+    END { print max + 0 }' "$checks")
+  [ "$sweeps" -ge 1 ] || fail "no complete ten-check sweep ran during the sampling window"
   [ "$span" -ge "$grace" ] \
-    || fail "the sweep spanned only ${span}s, shorter than the ${grace}s grace it must outlive"
+    || fail "the longest of $sweeps sweeps spanned only ${span}s, shorter than the ${grace}s grace one sweep must outlive"
   [ "$worst" -lt "$grace" ] \
     || fail "beacon went quiet for ${worst}s while the ${span}s sweep was still running (grace ${grace}s)"
   [ -z "$unhealthy_age" ] \
