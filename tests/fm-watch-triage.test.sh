@@ -82,20 +82,20 @@ wait_live() {
 # assertions describe.
 # 0 if the watcher is still alive after a completed cycle, 1 if it exited.
 wait_poll_cycle() {  # <state> <pid> [limit-ticks]
-  local state=$1 pid=$2 limit=${3:-300} beat first now i=0
-  beat="$state/.last-cycle-turnover"
-  rm -f "$beat"
+  local state=$1 pid=$2 limit=${3:-300} turnover first now i=0
+  turnover="$state/.last-cycle-turnover"
+  rm -f "$turnover"
   first=""
   while [ "$i" -lt "$limit" ]; do
     kill -0 "$pid" 2>/dev/null || return 1
-    first=$(file_mtime "$beat")
+    first=$(file_mtime "$turnover")
     [ -n "$first" ] && break
     sleep 0.1
     i=$((i + 1))
   done
   while [ "$i" -lt "$limit" ]; do
     kill -0 "$pid" 2>/dev/null || return 1
-    now=$(file_mtime "$beat")
+    now=$(file_mtime "$turnover")
     if [ -n "$now" ] && [ "$now" != "$first" ]; then
       return 0
     fi
@@ -5978,12 +5978,13 @@ test_beacon_stays_fresh_while_absorbing() {
 # `sleep POLL` in the watcher, so with a distinctive POLL the count of those
 # sleeps is the count of completed cycles.
 test_cycle_turnover_marker_is_touched_once_per_cycle() {
-  local dir state fakebin out pid touch_log sleep_log
-  local cycles turnovers beats
+  local dir state fakebin out pid touch_log sleep_log touch_sample
+  local cycles turnovers beats sampled i
   dir=$(make_case cycle-turnover-once); state="$dir/state"; fakebin="$dir/fakebin"
   out="$dir/watch.out"
   touch_log="$dir/touch.log"
   sleep_log="$dir/sleep.log"
+  touch_sample="$dir/touch.sample"
   : > "$touch_log"
   : > "$sleep_log"
 
@@ -6026,17 +6027,36 @@ SH
     FM_FAKE_TOUCH_LOG="$touch_log" FM_FAKE_SLEEP_LOG="$sleep_log" \
     "$WATCH" > "$out" &
   pid=$!
-  # Deliberately a wall-clock window rather than wait_poll_cycle: that helper
-  # reads the marker this case is bounding, so using it here would make the bug
-  # hide its own symptom and report a vacuity failure instead of the real one.
-  # Three POLLs of headroom yields several cycles even on a loaded host.
-  sleep 11
+  # Sample while the watcher is alive and parked in a terminal wait, never around
+  # the reap: a TERM landing between the turnover touch and the `sleep 3` that
+  # follows it would leave a turnover with no matching cycle and fail a correct
+  # watcher. A logged `sleep 3` proves its own cycle's turnover already happened,
+  # so counting turnovers a moment into that wait - and only accepting the sample
+  # when the sleep count has not moved across it - pins both counts to the same
+  # set of cycles with most of a POLL as margin.
+  # Deliberately not wait_poll_cycle: that helper reads the marker this case is
+  # bounding, so using it here would let the bug hide its own symptom and report
+  # a vacuity failure instead of the real one.
+  cycles=""
+  for i in $(seq 1 120); do
+    kill -0 "$pid" 2>/dev/null || fail "watcher exited during the sampling window: $(cat "$out")"
+    sampled=$(grep -cx '3' "$sleep_log" || true)
+    if [ "$sampled" -lt 3 ]; then
+      sleep 0.2
+      continue
+    fi
+    sleep 0.3
+    cp "$touch_log" "$touch_sample"
+    [ "$(grep -cx '3' "$sleep_log" || true)" = "$sampled" ] || continue
+    cycles=$sampled
+    break
+  done
   kill -0 "$pid" 2>/dev/null || fail "watcher exited during the sampling window: $(cat "$out")"
   reap "$pid"
+  [ -n "$cycles" ] || fail "never caught the watcher parked in a terminal wait long enough to sample"
 
-  cycles=$(grep -cx '3' "$sleep_log" || true)
-  turnovers=$(grep -cxF "$state/.last-cycle-turnover" "$touch_log" || true)
-  beats=$(grep -cxF "$state/.last-watcher-beat" "$touch_log" || true)
+  turnovers=$(grep -cxF "$state/.last-cycle-turnover" "$touch_sample" || true)
+  beats=$(grep -cxF "$state/.last-watcher-beat" "$touch_sample" || true)
 
   # Non-vacuity first: without at least two observed cycles and more beats than
   # turnovers, the equality below could hold while proving nothing.

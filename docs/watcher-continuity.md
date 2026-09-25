@@ -402,9 +402,11 @@ A cycle's work scales with the fleet while the grace does not, because a check s
 Beacon age therefore bounds how long the watcher has gone without making progress, not how long since a cycle turned over, so a healthy watcher in a large fleet is no longer read as wedged because its cycle work outran the grace.
 `bin/fm-watch-arm.sh` and `bin/fm-guard.sh` still take a bare 300-second default rather than deriving it from the poll interval, so a healthy watcher idle-waiting on a home with `FM_POLL` at 300 can still reach that age however often it beats.
 
-The beacon now means "progress happened" rather than "a cycle completed", so cycle turnover has its own signal.
-`state/.last-cycle-turnover` is touched exactly once per cycle immediately before the terminal wait and at no progress point.
-Nothing may infer turnover from the beacon, which fires many times per cycle, so a reader that needs a completed cycle reads the turnover marker.
+`state/.last-cycle-turnover` marks cycle turnover for test synchronization, touched exactly once per cycle immediately before the terminal wait and at no progress point.
+No production code reads it today; its only reader is the test suite's cycle-wait helper.
+It exists because the liveness beacon deliberately no longer implies a completed cycle, so a test that must wait out a whole cycle has nothing else to synchronize on.
+If supervision should ever depend on cycle turnover, that is a new decision and must not be inferred from this file's presence.
+Nothing may infer turnover from the beacon either, which fires many times per cycle.
 
 ## Regression coverage
 
