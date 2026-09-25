@@ -6031,9 +6031,12 @@ SH
   # the reap: a TERM landing between the turnover touch and the `sleep 3` that
   # follows it would leave a turnover with no matching cycle and fail a correct
   # watcher. A logged `sleep 3` proves its own cycle's turnover already happened,
-  # so counting turnovers a moment into that wait - and only accepting the sample
-  # when the sleep count has not moved across it - pins both counts to the same
-  # set of cycles with most of a POLL as margin.
+  # so counting turnovers a moment into that wait pins both counts to the same set
+  # of cycles with most of a POLL as margin. The sample is accepted only if the
+  # sleep count is still unmoved a moment AFTER the copy, because a cycle touches
+  # the marker tens of milliseconds before its own sleep is logged: a copy landing
+  # inside that gap would hold one turnover more than the cycles it is compared
+  # against, and the later recheck is what rejects exactly that window.
   # Deliberately not wait_poll_cycle: that helper reads the marker this case is
   # bounding, so using it here would let the bug hide its own symptom and report
   # a vacuity failure instead of the real one.
@@ -6047,6 +6050,7 @@ SH
     fi
     sleep 0.3
     cp "$touch_log" "$touch_sample"
+    sleep 0.3
     [ "$(grep -cx '3' "$sleep_log" || true)" = "$sampled" ] || continue
     cycles=$sampled
     break
