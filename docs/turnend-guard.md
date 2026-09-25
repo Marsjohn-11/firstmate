@@ -212,7 +212,8 @@ That longest step is the terminal wait (`event_wait_or_sleep`) of up to `FM_POLL
 
 The derived grace below accounts only for the poll, so it does not bound a check.
 On a home whose `FM_CHECK_TIMEOUT` exceeds that grace, a healthy watcher inside a single check still reads stale and the arm still refuses to attach.
-That remaining gap is tracked separately as `arm-guard-poll-derived-grace` and is not closed here.
+That gap is not closed here.
+A home that raises `FM_CHECK_TIMEOUT` above its derived grace can still have a healthy watcher read stale while it waits out one registered check, and closing it would mean deriving the grace from the check timeout as well as the poll.
 
 A fixed 300-second grace default stops correctly bounding staleness once a home's `FM_POLL` reaches or exceeds it.
 A perfectly healthy watcher mid-wait would then read stale at the edge of every full poll cycle by definition.
