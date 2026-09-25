@@ -269,6 +269,11 @@ JSON
 # hasClaudeMdExternalIncludesWarningShown to true. So false/false is "never
 # asked", not "No, disable": it must be treated like an absent flag - trust
 # registered, no import consent manufactured - rather than refused.
+#
+# The uncorroborated approved===false case lives here too, so the flags are
+# pinned as PRESENT and exactly false rather than merely not-true: a cleanup
+# that deleted them satisfies assert_trust_only_no_import_consent while still
+# rewriting the human's consent state.
 test_project_root_entry_default_import_flags_are_not_a_decline() {
   local rec store out
   rec=$(make_case project-default-flags)
@@ -283,29 +288,6 @@ JSON
     "the worktree entry either lost trust or gained unearned import consent"
   assert_trust_only_no_import_consent "$store" "$PROJ" \
     "the project-root entry either lost trust or gained import consent it was never asked for"
-  pass "fm-claude-trust.sh: a never-asked default external-imports pair is not treated as a decline"
-}
-
-# hasClaudeMdExternalIncludesWarningShown===true is the evidence the human was
-# actually shown the dialog they answered, so approved===false without it cannot
-# be an answer at all and must fall through to the ordinary undecided path -
-# trust registered on both entries, both import flags left exactly as they were
-# found. A test that only checked "the launch succeeded" would pass against the
-# defect this pins, where the bare false refused every claude spawn in the
-# fleet, so the surviving flag values are asserted as exactly false: a cleanup
-# that deleted them is a rewrite of consent state too.
-test_uncorroborated_approved_false_is_not_a_decline() {
-  local rec store out
-  rec=$(make_case import-false-uncorroborated)
-  read_case "$rec"
-  store="$CONFIG/.claude.json"
-  cat > "$store" <<JSON
-{"hasCompletedOnboarding":true,"projects":{"$PROJ":{"hasTrustDialogAccepted":false,"hasClaudeMdExternalIncludesApproved":false,"hasClaudeMdExternalIncludesWarningShown":false,"allowedTools":["Read"]}}}
-JSON
-  out=$(run_trust "$CONFIG" "$WT" "$PROJ")
-  expect_code 0 $? "approved=false with the warning never shown is undecided, not a decline: $out"
-  assert_trusted "$store" "$WT" "the worktree entry was not trusted on the undecided path"
-  assert_trusted "$store" "$PROJ" "the project-root entry was not trusted on the undecided path"
   assert_store_value "$store" 'false' \
     "the undecided approved flag was rewritten instead of left untouched" \
     projects "$PROJ" hasClaudeMdExternalIncludesApproved
@@ -315,9 +297,7 @@ JSON
   assert_store_value "$store" 'undefined' \
     "import consent was manufactured on the worktree entry" \
     projects "$WT" hasClaudeMdExternalIncludesApproved
-  assert_store_value "$store" '["Read"]' \
-    "the project entry's unrelated settings were lost" projects "$PROJ" allowedTools
-  pass "fm-claude-trust.sh: an uncorroborated approved=false survives registration as exactly false"
+  pass "fm-claude-trust.sh: a never-asked default external-imports pair is not a decline and survives as exactly false"
 }
 
 test_registration_is_idempotent() {
@@ -853,7 +833,6 @@ test_registration_carries_forward_existing_import_consent
 test_project_root_entry_preserves_other_keys
 test_project_root_entry_declined_external_imports_is_not_overridden
 test_project_root_entry_default_import_flags_are_not_a_decline
-test_uncorroborated_approved_false_is_not_a_decline
 test_registration_is_idempotent
 test_primary_checkout_is_refused
 test_cdpath_cannot_defeat_the_primary_checkout_refusal
