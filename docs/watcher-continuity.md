@@ -238,9 +238,11 @@ It is a non-fatal result that names its own remedy: re-drain, then acknowledge t
 The acknowledgement retires the marker whenever it settled what was presented.
 It settled what was presented when it consumed rows of its own, or when it had none to consume and no presented row waits above its cutoff.
 
-A wake appended after presentation has a higher sequence and stays queued.
-It resurfaces through its own wake or through the next watcher start's recovery check on a non-empty queue, rather than by holding the episode open.
-Holding the episode open for that row is what left a busy home with an episode no acknowledgement could ever retire, so every later start re-announced recovery instead of supervising.
+Consuming any row at all is enough, so the rule reaches wider than a wake appended after presentation.
+A partial acknowledgement that consumes rows 1 to 3 of 5 presented retires the episode, and so does a branch actor's acknowledgement that consumes its own eligible rows while main-only rows remain queued.
+Whatever is left stays queued and resurfaces through its own wake, or through the next cycle's recovery check on a non-empty queue, which mints a fresh announced episode for it rather than holding the current one open.
+That costs one extra cycle before the leftover rows resurface.
+Holding the episode open for them instead is what left a busy home with an episode no acknowledgement could ever retire, so every later start re-announced recovery instead of supervising.
 
 A stale acknowledgement settles nothing, because it consumed none of its own rows while a presented row still waits above its cutoff.
 It therefore leaves the episode open, and the remedy names that episode's live generation.
