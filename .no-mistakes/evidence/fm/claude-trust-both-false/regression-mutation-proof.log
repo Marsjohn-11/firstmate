@@ -1,0 +1,13 @@
+=== MUTATION A: restore the pre-fix predicate (approved===false alone, no WarningShown conjunct) ===
+patched predicate to pre-fix form
+--- the folded regression test against the pre-fix product:
+not ok - a never-asked default entry must not be refused as a decline: error: project entry for /private/var/folders/tv/b4_jb7290610qhwsd01ngyhr0000gq/T/fm-claude-trust.vdhxoX/project-default-flags/project in /private/var/folders/tv/b4_jb7290610qhwsd01ngyhr0000gq/T/fm-claude-trust.vdhxoX/project-default-flags/claude-config/.claude.json already declined external CLAUDE.md imports; refusing to override that consent
+error: refusing to pre-register Claude trust: could not record trust for '/private/var/folders/tv/b4_jb7290610qhwsd01ngyhr0000gq/T/fm-claude-trust.vdhxoX/project-default-flags/wt' and project '/private/var/folders/tv/b4_jb7290610qhwsd01ngyhr0000gq/T/fm-claude-trust.vdhxoX/project-default-flags/project' in '/private/var/folders/tv/b4_jb7290610qhwsd01ngyhr0000gq/T/fm-claude-trust.vdhxoX/project-default-flags/claude-config/.claude.json': expected exit 0, got 1
+one-test exit=1
+--- and the real spawn, pre-fix, on the reported both-false store:
+error: project entry for /private/var/folders/tv/b4_jb7290610qhwsd01ngyhr0000gq/T/fm-live-claude-spawn.sl8TgU/never-asked-both-false/project in /private/var/folders/tv/b4_jb7290610qhwsd01ngyhr0000gq/T
+error: refusing to pre-register Claude trust: could not record trust for '/private/var/folders/tv/b4_jb7290610qhwsd01ngyhr0000gq/T/fm-live-claude-spawn.sl8TgU/never-asked-both-false/wt' and project '/
+error: could not pre-register Claude workspace trust for /private/var/folders/tv/b4_jb7290610qhwsd01ngyhr0000gq/T/fm-live-claude-spawn.sl8TgU/never-asked-both-false/wt; refusing to launch a claude wor
+--- spawn exit code: 1
+(NO WORKER LAUNCHED)
+--- product restored (git diff clean: 0 lines)

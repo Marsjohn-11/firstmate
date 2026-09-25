@@ -1,0 +1,63 @@
+=== Live pane: a real claude worker in a worktree pre-registered from the both-false store ===
+
+ ▐▛███▛█   Claude Code v2.1.282
+▝▜██████▀  Opus (1M context) · Amazon Bedrock
+ ▝▝   ▝▝   /private/tmp/fm-lab.9glTBS/wt
+
+▎ Claude Code usage is cleared for Business Data per the AI For Me Guidance.
+▎ ITAR, PII, Customer Data, and more are strictly prohibited for use within this tool.
+▎ Read more: https://w.amazon.com/bin/view/Security/AI-Security/AIforMe-Guidance#HDATAANDEXAMPLESQUICKREFERENCETABLE
+
+❯ Print the marker string that appears in your project instructions, then stop.
+
+⏺ AGENTS-IMPORT-MARKER-7731
+
+✻ Brewed for 10s · done 3:56 PM
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus (1M context) | Context: 2% | Midway: 13h 22m
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents
+
+=== Claude config store after the live session (project entry only) ===
+/private/tmp/fm-lab.9glTBS/project
+{
+  "hasTrustDialogAccepted": true,
+  "hasClaudeMdExternalIncludesApproved": false,
+  "hasClaudeMdExternalIncludesWarningShown": false
+}
+/private/tmp/fm-lab.9glTBS/wt
+{
+  "hasTrustDialogAccepted": true
+}

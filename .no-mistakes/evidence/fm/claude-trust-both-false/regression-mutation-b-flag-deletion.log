@@ -1,0 +1,9 @@
+=== MUTATION B: a tidy-up that DELETES the undecided import flags instead of leaving them ===
+patched setFlags to drop undecided import flags
+--- store the mutated product leaves behind for a both-false project entry:
+not ok - the undecided approved flag was rewritten instead of left untouched (expected false, got undefined)
+one-test exit=1
+--- product restored (git diff: 0 lines)
+--- baseline re-check after restore:
+ok - fm-claude-trust.sh: a never-asked default external-imports pair is not a decline and survives as exactly false
+one-test exit=0

@@ -1,0 +1,27 @@
+LAB=/private/tmp/fm-lab.9glTBS
+--- project entry BEFORE pre-registration (the reported real-world table):
+{
+  "allowedTools": [],
+  "hasTrustDialogAccepted": true,
+  "hasClaudeMdExternalIncludesApproved": false,
+  "hasClaudeMdExternalIncludesWarningShown": false
+}
+--- bin/fm-claude-trust.sh <worktree> <project>:
+trusted: /private/tmp/fm-lab.9glTBS/wt
+trusted (project root): /private/tmp/fm-lab.9glTBS/project
+trust exit=0
+--- whole store AFTER pre-registration:
+{
+  "hasCompletedOnboarding": true,
+  "projects": {
+    "/private/tmp/fm-lab.9glTBS/project": {
+      "allowedTools": [],
+      "hasTrustDialogAccepted": true,
+      "hasClaudeMdExternalIncludesApproved": false,
+      "hasClaudeMdExternalIncludesWarningShown": false
+    },
+    "/private/tmp/fm-lab.9glTBS/wt": {
+      "hasTrustDialogAccepted": true
+    }
+  }
+}
