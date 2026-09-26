@@ -1,0 +1,10 @@
+ok - every per-item watcher loop reports progress once per item, before any early exit, so an item that exits early is still reported
+load averages: 545.98 367.88 380.55
+ok - every per-item watcher loop reports progress once per item, before any early exit, so an item that exits early is still reported
+load averages: 533.65 368.28 380.62
+ok - every per-item watcher loop reports progress once per item, before any early exit, so an item that exits early is still reported
+load averages: 521.66 368.54 380.64
+ok - every per-item watcher loop reports progress once per item, before any early exit, so an item that exits early is still reported
+load averages: 496.46 368.18 380.37
+ok - every per-item watcher loop reports progress once per item, before any early exit, so an item that exits early is still reported
+load averages: 473.98 367.58 380.01

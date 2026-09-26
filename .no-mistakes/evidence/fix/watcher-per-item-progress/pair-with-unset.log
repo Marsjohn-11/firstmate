@@ -1,0 +1,4 @@
+=== HEAD (with unset): turnover -> per-item, file order ===
+ok - the cycle-turnover marker is touched exactly once per cycle and stays distinct from the liveness beacon (3 turnovers, 33 beats, 3 cycles)
+ok - every per-item watcher loop reports progress once per item, before any early exit, so an item that exits early is still reported
+exit=0

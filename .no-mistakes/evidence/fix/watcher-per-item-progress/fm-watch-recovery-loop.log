@@ -1,0 +1,2 @@
+not ok - handling successor did not surface the crew event within the bounded startup-and-poll budget (waited 68s): 
+exit=1

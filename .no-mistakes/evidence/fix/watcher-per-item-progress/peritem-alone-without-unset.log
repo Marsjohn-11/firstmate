@@ -1,0 +1,3 @@
+=== WITHOUT unset: per-item alone ===
+ok - every per-item watcher loop reports progress once per item, before any early exit, so an item that exits early is still reported
+exit=0

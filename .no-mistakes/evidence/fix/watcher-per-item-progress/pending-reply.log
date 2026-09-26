@@ -1,0 +1,3 @@
+=== pending-reply per-record progress ===
+ok - the pending-reply tick reports progress once per record, including records that leave the loop early
+exit=0

@@ -1,0 +1,8 @@
+ok - the provably-working check reports progress once per task, including the short-circuiting one, and never lets reporting change its verdict
+ok - the cycle-turnover marker is touched exactly once per cycle and stays distinct from the liveness beacon (3 turnovers, 33 beats, 3 cycles)
+ok - every per-item watcher loop reports progress once per item, before any early exit, so an item that exits early is still reported
+--
+ok - the provably-working check reports progress once per task, including the short-circuiting one, and never lets reporting change its verdict
+ok - the cycle-turnover marker is touched exactly once per cycle and stays distinct from the liveness beacon (3 turnovers, 33 beats, 3 cycles)
+ok - every per-item watcher loop reports progress once per item, before any early exit, so an item that exits early is still reported
+--

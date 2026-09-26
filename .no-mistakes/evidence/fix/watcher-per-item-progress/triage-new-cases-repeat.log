@@ -1,0 +1,8 @@
+ok - the provably-working check reports progress once per task, including the short-circuiting one, and never lets reporting change its verd
+ok - the cycle-turnover marker is touched exactly once per cycle and stays distinct from the liveness beacon (3 turnovers, 33 beats, 3 cycle
+not ok - the churn fixture captured  panes; it must capture exactly the one batched task that is not provably working
+--
+ok - the provably-working check reports progress once per task, including the short-circuiting one, and never lets reporting change its verd
+ok - the cycle-turnover marker is touched exactly once per cycle and stays distinct from the liveness beacon (3 turnovers, 33 beats, 3 cycle
+not ok - the churn fixture captured  panes; it must capture exactly the one batched task that is not provably working
+--

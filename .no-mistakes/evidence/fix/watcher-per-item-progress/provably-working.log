@@ -1,0 +1,3 @@
+=== provably-working per-task progress ===
+ok - the provably-working check reports progress once per task, including the short-circuiting one, and never lets reporting change its verdict
+exit=0

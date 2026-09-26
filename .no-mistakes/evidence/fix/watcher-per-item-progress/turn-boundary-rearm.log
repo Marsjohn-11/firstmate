@@ -1,0 +1,3 @@
+=== turn-boundary re-arm (T3) ===
+ok - a presented acknowledgement survives a turn-boundary re-arm and settles its episode
+exit=0
