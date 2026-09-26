@@ -6266,6 +6266,10 @@ test_per_item_loops_beat_once_per_item() {
   printf 'quiet pane\n' > "$dir/churn-capture.txt"
   printf '%s' "$(hash_text 'quiet pane')" > "$state/.hash-sess_w2"
   : > "$dir/churn-capture.count"
+
+  # churn2 must fall back to the fake's not-working default, so clear the shared
+  # verdict that earlier cases in this file export and leave set.
+  unset FM_FAKE_CREW_STATE
   export FM_CREW_STATE_BIN="$fakebin/fm-crew-state.sh"
   export FM_FAKE_CREW_STATE_churn1='state: working · source: run-step · running'
   export FM_FAKE_TMUX_CAPTURE="$dir/churn-capture.txt"
