@@ -663,6 +663,10 @@ signal_turnend_panes_churned() {  # <file> ...
   done
   for meta in "$STATE"/*.meta; do
     [ -e "$meta" ] || continue
+    # Whole-fleet snapshot: several metadata subprocesses per RECORDED task, not
+    # just per batched one. Beat at the top so every path through the body bounds
+    # the gap to one task.
+    beat
     rec_task=${meta##*/}
     rec_task=${rec_task%.meta}
     kind=$(fm_meta_get "$meta" kind)
@@ -688,6 +692,7 @@ signal_turnend_panes_churned() {  # <file> ...
   # or tests/. A batch is normally one to three tasks and captures dominate its
   # cost; indexed lookup is the upgrade path if coalesced batches grow large.
   for task in "${signal_tasks[@]}"; do
+    beat
     task_index=-1
     for ((i = 0; i < ${#snapshot_tasks[@]}; i++)); do
       [ "${snapshot_tasks[$i]}" = "$task" ] && { task_index=$i; break; }
@@ -708,6 +713,9 @@ signal_turnend_panes_churned() {  # <file> ...
   done
   for ((i = 0; i < ${#signal_tasks[@]}; i++)); do
     task=${signal_tasks[$i]}
+    # Every task in the batch is evaluated with no short-circuit, and each costs
+    # up to FM_WORKTREE_WRITE_TIMEOUT, so beat at the top of the body.
+    beat
     crew_is_provably_working "$task" && continue
     task_index=${signal_indexes[$i]}
     churn_indexes+=("$task_index")
@@ -2167,6 +2175,11 @@ signal_files_actionable() {  # <status-file> ...
   for f in "$@"; do
     case "$f" in *.status) ;; *) continue ;; esac
     [ -e "$f" ] || [ -L "$f" ] || continue
+    # One status log per iteration, each a span read over a file that can be
+    # long; beat per log so this scan's cost cannot age the beacon. Reported at
+    # the top so every path through the body - including each early continue -
+    # bounds the gap to one log.
+    beat
     task=$(basename "$f"); task="${task%.status}"
     record=''; needs_decision=0
     status_span_first_actionable_record "$f" \
@@ -2189,9 +2202,6 @@ signal_files_actionable() {  # <status-file> ...
     if [ "$rc" -eq 0 ] || [ "$needs_decision" -eq 1 ]; then
       found=0
     fi
-    # One status log per iteration, each a span read over a file that can be
-    # long; beat per log so this scan's cost cannot age the beacon.
-    beat
   done
   return "$found"
 }
@@ -2231,6 +2241,10 @@ heartbeat_scan_finds_actionable() {
   FM_HEARTBEAT_SURFACE_ENDPOINTS=''
   for f in "$STATE"/*.status; do
     [ -e "$f" ] || [ -L "$f" ] || continue
+    # Whole-fleet scan, one span read per log; beat per log at the top so every
+    # path through the body - including each early continue - bounds the gap to
+    # one log rather than to the whole fleet.
+    beat
     task=$(basename "$f"); task="${task%.status}"
     record=$(status_span_first_actionable_record "$f" "$(hb_surfaced_offset "$task")")
     rc=$?
@@ -2592,8 +2606,10 @@ beat() {
 # watcher's staleness grace does not scale with the fleet, so let them report
 # progress through the same beacon rather than only when the whole call returns.
 # fm_classify_progress in that library owns the contract and the measurement.
+# Not exported: the value names a shell function of this process, which no
+# exec'd child could resolve, and every consumer runs in this watcher's own
+# shell or a subshell of it, where a plain assignment is already visible.
 FM_CLASSIFY_PROGRESS_HOOK=beat
-export FM_CLASSIFY_PROGRESS_HOOK
 
 # The beacon above means "progress happened" and fires many times per cycle, so
 # it cannot also answer "did a cycle complete". Turnover gets its own signal,

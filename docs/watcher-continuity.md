@@ -406,8 +406,11 @@ The watcher uses bash's native fatal handling for HUP and TERM, including during
 The watcher beats at each proven-progress point inside a cycle rather than once per cycle - between side-band reconciliation steps, before each registered check, at each scan phase, before each scanned window, and once per item inside the loops that cost per item.
 A cycle's work scales with the fleet while the grace does not, because a check sweep spends up to `FM_CHECK_TIMEOUT` per check and the pane scan captures every recorded window, so a large home's ordinary cycle outruns the grace.
 Whole-fleet loops scale the same way without a bound of their own: the provably-working check spends up to `FM_WORKTREE_WRITE_TIMEOUT` per task and short-circuits only on the first task that is not working, and a pending reply to an unreachable host costs that record an ssh timeout.
-Those loops therefore report progress per item, so beacon age is bounded by one item's work rather than by a whole fleet's.
-`fm_classify_progress` in [`bin/fm-classify-lib.sh`](../bin/fm-classify-lib.sh) owns that reporting contract, and the watcher supplies its beacon through `FM_CLASSIFY_PROGRESS_HOOK`; a caller that sets no hook is unaffected.
+The watcher's own per-item loops scale that way too: the signal and heartbeat status scans read one span per log, the turn-end churn absorb path builds a whole-fleet metadata snapshot and then captures one pane per batched window, and each of those spends subprocesses per item.
+Every one of those loops reports progress at the top of its body, after only the cheap guards that decide whether the item is in scope, so each early `continue` still bounds the gap to one item and no path through the body leaves the report unreached.
+Beacon age is therefore bounded by one item's work rather than by a whole fleet's.
+`fm_classify_progress` in [`bin/fm-classify-lib.sh`](../bin/fm-classify-lib.sh) owns that reporting contract for the shared check code, and the watcher supplies its beacon through `FM_CLASSIFY_PROGRESS_HOOK`; a caller that sets no hook is unaffected.
+The hook names a shell function of the watcher process and is deliberately not exported, because every consumer runs in that shell or a subshell of it.
 Beacon age therefore bounds how long the watcher has gone without making progress, not how long since a cycle turned over.
 
 One gap remains and is not closed by per-item reporting, because it is a threshold rather than a reporting rate.
