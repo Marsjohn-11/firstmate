@@ -596,7 +596,7 @@ These six cases are the ones the per-progress-point beat, the turnover marker, a
 The first four were re-run against the current per-item beat placement; the last two were measured at `712af97b`, before the per-item sites were added, and their fixtures reach none of them (no `*.status`, no `*.meta`, `FM_HEARTBEAT=999999`, no `config/turnend-churn-absorb`):
 
 ```text
-ok - every per-item watcher loop reports progress once per item, at the top of its body, so an item that exits early is still reported
+ok - every per-item watcher loop reports progress once per item, before any early exit, so an item that exits early is still reported
 ok - a no-verb signal whose crew is provably working is absorbed (no exit, no queue, suppressor advanced, beacon present)
 ok - the liveness beacon stays fresh while the watcher absorbs benign wakes (fm-guard never false-alarms)
 ok - the cycle-turnover marker is touched exactly once per cycle and stays distinct from the liveness beacon (3 turnovers, 33 beats, 3 cycles)
@@ -604,8 +604,20 @@ ok - a watcher stays beacon-fresh and healthy throughout a sweep longer than the
 ok - a presented acknowledgement survives a turn-boundary re-arm and settles its episode              # 712af97b
 ```
 
-The per-item case is the one that fails when any of the five per-item reports is removed or moved below its loop's early exit, and when `beat` is defined below the source-only guard so a sourced call cannot resolve it.
-It counts real `state/.last-watcher-beat` writes through a logging `touch` on `PATH`, over a fixture whose items deliberately leave the loop body early, and asserts exact per-item equalities rather than lower bounds.
+The per-item case counts real `state/.last-watcher-beat` writes through a logging `touch` on `PATH` and asserts exact per-item equalities rather than lower bounds.
+Its fixture sends items out of each loop early on purpose: unclassifiable symlinked status logs, a provably-working task in the churn batch, and an unchanged pane against its recorded hash.
+It pins the watcher's six per-item report sites as follows, each confirmed by applying that one mutation and watching the case fail:
+
+| Site | Pinned against removal | Pinned against placement after the early exit |
+|---|---|---|
+| Signal status scan | yes | yes |
+| Heartbeat status scan | yes | yes |
+| Churn metadata snapshot | yes | no early exit follows the report |
+| Churn batch-to-snapshot lookup | yes | no early exit follows the report; its failures leave the whole function |
+| Churn provably-working walk | yes | yes |
+| Churn pane capture | yes | yes, against a report after the hash comparison |
+
+It also fails when `beat` is defined below the source-only guard, so a sourced call cannot resolve it.
 
 Why these and not the enclosing suites.
 The absorb case reads `state/.seen-task_status` after a completed cycle, so it is the case that breaks when the cycle-wait helper loses its turnover signal, and it is the one that failed `Behavior portable serial 1` and `2`.

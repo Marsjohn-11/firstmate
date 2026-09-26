@@ -6207,15 +6207,17 @@ SH
 }
 
 # Every per-item loop in the watcher reports progress once per item, and reports
-# it at the top of its body so an item that exits the body early is still
-# reported. The staleness grace does not scale with the fleet, so a loop that
+# it before the item can leave the body early - at the top of the body, or for
+# the pane capture immediately after the capture - so an item that exits early
+# is still reported. The staleness grace does not scale with the fleet, so a loop that
 # reports only on the paths that run to the bottom leaves its longest span - a
 # whole fleet of items that each exit early - entirely unreported, which is the
 # false hung-supervision alarm this contract exists to prevent.
 #
 # Exact equalities, not lower bounds: the count is what distinguishes per-item
-# reporting from once-per-call, and the mixed readable/unclassifiable fixture is
-# what distinguishes a report at the top of the body from one at the bottom.
+# reporting from once-per-call, and the items that leave early - unclassifiable
+# logs, a provably-working task, an unchanged pane - are what distinguish a
+# report before the early exit from one after it.
 test_per_item_loops_beat_once_per_item() {
   local dir state fakebin beats i
   dir=$(make_case per-item-beats); state="$dir/state"; fakebin="$dir/fakebin"
@@ -6229,9 +6231,11 @@ test_per_item_loops_beat_once_per_item() {
   [ "$beats" -eq 3 ] \
     || fail "the signal scan reported $beats times over three absorbed logs; it must report once per log"
 
-  # 2. Placement: two readable logs run to the bottom of the body, two symlinked
-  # logs cannot be classified and take the body's early continue. A report at the
-  # top counts all four; one below the continue counts only the two.
+  # 2. Placement: two symlinked logs cannot be classified, return rc==2, and leave
+  # through the body's second continue. The two readable routine logs are absorbed
+  # but still return rc==1 WITH their classified endpoint as the record, so the
+  # empty-record continue does not fire for them and they reach the bottom of the
+  # body. A report at the top counts all four; one below the continues counts two.
   rm -f "$state"/*.status
   for i in 1 2; do
     printf 'working: routine note %s\n' "$i" > "$state/plain$i.status"
@@ -6245,9 +6249,13 @@ test_per_item_loops_beat_once_per_item() {
   [ "$beats" -eq 4 ] \
     || fail "the heartbeat scan reported $beats times over four logs, two of which exit the body early; it must report once per log"
 
-  # 3. The churn absorb path's three loops: a whole-fleet metadata snapshot over
-  # every RECORDED task, then the batch-to-snapshot lookup and the
-  # provably-working walk over every BATCHED task. Three plus two plus two.
+  # 3. The churn absorb path's four loops: a whole-fleet metadata snapshot over
+  # every RECORDED task, the batch-to-snapshot lookup and the provably-working
+  # walk over every BATCHED task, and the pane capture over every batched task
+  # that is not provably working. churn1 is provably working, so the walk leaves
+  # it through its early continue. churn2 is not, so it reaches the capture, whose
+  # pane is unchanged against its recorded hash and returns right after the
+  # capture. Three plus two plus two plus one.
   rm -f "$state"/*.status
   : > "$dir/config/turnend-churn-absorb"
   for i in 1 2 3; do
@@ -6255,12 +6263,22 @@ test_per_item_loops_beat_once_per_item() {
   done
   : > "$state/churn1.turn-ended"
   : > "$state/churn2.turn-ended"
+  printf 'quiet pane\n' > "$dir/churn-capture.txt"
+  printf '%s' "$(hash_text 'quiet pane')" > "$state/.hash-sess_w2"
+  : > "$dir/churn-capture.count"
+  export FM_CREW_STATE_BIN="$fakebin/fm-crew-state.sh"
+  export FM_FAKE_CREW_STATE_churn1='state: working · source: run-step · running'
+  export FM_FAKE_TMUX_CAPTURE="$dir/churn-capture.txt"
+  export FM_FAKE_TMUX_CAPTURE_COUNT_FILE="$dir/churn-capture.count"
   beats=$(count_beats "$dir" "$state" "$fakebin" \
     'signal_turnend_panes_churned "$STATE/churn1.turn-ended" "$STATE/churn2.turn-ended"')
-  [ "$beats" -eq 7 ] \
-    || fail "the churn absorb path reported $beats times over three recorded tasks and a two-task batch; it must report once per item in each of its three loops (expected 7)"
+  unset FM_FAKE_CREW_STATE_churn1 FM_FAKE_TMUX_CAPTURE FM_FAKE_TMUX_CAPTURE_COUNT_FILE
+  [ "$(cat "$dir/churn-capture.count")" = 1 ] \
+    || fail "the churn fixture captured $(cat "$dir/churn-capture.count") panes; it must capture exactly the one batched task that is not provably working"
+  [ "$beats" -eq 8 ] \
+    || fail "the churn absorb path reported $beats times over three recorded tasks, a two-task batch and one capture; it must report once per item in each of its four loops, including the working task that leaves the walk early and the unchanged pane that returns after its capture (expected 8)"
 
-  pass "every per-item watcher loop reports progress once per item, at the top of its body, so an item that exits early is still reported"
+  pass "every per-item watcher loop reports progress once per item, before any early exit, so an item that exits early is still reported"
 }
 
 # --- afk coherence: the daemon owns triage; the watcher does not double-triage ---
