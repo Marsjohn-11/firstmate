@@ -619,6 +619,22 @@ It pins the watcher's six per-item report sites as follows, each confirmed by ap
 
 It also fails when `beat` is defined below the source-only guard, so a sourced call cannot resolve it.
 
+The pending-reply per-record loop in `bin/fm-pending-reply-lib.sh` reports through `fm_classify_progress`, and `tests/fm-pending-reply.test.sh` pins it with its own case:
+
+```text
+ok - the pending-reply tick reports progress once per record, including records that leave the loop early
+```
+
+It seeds four records and asserts exactly four reports. Three of them leave the loop body early through different `continue`s: a resolved record, an undelivered one, and an escalated one with no resolvable reply. Only the open record runs the whole body.
+Each mutation below was applied alone and made the case fail:
+
+| Mutation | Reports |
+|---|---|
+| Report removed | 0 |
+| Report moved below the resolved-record `continue` | 3 |
+| Report moved below the undelivered-record `continue` | 2 |
+| Report moved below the escalated-record `continue` | 1 |
+
 Why these and not the enclosing suites.
 The absorb case reads `state/.seen-task_status` after a completed cycle, so it is the case that breaks when the cycle-wait helper loses its turnover signal, and it is the one that failed `Behavior portable serial 1` and `2`.
 The turnover case bounds the marker to one touch per cycle, counting cycles from the terminal wait rather than from the marker, so it fails both when the marker is touched at a progress point and when it is not touched at all.
