@@ -732,6 +732,10 @@ signal_turnend_panes_churned() {  # <file> ...
     prev=$(cat "$hash_file" 2>/dev/null) || return 1
     [[ $prev =~ ^[0-9a-f]{32}$ ]] || return 1
     now=$(fm_backend_capture "$backend" "$w" 40 "$label" 2>/dev/null) || return 1
+    # One backend capture per window, and captures dominate this loop's cost;
+    # beat per capture so a wide batch cannot age the beacon. Placed before the
+    # comparisons so a window that returns early is still reported.
+    beat
     [ -n "$now" ] || return 1
     [ "$(printf '%s' "$now" | hash_pane)" != "$prev" ] || return 1
     churned_keys+=("$key")
@@ -2185,6 +2189,9 @@ signal_files_actionable() {  # <status-file> ...
     if [ "$rc" -eq 0 ] || [ "$needs_decision" -eq 1 ]; then
       found=0
     fi
+    # One status log per iteration, each a span read over a file that can be
+    # long; beat per log so this scan's cost cannot age the beacon.
+    beat
   done
   return "$found"
 }
@@ -2580,6 +2587,13 @@ rerecord_device_shifted_pr_poll() {  # <id>
 beat() {
   touch "$STATE/.last-watcher-beat"
 }
+
+# bin/fm-classify-lib.sh's bounded per-item loops cost per item while this
+# watcher's staleness grace does not scale with the fleet, so let them report
+# progress through the same beacon rather than only when the whole call returns.
+# fm_classify_progress in that library owns the contract and the measurement.
+FM_CLASSIFY_PROGRESS_HOOK=beat
+export FM_CLASSIFY_PROGRESS_HOOK
 
 # The beacon above means "progress happened" and fires many times per cycle, so
 # it cannot also answer "did a cycle complete". Turnover gets its own signal,

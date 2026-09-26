@@ -818,6 +818,60 @@ test_signal_crew_provably_working_classifier() {
   pass "signal_crew_provably_working: benign only when every referenced crew is provably working"
 }
 
+# The provably-working check costs up to FM_WORKTREE_WRITE_TIMEOUT per task and
+# short-circuits only on the first task that is not working, so its cost scales
+# with the fleet while a caller's staleness grace does not. It must therefore
+# report progress once per task examined, not once per call: a caller judged by
+# elapsed time reads a healthy worker as hung otherwise, which is the 370-seconds
+# silent case this exists to prevent.
+test_provably_working_reports_progress_per_task() {
+  local dir fakebin state log count first_line
+  dir=$(make_case provably-working-progress); fakebin="$dir/fakebin"; state="$dir/state"
+  log="$dir/progress.log"
+  : > "$log"
+  export FM_CREW_STATE_BIN="$fakebin/fm-crew-state.sh"
+  export FM_FAKE_CREW_STATE_a='state: working · source: run-step · running'
+  export FM_FAKE_CREW_STATE_b='state: working · source: run-step · running'
+  export FM_FAKE_CREW_STATE_c='state: working · source: run-step · running'
+  export FM_FAKE_CREW_STATE_d='state: done · source: run-step · run passed'
+
+  # Three working tasks: one report each, and the verdict is unchanged.
+  FM_CLASSIFY_PROGRESS_HOOK="printf 'tick\n' >> $(printf '%q' "$log")" \
+    signal_crew_provably_working "$state/a.status" "$state/b.status" "$state/c.status" \
+    || fail "three provably-working crews were not benign"
+  count=$(grep -c '^tick$' "$log" || true)
+  [ "$count" -eq 3 ] \
+    || fail "expected one progress report per task over three tasks, got $count"
+
+  # The short-circuit path must report the task it examined too, otherwise the
+  # longest silent span - many working tasks ahead of a stopped one - is exactly
+  # the span that goes unreported.
+  : > "$log"
+  FM_CLASSIFY_PROGRESS_HOOK="printf 'tick\n' >> $(printf '%q' "$log")" \
+    signal_crew_provably_working "$state/a.status" "$state/b.status" "$state/d.status" \
+    && fail "a batch containing a stopped crew was treated as benign"
+  count=$(grep -c '^tick$' "$log" || true)
+  [ "$count" -eq 3 ] \
+    || fail "expected a progress report for every task examined before the short-circuit, got $count"
+
+  # No hook set is a no-op that cannot change a verdict.
+  : > "$log"
+  unset FM_CLASSIFY_PROGRESS_HOOK
+  signal_crew_provably_working "$state/a.status" \
+    || fail "an unset progress hook changed the benign verdict"
+  [ ! -s "$log" ] || fail "an unset progress hook still wrote progress"
+
+  # A failing hook must not change the verdict either.
+  FM_CLASSIFY_PROGRESS_HOOK='false' \
+    signal_crew_provably_working "$state/a.status" \
+    || fail "a failing progress hook changed the benign verdict"
+
+  first_line=$(head -1 "$log" 2>/dev/null || true)
+  [ -z "$first_line" ] || fail "unexpected progress output: $first_line"
+  unset FM_FAKE_CREW_STATE_a FM_FAKE_CREW_STATE_b FM_FAKE_CREW_STATE_c FM_FAKE_CREW_STATE_d
+  pass "the provably-working check reports progress once per task, including the short-circuiting one, and never lets reporting change its verdict"
+}
+
 test_secondmate_status_routine_absorbed_routed_surfaced_classifier() {
   local dir fakebin state line
   dir=$(make_case secondmate-signal-classify); fakebin="$dir/fakebin"; state="$dir/state"
@@ -6447,6 +6501,7 @@ test_empty_write_prune_widens_the_probe
 test_empty_write_prune_from_the_environment_widens_the_probe
 test_worktree_write_probe_is_wall_clock_bounded
 test_signal_crew_provably_working_classifier
+test_provably_working_reports_progress_per_task
 test_secondmate_status_routine_absorbed_routed_surfaced_classifier
 test_provably_working_signal_absorbed
 test_turn_ended_provably_working_absorbed

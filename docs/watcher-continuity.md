@@ -403,10 +403,16 @@ Once per poll the watcher checks that its home, its state directory, and its own
 The watcher uses bash's native fatal handling for HUP and TERM, including during a blocked poll, so both run its EXIT cleanup.
 `watcher_stop_signals` in `bin/fm-watch.sh` owns the signal-handling rationale.
 
-The watcher beats at each proven-progress point inside a cycle rather than once per cycle - between side-band reconciliation steps, before each registered check, at each scan phase, and before each scanned window.
+The watcher beats at each proven-progress point inside a cycle rather than once per cycle - between side-band reconciliation steps, before each registered check, at each scan phase, before each scanned window, and once per item inside the loops that cost per item.
 A cycle's work scales with the fleet while the grace does not, because a check sweep spends up to `FM_CHECK_TIMEOUT` per check and the pane scan captures every recorded window, so a large home's ordinary cycle outruns the grace.
-Beacon age therefore bounds how long the watcher has gone without making progress, not how long since a cycle turned over, so a healthy watcher in a large fleet is no longer read as wedged because its cycle work outran the grace.
-`bin/fm-watch-arm.sh` and `bin/fm-guard.sh` still take a bare 300-second default rather than deriving it from the poll interval, so a healthy watcher idle-waiting on a home with `FM_POLL` at 300 can still reach that age however often it beats.
+Whole-fleet loops scale the same way without a bound of their own: the provably-working check spends up to `FM_WORKTREE_WRITE_TIMEOUT` per task and short-circuits only on the first task that is not working, and a pending reply to an unreachable host costs that record an ssh timeout.
+Those loops therefore report progress per item, so beacon age is bounded by one item's work rather than by a whole fleet's.
+`fm_classify_progress` in [`bin/fm-classify-lib.sh`](../bin/fm-classify-lib.sh) owns that reporting contract, and the watcher supplies its beacon through `FM_CLASSIFY_PROGRESS_HOOK`; a caller that sets no hook is unaffected.
+Beacon age therefore bounds how long the watcher has gone without making progress, not how long since a cycle turned over.
+
+One gap remains and is not closed by per-item reporting, because it is a threshold rather than a reporting rate.
+`bin/fm-watch-arm.sh` and `bin/fm-guard.sh` still take a bare 300-second default instead of deriving it from the poll interval, so a healthy watcher idle-waiting on a home with `FM_POLL` at 300 still reaches that age however often it beats.
+Closing it means deriving those two defaults from the poll the way `fm_poll_derived_grace` already does for its own callers.
 
 `state/.last-cycle-turnover` marks cycle turnover for test synchronization, touched exactly once per cycle immediately before the terminal wait and at no progress point.
 No production code reads it today; its only reader is the test suite's cycle-wait helper.
