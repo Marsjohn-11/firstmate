@@ -6227,6 +6227,7 @@ test_per_item_loops_beat_once_per_item() {
   for i in 1 2 3; do
     printf 'working: routine note %s\n' "$i" > "$state/absorb$i.status"
   done
+  # shellcheck disable=SC2016 # single quotes are deliberate: count_beats expands $STATE itself, against the case state dir
   beats=$(count_beats "$dir" "$state" "$fakebin" 'signal_files_actionable "$STATE"/*.status')
   [ "$beats" -eq 3 ] \
     || fail "the signal scan reported $beats times over three absorbed logs; it must report once per log"
@@ -6242,6 +6243,7 @@ test_per_item_loops_beat_once_per_item() {
     printf 'working: linked note %s\n' "$i" > "$dir/linked$i.log"
     ln -sf "$dir/linked$i.log" "$state/linked$i.status"
   done
+  # shellcheck disable=SC2016 # single quotes are deliberate: count_beats expands $STATE itself, against the case state dir
   beats=$(count_beats "$dir" "$state" "$fakebin" 'signal_files_actionable "$STATE"/*.status')
   [ "$beats" -eq 4 ] \
     || fail "the signal scan reported $beats times over four logs, two of which exit the body early; it must report once per log"
@@ -6274,6 +6276,7 @@ test_per_item_loops_beat_once_per_item() {
   export FM_FAKE_CREW_STATE_churn1='state: working · source: run-step · running'
   export FM_FAKE_TMUX_CAPTURE="$dir/churn-capture.txt"
   export FM_FAKE_TMUX_CAPTURE_COUNT_FILE="$dir/churn-capture.count"
+  # shellcheck disable=SC2016 # single quotes are deliberate: count_beats expands $STATE itself, against the case state dir
   beats=$(count_beats "$dir" "$state" "$fakebin" \
     'signal_turnend_panes_churned "$STATE/churn1.turn-ended" "$STATE/churn2.turn-ended"')
   unset FM_FAKE_CREW_STATE_churn1 FM_FAKE_TMUX_CAPTURE FM_FAKE_TMUX_CAPTURE_COUNT_FILE
