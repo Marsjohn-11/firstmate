@@ -6175,6 +6175,94 @@ SH
   pass "the cycle-turnover marker is touched exactly once per cycle and stays distinct from the liveness beacon ($turnovers turnovers, $beats beats, $cycles cycles)"
 }
 
+# count_beats <dir> <state> <fakebin> <call>: run <call> against the watcher's
+# own functions in a sourced subshell and print how many times it touched
+# state/.last-watcher-beat. Counting real beacon writes through a logging `touch`
+# on PATH is what makes the rate observable; a live watcher cannot be used here
+# because its other per-cycle beats swamp the per-item ones.
+count_beats() {  # <dir> <state> <fakebin> <call>
+  local dir=$1 state=$2 fakebin=$3 call=$4 log="$1/beat-touch.log"
+  cat > "$fakebin/touch" <<'SH'
+#!/usr/bin/env bash
+set -u
+for _a in "$@"; do
+  case "$_a" in
+    -*) ;;
+    *) printf '%s\n' "$_a" >> "$FM_FAKE_TOUCH_LOG" ;;
+  esac
+done
+for _c in /usr/bin/touch /bin/touch; do
+  [ -x "$_c" ] && exec "$_c" "$@"
+done
+exit 127
+SH
+  chmod +x "$fakebin/touch"
+  PATH="$fakebin:$PATH" FM_FAKE_TOUCH_LOG="$log" FM_HOME="$dir" \
+    FM_STATE_OVERRIDE="$state" FM_CONFIG_OVERRIDE="$dir/config" \
+    bash -c ". \"\$1\"
+      : > \"\$FM_FAKE_TOUCH_LOG\"
+      $call >/dev/null 2>&1 || true
+      grep -cxF \"\$STATE/.last-watcher-beat\" \"\$FM_FAKE_TOUCH_LOG\" || true" \
+    _ "$WATCH"
+}
+
+# Every per-item loop in the watcher reports progress once per item, and reports
+# it at the top of its body so an item that exits the body early is still
+# reported. The staleness grace does not scale with the fleet, so a loop that
+# reports only on the paths that run to the bottom leaves its longest span - a
+# whole fleet of items that each exit early - entirely unreported, which is the
+# false hung-supervision alarm this contract exists to prevent.
+#
+# Exact equalities, not lower bounds: the count is what distinguishes per-item
+# reporting from once-per-call, and the mixed readable/unclassifiable fixture is
+# what distinguishes a report at the top of the body from one at the bottom.
+test_per_item_loops_beat_once_per_item() {
+  local dir state fakebin beats i
+  dir=$(make_case per-item-beats); state="$dir/state"; fakebin="$dir/fakebin"
+  mkdir -p "$dir/config"
+
+  # 1. The benign absorb path: three routine-only logs, nothing actionable.
+  for i in 1 2 3; do
+    printf 'working: routine note %s\n' "$i" > "$state/absorb$i.status"
+  done
+  beats=$(count_beats "$dir" "$state" "$fakebin" 'signal_files_actionable "$STATE"/*.status')
+  [ "$beats" -eq 3 ] \
+    || fail "the signal scan reported $beats times over three absorbed logs; it must report once per log"
+
+  # 2. Placement: two readable logs run to the bottom of the body, two symlinked
+  # logs cannot be classified and take the body's early continue. A report at the
+  # top counts all four; one below the continue counts only the two.
+  rm -f "$state"/*.status
+  for i in 1 2; do
+    printf 'working: routine note %s\n' "$i" > "$state/plain$i.status"
+    printf 'working: linked note %s\n' "$i" > "$dir/linked$i.log"
+    ln -sf "$dir/linked$i.log" "$state/linked$i.status"
+  done
+  beats=$(count_beats "$dir" "$state" "$fakebin" 'signal_files_actionable "$STATE"/*.status')
+  [ "$beats" -eq 4 ] \
+    || fail "the signal scan reported $beats times over four logs, two of which exit the body early; it must report once per log"
+  beats=$(count_beats "$dir" "$state" "$fakebin" heartbeat_scan_finds_actionable)
+  [ "$beats" -eq 4 ] \
+    || fail "the heartbeat scan reported $beats times over four logs, two of which exit the body early; it must report once per log"
+
+  # 3. The churn absorb path's three loops: a whole-fleet metadata snapshot over
+  # every RECORDED task, then the batch-to-snapshot lookup and the
+  # provably-working walk over every BATCHED task. Three plus two plus two.
+  rm -f "$state"/*.status
+  : > "$dir/config/turnend-churn-absorb"
+  for i in 1 2 3; do
+    printf 'window=sess:w%s\nbackend=tmux\nkind=crew\n' "$i" > "$state/churn$i.meta"
+  done
+  : > "$state/churn1.turn-ended"
+  : > "$state/churn2.turn-ended"
+  beats=$(count_beats "$dir" "$state" "$fakebin" \
+    'signal_turnend_panes_churned "$STATE/churn1.turn-ended" "$STATE/churn2.turn-ended"')
+  [ "$beats" -eq 7 ] \
+    || fail "the churn absorb path reported $beats times over three recorded tasks and a two-task batch; it must report once per item in each of its three loops (expected 7)"
+
+  pass "every per-item watcher loop reports progress once per item, at the top of its body, so an item that exits early is still reported"
+}
+
 # --- afk coherence: the daemon owns triage; the watcher does not double-triage ---
 
 test_afk_signal_records_heartbeat_endpoint() {
@@ -6614,6 +6702,7 @@ test_heartbeat_backstop_surfaces_unsurfaced_status
 test_heartbeat_backstop_surfaces_a_masked_status
 test_beacon_stays_fresh_while_absorbing
 test_cycle_turnover_marker_is_touched_once_per_cycle
+test_per_item_loops_beat_once_per_item
 test_afk_signal_records_heartbeat_endpoint
 test_afk_present_reverts_watcher_to_one_shot
 test_afk_paused_changed_pane_hands_off_plain_stale

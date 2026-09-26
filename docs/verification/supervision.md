@@ -591,16 +591,21 @@ ok - a watcher stays beacon-fresh and healthy throughout a sweep longer than the
 
 ### Targeted validation of the beat and turnover contracts
 
-Measured 2026-09-25 on macOS 25.6.0 at load average 60-65 across 16 cores.
-These five cases are the ones the per-progress-point beat, the turnover marker, and the recovery-generation reopen can break, so they are what a change to those contracts must run:
+Measured 2026-09-25 on macOS 25.6.0 at load average 60-78 across 16 cores.
+These six cases are the ones the per-progress-point beat, the turnover marker, and the recovery-generation reopen can break, so they are what a change to those contracts must run.
+The first four were re-run against the current per-item beat placement; the last two were measured at `712af97b`, before the per-item sites were added, and their fixtures reach none of them (no `*.status`, no `*.meta`, `FM_HEARTBEAT=999999`, no `config/turnend-churn-absorb`):
 
 ```text
+ok - every per-item watcher loop reports progress once per item, at the top of its body, so an item that exits early is still reported
 ok - a no-verb signal whose crew is provably working is absorbed (no exit, no queue, suppressor advanced, beacon present)
 ok - the liveness beacon stays fresh while the watcher absorbs benign wakes (fm-guard never false-alarms)
 ok - the cycle-turnover marker is touched exactly once per cycle and stays distinct from the liveness beacon (3 turnovers, 33 beats, 3 cycles)
-ok - a watcher stays beacon-fresh and healthy throughout a sweep longer than the stale grace
-ok - a presented acknowledgement survives a turn-boundary re-arm and settles its episode
+ok - a watcher stays beacon-fresh and healthy throughout a sweep longer than the stale grace          # 712af97b
+ok - a presented acknowledgement survives a turn-boundary re-arm and settles its episode              # 712af97b
 ```
+
+The per-item case is the one that fails when any of the five per-item reports is removed or moved below its loop's early exit, and when `beat` is defined below the source-only guard so a sourced call cannot resolve it.
+It counts real `state/.last-watcher-beat` writes through a logging `touch` on `PATH`, over a fixture whose items deliberately leave the loop body early, and asserts exact per-item equalities rather than lower bounds.
 
 Why these and not the enclosing suites.
 The absorb case reads `state/.seen-task_status` after a completed cycle, so it is the case that breaks when the cycle-wait helper loses its turnover signal, and it is the one that failed `Behavior portable serial 1` and `2`.

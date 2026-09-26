@@ -386,6 +386,43 @@ _event_cap_key=""
 _event_cap_ok=0
 _event_cap_fails=0
 
+# Liveness beacon for fm-guard.sh and bin/fm-watch-arm.sh: a fresh mtime means
+# this watcher is alive and making progress. Only the watcher process writes it.
+#
+# It is touched at each proven-progress point inside a cycle - between
+# side-band reconciliation steps, before each check, at each scan phase, and
+# before each scanned window - not once per cycle.
+# One cycle's work scales with the fleet - a check sweep spends up to
+# CHECK_TIMEOUT per registered check, and the pane scan captures every recorded
+# window - so in a large home a single cycle routinely outruns the 300s grace.
+# Beating once per cycle made that healthy watcher read as wedged: every later
+# arm refused to attach to a live pid with a stale beacon and started a second
+# watcher that could only exit, and the guard reported supervision as hung.
+#
+# Defined here, above the source-only guard, because every per-item loop that
+# reports through it is defined above that guard too: a sourced unit call must
+# find it.
+beat() {
+  touch "$STATE/.last-watcher-beat"
+}
+
+# bin/fm-classify-lib.sh's bounded per-item loops cost per item while this
+# watcher's staleness grace does not scale with the fleet, so let them report
+# progress through the same beacon rather than only when the whole call returns.
+# fm_classify_progress in that library owns the contract and the measurement.
+# Not exported: the value names a shell function of this process, which no
+# exec'd child could resolve, and every consumer runs in this watcher's own
+# shell or a subshell of it, where a plain assignment is already visible.
+FM_CLASSIFY_PROGRESS_HOOK=beat
+
+# The beacon above means "progress happened" and fires many times per cycle, so
+# it cannot also answer "did a cycle complete". Turnover gets its own signal,
+# touched exactly once per cycle immediately before the terminal wait and at no
+# progress point, so a reader can tell the two facts apart.
+cycle_turnover() {
+  touch "$STATE/.last-cycle-turnover"
+}
+
 # afk_present: 0 while the away-mode flag exists. When set, the daemon wraps this
 # watcher and owns triage, so the watcher must behave one-shot (enqueue + exit on
 # every wake) and let the daemon classify - never absorb here, or the daemon's
@@ -2584,39 +2621,6 @@ rerecord_device_shifted_pr_poll() {  # <id>
   pr_poll_publish_release || exit 1
   pr_poll_control_release || exit 1
   return 0
-}
-
-# Liveness beacon for fm-guard.sh and bin/fm-watch-arm.sh: a fresh mtime means
-# this watcher is alive and making progress. Only the watcher process writes it.
-#
-# It is touched at each proven-progress point inside a cycle - between
-# side-band reconciliation steps, before each check, at each scan phase, and
-# before each scanned window - not once per cycle.
-# One cycle's work scales with the fleet - a check sweep spends up to
-# CHECK_TIMEOUT per registered check, and the pane scan captures every recorded
-# window - so in a large home a single cycle routinely outruns the 300s grace.
-# Beating once per cycle made that healthy watcher read as wedged: every later
-# arm refused to attach to a live pid with a stale beacon and started a second
-# watcher that could only exit, and the guard reported supervision as hung.
-beat() {
-  touch "$STATE/.last-watcher-beat"
-}
-
-# bin/fm-classify-lib.sh's bounded per-item loops cost per item while this
-# watcher's staleness grace does not scale with the fleet, so let them report
-# progress through the same beacon rather than only when the whole call returns.
-# fm_classify_progress in that library owns the contract and the measurement.
-# Not exported: the value names a shell function of this process, which no
-# exec'd child could resolve, and every consumer runs in this watcher's own
-# shell or a subshell of it, where a plain assignment is already visible.
-FM_CLASSIFY_PROGRESS_HOOK=beat
-
-# The beacon above means "progress happened" and fires many times per cycle, so
-# it cannot also answer "did a cycle complete". Turnover gets its own signal,
-# touched exactly once per cycle immediately before the terminal wait and at no
-# progress point, so a reader can tell the two facts apart.
-cycle_turnover() {
-  touch "$STATE/.last-cycle-turnover"
 }
 
 resurface_after_downtime() {
