@@ -1,0 +1,65 @@
+== target: 594 records, grace 15s, load { 84.14 91.95 139.95 }
+t=  1s beacon missing
+t=  2s beacon_age=1s
+t=  3s beacon_age=2s
+t=  4s beacon_age=3s
+t=  5s beacon_age=4s
+t=  6s beacon_age=6s
+t=  7s beacon_age=0s
+t=  8s beacon_age=1s
+t=  9s beacon_age=2s
+t= 10s beacon_age=3s
+t= 11s beacon_age=5s
+t= 12s beacon_age=6s
+t= 13s beacon_age=1s
+t= 14s beacon_age=2s
+t= 15s beacon_age=3s
+t= 16s beacon_age=5s
+t= 17s beacon_age=1s
+t= 18s beacon_age=2s
+t= 19s beacon_age=3s
+t= 20s beacon_age=4s
+t= 21s beacon_age=1s
+t= 22s beacon_age=2s
+t= 23s beacon_age=3s
+t= 24s beacon_age=4s
+t= 25s beacon_age=1s
+t= 26s beacon_age=2s
+t= 27s beacon_age=3s
+t= 28s beacon_age=0s
+t= 29s beacon_age=1s
+t= 30s beacon_age=3s
+   second arm at t=30s rc=0: watcher: already running pid 85863
+t= 31s beacon_age=5s
+t= 32s beacon_age=1s
+t= 33s beacon_age=2s
+t= 34s beacon_age=4s
+t= 35s beacon_age=5s
+t= 36s beacon_age=1s
+t= 37s beacon_age=3s
+t= 38s beacon_age=5s
+t= 39s beacon_age=6s
+t= 40s beacon_age=0s
+t= 41s beacon_age=2s
+t= 42s beacon_age=4s
+t= 43s beacon_age=6s
+t= 44s beacon_age=8s
+t= 45s beacon_age=10s
+t= 46s beacon_age=1s
+t= 47s beacon_age=0s
+t= 48s beacon_age=1s
+t= 49s beacon_age=3s
+t= 50s beacon_age=4s
+t= 51s beacon_age=6s
+t= 52s beacon_age=1s
+t= 53s beacon_age=2s
+t= 54s beacon_age=3s
+t= 55s beacon_age=4s
+t= 56s beacon_age=6s
+t= 57s beacon_age=1s
+t= 58s beacon_age=2s
+t= 59s beacon_age=3s
+t= 60s beacon_age=6s
+== target: max beacon age 10s over 60s; second arm rc=0
+rm: /var/folders/tv/b4_jb7290610qhwsd01ngyhr0000gq/T//fm-lab.R9EIfv/state: Directory not empty
+rm: /var/folders/tv/b4_jb7290610qhwsd01ngyhr0000gq/T//fm-lab.R9EIfv: Directory not empty

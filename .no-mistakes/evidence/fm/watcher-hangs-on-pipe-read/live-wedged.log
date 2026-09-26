@@ -1,0 +1,32 @@
+stuck observation started
+t= 1s beacon_age=4s
+t= 2s beacon_age=5s
+t= 3s beacon_age=6s
+t= 4s beacon_age=8s
+t= 5s beacon_age=9s
+t= 6s beacon_age=10s
+t= 7s beacon_age=11s
+t= 8s beacon_age=12s
+t= 9s beacon_age=14s
+t=10s beacon_age=15s
+t=11s beacon_age=16s
+t=12s beacon_age=17s
+t=13s beacon_age=18s
+t=14s beacon_age=20s
+t=15s beacon_age=21s
+t=16s beacon_age=22s
+t=17s beacon_age=23s
+t=18s beacon_age=24s
+t=19s beacon_age=26s
+t=20s beacon_age=27s
+t=21s beacon_age=28s
+t=22s beacon_age=29s
+t=23s beacon_age=31s
+t=24s beacon_age=32s
+t=25s beacon_age=33s
+t=26s beacon_age=34s
+t=27s beacon_age=35s
+t=28s beacon_age=37s
+t=29s beacon_age=38s
+t=30s beacon_age=39s
+== wedged item: beacon aged to 39s during a 30s stuck observation (beat interval 1s)
