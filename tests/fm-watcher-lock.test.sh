@@ -1148,6 +1148,55 @@ test_autoarm_reclaim_refuses_when_the_steal_mutex_was_taken() {
   pass "a reclaim that loses its steal mutex signals nothing and removes nothing"
 }
 
+# A contender whose steal-mutex link was replaced by a rival's must remove the
+# owner directory it created, or every lost reclaim race leaves a
+# <lock>.steal.owner.XXXXXX directory behind. Both steal-mutex callers are
+# driven through the same lost race.
+test_lost_steal_race_leaves_no_owner_directory() {
+  local dir state lockdir loser rc lose
+  # shellcheck disable=SC2016 # This is a stub body; every expansion belongs to the child shell that evals it.
+  lose='
+    fm_lock_try_acquire_steal_mutex() {
+      fm_lock_try_create "$1" || return 1
+      printf "%s\n" "$FM_LOCK_OWNER_DIR" > "$FM_TEST_LOSER"
+      # A live rival reclaimer replaced our link with its own and left our
+      # owner directory in place.
+      rm -f "$1"
+      mkdir -p "$1.rival"
+      printf "%s\n" "$PPID" > "$1.rival/pid"
+      ln -s "$1.rival" "$1"
+    }
+  '
+
+  dir=$(make_case lost-steal-race-primary)
+  state="$dir/state"
+  lockdir="$state/.contend.lock"
+  mkdir "$lockdir"
+  printf '%s\n' "$(dead_pid)" > "$lockdir/pid"
+  rc=0
+  FM_STATE_OVERRIDE="$state" FM_TEST_LOSER="$dir/loser" bash -c '
+    . "$1"
+    eval "$3"
+    fm_lock_try_acquire "$2"
+  ' _ "$LIB" "$lockdir" "$lose" || rc=$?
+  [ "$rc" -ne 0 ] || fail "fm_lock_try_acquire reported success after losing its steal mutex"
+  loser=$(cat "$dir/loser" 2>/dev/null || true)
+  [ -n "$loser" ] || fail "the lost-race stub never recorded the loser's owner directory"
+  assert_absent "$loser" "fm_lock_try_acquire left its owner directory after losing the steal race"
+  assert_present "$lockdir.steal.rival" "the rival's steal-mutex owner was disturbed"
+
+  dir=$(make_case lost-steal-race-autoarm)
+  state="$dir/state"
+  autoarm_legacy_claim "$state" "$(dead_pid)" "dead legacy owner"
+  rc=0
+  FM_TEST_LOSER="$dir/loser" release_abandoned_under "$state" "$LIB" "$lose" || rc=$?
+  [ "$rc" -ne 0 ] || fail "fm_autoarm_release_abandoned reported success after losing its steal mutex"
+  loser=$(cat "$dir/loser" 2>/dev/null || true)
+  [ -n "$loser" ] || fail "the lost-race stub never recorded the autoarm loser's owner directory"
+  assert_absent "$loser" "fm_autoarm_release_abandoned left its owner directory after losing the steal race"
+  pass "a contender that loses the steal race removes its own owner directory"
+}
+
 test_watch_restart_rejects_reused_pid() {
   local dir state fakebin out live pid i
   dir=$(make_case restart-reused-pid)
@@ -1982,6 +2031,7 @@ test_recycled_pid_verdict_is_steal_mutex_only
 test_lock_never_creates_a_nested_steal_mutex
 test_lock_stale_steal_recovery_stays_bounded
 test_autoarm_reclaim_refuses_when_the_steal_mutex_was_taken
+test_lost_steal_race_leaves_no_owner_directory
 test_watch_restart_rejects_reused_pid
 test_watch_restart_attaches_to_healthy_peer
 test_watcher_self_evicts_on_lock_takeover

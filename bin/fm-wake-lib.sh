@@ -1231,6 +1231,7 @@ fm_lock_try_acquire() {
   fi
   if ! fm_lock_points_to_owner "$steal" "$steal_owner"; then
     fm_lock_release "$steal"
+    fm_lock_discard_owner "$steal_owner"
     FM_LOCK_HELD_PID=$(cat "$lockdir/pid" 2>/dev/null || true)
     FM_LOCK_OWNER_DIR=
     return 1
@@ -2039,6 +2040,7 @@ fm_autoarm_release_abandoned() {  # <state-dir> [grace]
   fi
   if ! fm_lock_points_to_owner "$steal" "$steal_owner"; then
     fm_lock_release "$steal"
+    fm_lock_discard_owner "$steal_owner"
     return 1
   fi
   lock_pid=$(cat "$lock/pid" 2>/dev/null || true)
