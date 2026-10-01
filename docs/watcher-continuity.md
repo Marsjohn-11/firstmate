@@ -488,7 +488,7 @@ They also prove that a legacy or handoff-phase watcher marker from an absent rep
 
 - The once-per-generation announcement bound with the real Pi extension against a refused handling handshake.
 - A handling successor that must surface a real crew event instead of going blind.
-- A turn-boundary re-arm between a drain's presentation and its acknowledgement, which must leave that acknowledgement able to retire its own episode and must supervise once the episode is settled.
+- A turn-boundary re-arm between a drain's presentation and its acknowledgement, which must keep the presented generation, let that acknowledgement consume its own rows, settle a row appended during handling through its own episode, and supervise once both are settled.
 
 `tests/fm-watch-triage.test.sh` proves TERM stops a watcher blocked inside a poll's pane capture and still releases its lock and records an acknowledgeable stop.
 It also exercises a single TERM with a live foreign downtime-marker lock holder, retained stale singleton and subsequent arm-style recovery, including decimal `08` and zero `00` cleanup bounds.
