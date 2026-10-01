@@ -1,0 +1,4 @@
+base d1 stat_execs=1350
+base d2 stat_execs=1260
+target d1 stat_execs=540
+target d2 stat_execs=474

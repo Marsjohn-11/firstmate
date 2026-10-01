@@ -1,0 +1,3 @@
+diff -r out-base out-target:
+IDENTICAL (7 drains: initial, repeat, appends, rotation, truncation, vanished file, repeat)
+persisted state: 61 files, same set, 0 diffs after masking per-copy inode/birth idents

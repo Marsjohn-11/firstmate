@@ -1,0 +1,14 @@
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task10 [key=rot] needs-decision: after rotation
+task13 [key=b13] blocked: waiting on infra 13
+task15 [key=tr] blocked: truncated then reopened
+task18 [key=b18] blocked: waiting on infra 18
+task23 [key=b23] blocked: waiting on infra 23
+task25 [key=k25] needs-decision: choose path for 25
+task28 [key=b28] blocked: waiting on infra 28
+task3 [key=b3] blocked: waiting on infra 3
+task3 [key=late] needs-decision: new question on task3
+task30 [key=k30] needs-decision: choose path for 30
+task8 [key=b8] blocked: waiting on infra 8
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+rc=0
