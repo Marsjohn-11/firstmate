@@ -227,8 +227,8 @@ test_handling_successor_does_not_go_blind() {
 # fresh generation, so the acknowledgement the handling turn had been given
 # reported a newer episode and asked for a re-drain, whose own acknowledgement
 # the next turn boundary invalidated again - one firstmate turn per round with no
-# watcher alive in between, indefinitely, and an episode nothing could retire
-# while the fleet stayed busy. Drives the real watcher and the real drain.
+# watcher alive in between, indefinitely. Drives the real watcher and the real
+# drain.
 test_presented_acknowledgement_survives_a_turn_boundary_rearm() {
   local dir home state fakebin out err child now sequence generation marker ack_err
   dir=$(make_case rearm-during-handling)
@@ -269,8 +269,8 @@ test_presented_acknowledgement_survives_a_turn_boundary_rearm() {
   [ "${marker##*:}" = "$generation" ] \
     || fail "T3 turn-boundary re-arm moved the recovery generation to $marker (presented $generation)"
 
-  # A row appended during handling must not stop the presented acknowledgement
-  # from retiring the episode it names.
+  # A row appended during handling opens an episode of its own so it resurfaces.
+  # The presented acknowledgement still consumes the row it was given.
   append_wake "$state" signal late "signal: row appended during handling" \
     || fail "T3 could not append the late row"
   ack_err="$dir/ack.err"
@@ -278,13 +278,15 @@ test_presented_acknowledgement_survives_a_turn_boundary_rearm() {
     --ack-through "$sequence" --recovery-generation "$generation" \
     >/dev/null 2> "$ack_err" \
     || fail "T3 presented acknowledgement failed: $(cat "$ack_err")"
-  ! grep -Fq 'newer recovery episode' "$ack_err" \
-    || fail "T3 presented acknowledgement was orphaned: $(cat "$ack_err")"
+  grep -Fq '(1 row(s) consumed)' "$ack_err" \
+    || fail "T3 presented acknowledgement did not consume its row: $(cat "$ack_err")"
   marker=$(cat "$state/.watcher-down")
   case "$marker" in
-    acked:*) ;;
-    *) fail "T3 episode was not retired by its own acknowledgement: $marker" ;;
+    pending:downtime:*) ;;
+    *) fail "T3 late row did not open its own pending episode: $marker" ;;
   esac
+  [ "${marker##*:}" != "$generation" ] \
+    || fail "T3 late row reused the presented generation: $marker"
 
   # The late row is still queued and still resurfaces, and once it too is
   # acknowledged a re-arm supervises instead of announcing recovery again.
@@ -298,6 +300,11 @@ test_presented_acknowledgement_survives_a_turn_boundary_rearm() {
   FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-wake-drain.sh" \
     --ack-through "$sequence" --recovery-generation "$generation" >/dev/null 2>&1 \
     || fail "T3 late-row acknowledgement failed"
+  marker=$(cat "$state/.watcher-down")
+  case "$marker" in
+    acked:*) ;;
+    *) fail "T3 late-row episode was not retired by its own acknowledgement: $marker" ;;
+  esac
   out="$dir/watch3.out"
   PATH="$fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$state" \
     FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
@@ -320,7 +327,7 @@ test_presented_acknowledgement_survives_a_turn_boundary_rearm() {
   fi
   kill -TERM "$child" 2>/dev/null || true
   wait "$child" 2>/dev/null || true
-  pass "a presented acknowledgement survives a turn-boundary re-arm and settles its episode"
+  pass "a presented acknowledgement survives a turn-boundary re-arm, and a late row settles through its own episode"
 }
 
 test_handling_successor_does_not_go_blind

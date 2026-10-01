@@ -250,6 +250,9 @@ Whatever is left stays queued and resurfaces through its own wake, or through th
 That costs one extra cycle before the leftover rows resurface.
 Holding the episode open for them instead is what left a busy home with an episode no acknowledgement could ever retire, so every later start re-announced recovery instead of supervising.
 
+A durable row appended after the announcement opens a fresh pending episode of its own (see "Generation reuse" above).
+The acknowledgement presented before that row still consumes its own rows, and its remedy names the newer episode, whose own acknowledgement retires it once the row is presented.
+
 A stale acknowledgement settles nothing, because it consumed none of its own rows while a presented row still waits above its cutoff.
 It therefore leaves the episode open, and the remedy names that episode's live generation.
 A watcher close during handling republishes the same generation as pending, and the outstanding generation-bound acknowledgement stays valid and retires it without a dedicated recovery turn.
