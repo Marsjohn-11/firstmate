@@ -225,6 +225,39 @@ SH
   pass "classify stat helpers resolve the kernel name once per process"
 }
 
+test_status_identity_and_size_read_with_one_stat() {
+  local script="$TMP_ROOT/ident-size.sh" shim="$TMP_ROOT/stat-shim" log="$TMP_ROOT/stat.log" file="$TMP_ROOT/ident-sized"
+  mkdir -p "$shim"
+  cat > "$shim/stat" <<SH
+#!/bin/sh
+printf 'stat\n' >> "$log"
+exec $(command -v stat) "\$@"
+SH
+  chmod +x "$shim/stat"
+  printf 'caf\303\251 bytes\n' > "$file"
+  cat > "$script" <<'SH'
+PATH="$2:$PATH"
+. "$1/bin/fm-classify-lib.sh"
+ident=$(_fm_open_decisions_file_ident "$4") || printf 'identity unreadable\n'
+size=$(_fm_status_file_size "$4")
+case "$ident" in strong:*:*:*|weak:*:*) ;; *) printf 'identity %q\n' "$ident" ;; esac
+: > "$3"
+_fm_status_read_ident_size "$4" || printf 'paired read failed\n'
+[ "$_FM_STAT_IDENTITY" = "$ident" ] || printf 'paired identity %q, single %q\n' "$_FM_STAT_IDENTITY" "$ident"
+[ "$_FM_STAT_SIZE" = "$size" ] || printf 'paired size %q, single %q\n' "$_FM_STAT_SIZE" "$size"
+if [ "$(uname -s)" != Darwin ]; then
+  calls=$(grep -c . "$3" || true)
+  [ "$calls" -eq 1 ] || printf 'paired read ran stat %s times\n' "$calls"
+fi
+_fm_status_read_ident_size "$4.missing" && printf 'missing file read succeeded\n'
+FM_STATUS_IDENTITY_READER=echo FM_STATUS_SIZE_READER=echo _fm_status_read_ident_size "$4" \
+  || printf 'injected read failed\n'
+[ "$_FM_STAT_IDENTITY:$_FM_STAT_SIZE" = "$4:$4" ] || printf 'injected readers ignored\n'
+SH
+  run_everywhere "status identity and size read" "$script" "$shim" "$log" "$file"
+  pass "status identity and size come from one stat read and match the single helpers"
+}
+
 if [ -n "${FM_TEST_ONLY:-}" ]; then
   "$FM_TEST_ONLY"
 else
@@ -234,4 +267,5 @@ else
   test_recovery_marker_read_accepts_exactly_one_newline
   test_window_to_task_matches_the_meta_pipeline
   test_classify_stat_helpers_read_the_kernel_name_once
+  test_status_identity_and_size_read_with_one_stat
 fi
