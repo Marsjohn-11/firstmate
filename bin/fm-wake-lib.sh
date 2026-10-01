@@ -1148,7 +1148,7 @@ _fm_lock_reap_stale_holder() {  # <path>
 # even once its pid names something else. A nested mutex without pid-identity
 # cannot be reclaimed after its pid is recycled; this revision never creates
 # nested mutexes.
-fm_lock_steal_try_acquire() {  # <steal-lock>
+fm_lock_try_acquire_steal_mutex() {  # <steal-lock>
   local lockdir=$1 current
   FM_LOCK_OWNER_DIR=
   fm_lock_try_create "$lockdir" && return 0
@@ -1160,10 +1160,6 @@ fm_lock_steal_try_acquire() {  # <steal-lock>
     _fm_lock_reap_stale_holder "$lockdir" || return 1
   fi
   fm_lock_try_create "$lockdir"
-}
-
-fm_lock_try_acquire_steal_mutex() {  # <steal-lock>
-  fm_lock_steal_try_acquire "$@"
 }
 
 fm_lock_try_acquire() {
@@ -1213,7 +1209,7 @@ fm_lock_try_acquire() {
   fi
 
   steal="$lockdir.steal"
-  if ! fm_lock_steal_try_acquire "$steal"; then
+  if ! fm_lock_try_acquire_steal_mutex "$steal"; then
     FM_LOCK_HELD_PID=$(cat "$lockdir/pid" 2>/dev/null || true)
     FM_LOCK_OWNER_DIR=
     return 1
@@ -2035,7 +2031,7 @@ fm_autoarm_release_abandoned() {  # <state-dir> [grace]
   steal="$lock.steal"
   epoch="$state/.claude-autoarm-epoch"
   fm_autoarm_claim_abandoned "$state" "$grace" || return 1
-  fm_lock_steal_try_acquire "$steal" || return 1
+  fm_lock_try_acquire_steal_mutex "$steal" || return 1
   steal_owner=${FM_LOCK_OWNER_DIR:-}
   if ! fm_autoarm_claim_abandoned "$state" "$grace"; then
     fm_lock_release "$steal"

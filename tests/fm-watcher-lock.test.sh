@@ -772,7 +772,7 @@ test_lock_reclaims_a_self_held_steal_mutex() {
   # non-blocking attempt is the whole mechanism.
   out=$(FM_LOCK_STALE_AFTER=0 FM_STATE_OVERRIDE="$state" bash -c '
     . "$1"
-    fm_lock_steal_try_acquire "$2.steal" || exit 20
+    fm_lock_try_acquire_steal_mutex "$2.steal" || exit 20
     held=$(cat "$2.steal/pid" 2>/dev/null || true)
     fm_current_pid mine || exit 21
     [ "$held" = "$mine" ] || exit 22
@@ -1085,7 +1085,7 @@ test_autoarm_reclaim_refuses_when_the_steal_mutex_was_taken() {
   local dir state lock victim identity rc i clobber
   # shellcheck disable=SC2016 # This is a stub body; every expansion belongs to the child shell that evals it.
   clobber='
-    fm_lock_steal_try_acquire() {
+    fm_lock_try_acquire_steal_mutex() {
       fm_lock_try_create "$1" || return 1
       # A competitor reclaiming the same stale mutex removed ours, discarded our
       # owner directory, and published its own.
