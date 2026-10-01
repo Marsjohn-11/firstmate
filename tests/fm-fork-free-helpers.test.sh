@@ -227,13 +227,21 @@ SH
 
 test_status_identity_and_size_read_with_one_stat() {
   local script="$TMP_ROOT/ident-size.sh" shim="$TMP_ROOT/stat-shim" log="$TMP_ROOT/stat.log" file="$TMP_ROOT/ident-sized"
-  mkdir -p "$shim"
+  local weak_shim="$TMP_ROOT/stat-weak-shim"
+  mkdir -p "$shim" "$weak_shim"
   cat > "$shim/stat" <<SH
 #!/bin/sh
 printf 'stat\n' >> "$log"
 exec $(command -v stat) "\$@"
 SH
   chmod +x "$shim/stat"
+
+  # Reports birth epoch 0 in the third tab field, as a filesystem without birth times does.
+  cat > "$weak_shim/stat" <<SH
+#!/bin/sh
+$(command -v stat) "\$@" | awk -F '\t' -v OFS='\t' 'NF >= 3 { \$3 = 0 } 1'
+SH
+  chmod +x "$weak_shim/stat"
   printf 'caf\303\251 bytes\n' > "$file"
   cat > "$script" <<'SH'
 PATH="$2:$PATH"
@@ -253,8 +261,17 @@ _fm_status_read_ident_size "$4.missing" && printf 'missing file read succeeded\n
 FM_STATUS_IDENTITY_READER=echo FM_STATUS_SIZE_READER=echo _fm_status_read_ident_size "$4" \
   || printf 'injected read failed\n'
 [ "$_FM_STAT_IDENTITY:$_FM_STAT_SIZE" = "$4:$4" ] || printf 'injected readers ignored\n'
+if [ "$(uname -s)" != Darwin ]; then
+  want="weak:$(stat -c '%d:%i' "$4")"
+  PATH="$5:$PATH"
+  ident=$(_fm_open_decisions_file_ident "$4") || printf 'weak identity unreadable\n'
+  [ "$ident" = "$want" ] || printf 'weak identity %q, want %q\n' "$ident" "$want"
+  _fm_status_read_ident_size "$4" || printf 'weak paired read failed\n'
+  [ "$_FM_STAT_IDENTITY" = "$want" ] || printf 'weak paired identity %q, want %q\n' "$_FM_STAT_IDENTITY" "$want"
+  [ "$_FM_STAT_SIZE" = "$size" ] || printf 'weak paired size %q, want %q\n' "$_FM_STAT_SIZE" "$size"
+fi
 SH
-  run_everywhere "status identity and size read" "$script" "$shim" "$log" "$file"
+  run_everywhere "status identity and size read" "$script" "$shim" "$log" "$file" "$weak_shim"
   pass "status identity and size come from one stat read and match the single helpers"
 }
 
