@@ -1,0 +1,17 @@
+=== S1: stacked stale steal chain (40 levels), single acquirer ===
+[base] stacked=40 rc=1 elapsed=2s holder_pid=999999 remaining_steal_depth=40 errors=0
+[fix] stacked=40 rc=0 elapsed=6s holder_pid=51434 remaining_steal_depth=40 errors=0
+=== S2: 8 concurrent recoverers on stale lock + stale steal chain (6 levels) ===
+[base] winners=0 exit_codes=[ 0 0 0 0 0 0 0 0 ] elapsed=4s name_too_long_errors=0 nested_left=6
+[fix] winners=1 exit_codes=[ 0 0 0 0 0 0 0 0 ] elapsed=9s name_too_long_errors=0 nested_left=6
+=== S3 (adversarial): live steal-mutex holder must not be reclaimed ===
+[fix] rc=1 (expect nonzero) steal_pid_still=59597 live=59597 primary_pid_still=999999
+=== S4: steal mutex whose recorded pid was recycled onto a live process is reclaimed ===
+[fix] rc=0 (expect 0) new_holder_pid=59781 steal_left=no live_proc_untouched=yes
+=== S5 (adversarial): PRIMARY lock with recycled pid stays treated as live ===
+rc=1 held_pid=60805
+[fix] primary_pid_still=60805 (expect 60805)
+=== S6: identity recorded on fresh acquisition ===
+pid=61021 self=61021
+identity=Wed Sep 30 23:27:29 2026     bash -c . "$1"; fm_lock_try_acq
+released_exists=no

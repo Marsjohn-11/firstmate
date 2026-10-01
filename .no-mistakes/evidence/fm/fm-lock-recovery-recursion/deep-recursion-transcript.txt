@@ -1,0 +1,4 @@
+[old] stacked=40 rc=124 elapsed=120s holder_pid=999999 (dead=999999) 'too long' lines=73
+[old]   basename: <tmp>/old-state/.watch.lock.steal.steal.steal.steal.steal.steal.s
+[old]   basename: <tmp>/old-state/.watch.lock.steal.steal.steal.steal.steal.steal.s
+[fix] stacked=40 rc=0 elapsed=9s holder_pid=87837 (dead=999999) 'too long' lines=0

@@ -1,0 +1,8 @@
+=== R1: one stale lock + one stale steal mutex, fm_lock_acquire_wait (20s cap) ===
+[old] rc=0 elapsed=4s holder_pid=76225 (dead=999999) deepest_steal_path_created=0 'File name too long' lines=0
+[base] rc=124 elapsed=20s holder_pid=999999 (dead=999999) deepest_steal_path_created=1 'File name too long' lines=0
+[fix] rc=0 elapsed=3s holder_pid=84853 (dead=999999) deepest_steal_path_created=0 'File name too long' lines=0
+=== R2: real fm-watch.sh in a marked lab home, stale .watch.lock + stale .watch.lock.steal ===
+[base] watcher_alive_after_100x100ms=no .watch.lock_pid=999999 watcher_pid=86371 acquired=no
+[base]   out: watcher: already running pid 999999
+[fix] watcher_alive_after_18x100ms=yes .watch.lock_pid=3315 watcher_pid=3315 acquired=yes
