@@ -1,0 +1,6 @@
+T2_WATCH_OUTPUT=signal: /private/var/folders/tv/b4_jb7290610qhwsd01ngyhr0000gq/T/fm-watch-recovery-loop.905WV6/recovery-gap-successor/state/crew.status 
+T2_QUEUE_ROW=1790830974	2	signal	crew.status	signal: /private/var/folders/tv/b4_jb7290610qhwsd01ngyhr0000gq/T/fm-watch-recovery-loop.905WV6/recovery-gap-successor/state/crew.status
+ok - a resurfacing handling successor stays alive and supervises instead of going blind
+T3_GENERATION=64561.1790830995.V8ofeF
+T3_MARKER=acked:handling:64561.1790830995.V8ofeF
+ok - a presented acknowledgement survives a turn-boundary re-arm, and a late row settles through its own episode

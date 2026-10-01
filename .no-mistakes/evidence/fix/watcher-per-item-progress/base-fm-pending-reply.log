@@ -1,0 +1,2 @@
+not ok - the pending-reply tick reported progress 0 times over four selected records, three of which leave the loop early, and one settled record; it must report once per selected record
+not ok - pending-reply per-record progress regression failed

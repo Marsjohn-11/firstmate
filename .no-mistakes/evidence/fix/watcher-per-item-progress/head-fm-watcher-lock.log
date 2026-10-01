@@ -1,0 +1,7 @@
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - live watcher lock with stale heartbeat is actionable
+ok - guard banner leads when down with pending wakes (repair-after-drain) and stays silent when live and fresh
+ok - arm attaches to a live fresh watcher and fails loudly when that cycle has no successor
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+SWEEP_SPAN=33s WORST_BEACON_AGE=7s GRACE=12s CHECK_RUNS=28 HEALTHY_THROUGHOUT=yes
+ok - a watcher stays beacon-fresh and healthy throughout a sweep longer than the stale grace

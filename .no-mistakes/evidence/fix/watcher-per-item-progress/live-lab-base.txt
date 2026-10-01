@@ -1,0 +1,37 @@
+[base] watcher pid 10292, grace 12s
+[base] t=2s beacon=1s guard silent
+[base] t=4s beacon=5s guard silent
+[base] t=6s beacon=8s guard silent
+[base] t=8s beacon=11s guard silent
+[base] t=10s beacon=13s GUARD: ●  WATCHER DOWN - SUPERVISION IS OFF ●  10 registered custom check(s), but no watcher has a fresh beacon (last beat: 14s ago, grace 12s). 
+[base] t=12s beacon=17s GUARD: WARNING: watcher still down (same stale episode; last beat: 17s ago, grace 12s) - full banner already printed this episode. 
+[base] t=14s beacon=21s GUARD: WARNING: watcher still down (same stale episode; last beat: 22s ago, grace 12s) - full banner already printed this episode. 
+[base] t=16s beacon=25s GUARD: WARNING: watcher still down (same stale episode; last beat: 26s ago, grace 12s) - full banner already printed this episode. 
+[base] t=18s beacon=29s GUARD: WARNING: watcher still down (same stale episode; last beat: 29s ago, grace 12s) - full banner already printed this episode. 
+[base] t=20s beacon=0s guard silent
+[base] t=22s beacon=3s guard silent
+[base] t=24s beacon=6s guard silent
+[base] t=26s beacon=9s guard silent
+[base] t=28s beacon=11s GUARD: ●  WATCHER DOWN - SUPERVISION IS OFF ●  10 registered custom check(s), but no watcher has a fresh beacon (last beat: 12s ago, grace 12s). 
+[base] t=30s beacon=15s GUARD: WARNING: watcher still down (same stale episode; last beat: 16s ago, grace 12s) - full banner already printed this episode. 
+[base] t=32s beacon=21s GUARD: WARNING: watcher still down (same stale episode; last beat: 21s ago, grace 12s) - full banner already printed this episode. 
+[base] t=34s beacon=24s GUARD: WARNING: watcher still down (same stale episode; last beat: 24s ago, grace 12s) - full banner already printed this episode. 
+[base] t=36s beacon=28s GUARD: WARNING: watcher still down (same stale episode; last beat: 28s ago, grace 12s) - full banner already printed this episode. 
+[base] t=38s beacon=1s guard silent
+[base] t=40s beacon=6s guard silent
+[base] t=42s beacon=9s guard silent
+[base] t=44s beacon=14s GUARD: ●  WATCHER DOWN - SUPERVISION IS OFF ●  10 registered custom check(s), but no watcher has a fresh beacon (last beat: 15s ago, grace 12s). 
+[base] t=46s beacon=24s GUARD: WARNING: watcher still down (same stale episode; last beat: 25s ago, grace 12s) - full banner already printed this episode. 
+[base] t=48s beacon=30s GUARD: WARNING: watcher still down (same stale episode; last beat: 31s ago, grace 12s) - full banner already printed this episode. 
+[base] t=50s beacon=38s GUARD: WARNING: watcher still down (same stale episode; last beat: 38s ago, grace 12s) - full banner already printed this episode. 
+[base] t=52s beacon=0s guard silent
+[base] t=54s beacon=5s guard silent
+[base] t=56s beacon=10s guard silent
+[base] t=58s beacon=13s GUARD: ●  WATCHER DOWN - SUPERVISION IS OFF ●  10 registered custom check(s), but no watcher has a fresh beacon (last beat: 14s ago, grace 12s). 
+[base] t=60s beacon=19s GUARD: WARNING: watcher still down (same stale episode; last beat: 19s ago, grace 12s) - full banner already printed this episode. 
+[base] t=62s beacon=21s GUARD: WARNING: watcher still down (same stale episode; last beat: 22s ago, grace 12s) - full banner already printed this episode. 
+[base] t=64s beacon=26s GUARD: WARNING: watcher still down (same stale episode; last beat: 29s ago, grace 12s) - full banner already printed this episode. 
+[base] t=66s beacon=33s GUARD: WARNING: watcher still down (same stale episode; last beat: 40s ago, grace 12s) - full banner already printed this episode. 
+[base] t=68s beacon=46s GUARD: WARNING: watcher still down (same stale episode; last beat: 47s ago, grace 12s) - full banner already printed this episode. 
+[base] t=70s beacon=8s GUARD: WARNING: watcher still down (same stale episode; last beat: 13s ago, grace 12s) - full banner already printed this episode. 
+[base] SUMMARY complete_sweeps=4 longest_sweep=40s worst_beacon_age=46s grace=12s guard_alarms=21

@@ -1,0 +1,5 @@
+ok - the provably-working check reports progress once per task, including the short-circuiting one, and never lets reporting change its verdict
+ok - a no-verb signal whose crew is provably working is absorbed (no exit, no queue, suppressor advanced, beacon present)
+ok - the liveness beacon stays fresh while the watcher absorbs benign wakes (fm-guard never false-alarms)
+ok - the cycle-turnover marker is touched exactly once per cycle and stays distinct from the liveness beacon (3 turnovers, 33 beats, 3 cycles)
+ok - every per-item watcher loop reports progress once per item, before any early exit, so an item that exits early is still reported

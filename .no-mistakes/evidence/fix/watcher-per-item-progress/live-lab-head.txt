@@ -1,0 +1,37 @@
+[head] watcher pid 10289, grace 12s
+[head] t=2s beacon=0s guard silent
+[head] t=4s beacon=3s guard silent
+[head] t=6s beacon=2s guard silent
+[head] t=8s beacon=1s guard silent
+[head] t=10s beacon=0s guard silent
+[head] t=12s beacon=0s guard silent
+[head] t=14s beacon=0s guard silent
+[head] t=16s beacon=0s guard silent
+[head] t=18s beacon=1s guard silent
+[head] t=20s beacon=1s guard silent
+[head] t=22s beacon=1s guard silent
+[head] t=24s beacon=1s guard silent
+[head] t=26s beacon=2s guard silent
+[head] t=28s beacon=2s guard silent
+[head] t=30s beacon=2s guard silent
+[head] t=32s beacon=0s guard silent
+[head] t=34s beacon=1s guard silent
+[head] t=36s beacon=1s guard silent
+[head] t=38s beacon=2s guard silent
+[head] t=40s beacon=2s guard silent
+[head] t=42s beacon=0s guard silent
+[head] t=44s beacon=3s guard silent
+[head] t=46s beacon=3s guard silent
+[head] t=48s beacon=1s guard silent
+[head] t=50s beacon=5s guard silent
+[head] t=52s beacon=1s guard silent
+[head] t=54s beacon=0s guard silent
+[head] t=56s beacon=1s guard silent
+[head] t=58s beacon=1s guard silent
+[head] t=60s beacon=0s guard silent
+[head] t=62s beacon=1s guard silent
+[head] t=64s beacon=3s guard silent
+[head] t=66s beacon=0s guard silent
+[head] t=68s beacon=0s guard silent
+[head] t=70s beacon=3s guard silent
+[head] SUMMARY complete_sweeps=3 longest_sweep=35s worst_beacon_age=5s grace=12s guard_alarms=0
