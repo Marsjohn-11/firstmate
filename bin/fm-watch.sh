@@ -287,8 +287,11 @@ WATCHER_STALL_BOUND=$(fm_watcher_stall_bound "$POLL")
 # long legitimate scan never reads as a dead watcher. Only forward progress
 # touches it. A loop that stops advancing stops beating, and the stall bound
 # above still retires it (watcher_progress_beat below).
+# A padded zero such as 00 is still zero, and a value too large for the shell
+# to compare would make every beat check error out, so compare arithmetically.
 WATCHER_BEAT_SECS=${FM_WATCHER_BEAT_SECS:-10}
-case "$WATCHER_BEAT_SECS" in ''|*[!0-9]*|0) WATCHER_BEAT_SECS=10 ;; esac
+case "$WATCHER_BEAT_SECS" in ''|*[!0-9]*) WATCHER_BEAT_SECS=10 ;; esac
+[ "$WATCHER_BEAT_SECS" -gt 0 ] 2>/dev/null || WATCHER_BEAT_SECS=10
 HEARTBEAT=${FM_HEARTBEAT:-600}        # base seconds between heartbeat scans
 HEARTBEAT_MAX=${FM_HEARTBEAT_MAX:-7200}  # heartbeat backoff cap
 CHECK_INTERVAL=${FM_CHECK_INTERVAL:-300}  # seconds between *.check.sh sweeps
