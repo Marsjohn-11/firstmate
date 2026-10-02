@@ -1533,15 +1533,11 @@ _fm_pending_reply_tick_fields() {  # <record-path>
   _FM_PENDING_REPLY_TICK_CORR=''
   _FM_PENDING_REPLY_TICK_TASK=''
   _FM_PENDING_REPLY_TICK_PHASE=''
-  _FM_PENDING_REPLY_TICK_ESCALATED=''
-  _FM_PENDING_REPLY_TICK_CLOSED=''
   while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in
       corr_id=*) _FM_PENDING_REPLY_TICK_CORR=${line#corr_id=} ;;
       task_id=*) _FM_PENDING_REPLY_TICK_TASK=${line#task_id=} ;;
       phase=*) _FM_PENDING_REPLY_TICK_PHASE=${line#phase=} ;;
-      escalated_epoch=*) _FM_PENDING_REPLY_TICK_ESCALATED=${line#escalated_epoch=} ;;
-      escalation_closed_epoch=*) _FM_PENDING_REPLY_TICK_CLOSED=${line#escalation_closed_epoch=} ;;
     esac
   done 2>/dev/null < "$1"
 }
@@ -1583,13 +1579,9 @@ fm_pending_reply_tick() {  # <state-dir> [progress-command]
     task_id=$_FM_PENDING_REPLY_TICK_TASK
     phase=$_FM_PENDING_REPLY_TICK_PHASE
     if [ "$phase" = resolved ]; then
-      # Only an escalation still open needs the locked close. This is the retry
-      # that makes the close converge after a transient write failure. The
-      # locked path re-checks both fields, and a resolved record never gains a
-      # new escalation, so skipping a settled record changes nothing.
-      if [ -n "$_FM_PENDING_REPLY_TICK_ESCALATED" ] && [ -z "$_FM_PENDING_REPLY_TICK_CLOSED" ]; then
-        fm_pending_reply_close_escalation "$state" "$corr" || true
-      fi
+      # Cheap no-op unless an escalation for this record is still open; this is
+      # the retry that makes the close converge after a transient write failure.
+      fm_pending_reply_close_escalation "$state" "$corr" || true
       continue
     fi
     fm_pending_reply_reconcile_delivery "$state" "$corr" || true
