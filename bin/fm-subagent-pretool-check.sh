@@ -141,25 +141,25 @@ done
 # So any stem in the normalized name appears in the raw payload with only such
 # gaps between its letters, and a payload with no such appearance cannot deny.
 # A control byte also delegates, because jq may re-render raw text it accepts
-# with inserted escapes.
+# with inserted escapes, and so does a payload over 64 KiB, where one jq fork
+# costs less than this scan.
 raw_may_name_delegation() {  # <payload>
-  local LC_ALL=C stem re gap='([^A-Za-z0-9]|\\[bfnrt])*' i
+  local LC_ALL=C stem re="" alt gap='([^A-Za-z0-9]|\\[bfnrt])*' i rc
+  [ "${#1}" -le 65536 ] || return 0
   case "$1" in
     *'\u'*|*[[:cntrl:]]*) return 0 ;;
   esac
-  shopt -s nocasematch
   for stem in $DELEGATION_STEMS; do
-    re=${stem:0:1}
+    alt=${stem:0:1}
     for ((i = 1; i < ${#stem}; i++)); do
-      re="$re$gap${stem:i:1}"
+      alt="$alt$gap${stem:i:1}"
     done
-    if [[ $1 =~ $re ]]; then
-      shopt -u nocasematch
-      return 0
-    fi
+    re="${re:+$re|}$alt"
   done
+  shopt -s nocasematch
+  [[ $1 =~ $re ]]; rc=$?
   shopt -u nocasematch
-  return 1
+  return "$rc"
 }
 
 if [ "$TOOL_SET" -eq 0 ]; then
