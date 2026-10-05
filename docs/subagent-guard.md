@@ -66,7 +66,7 @@ Folding the two lists together would be the drift risk, because the observe-or-s
 
 The shipped guard fires on every delegation-shaped name that reaches it, including future names that no deny list knows about yet.
 That future-name behavior is the reason the tracked matcher must match all tools and let the script filter.
-On the stdin path the guard first searches the raw JSON payload for any stem, allowing for the bytes normalization drops, and allows at once when none appears, so most tool calls are allowed before any `jq` process starts.
+On the stdin path the guard first searches a raw JSON payload of at most 64 KiB for any stem, allowing for the bytes normalization drops, and allows at once when none appears, so most tool calls are allowed before any `jq` process starts; a larger payload goes straight to `jq`, which costs less than the scan at that size.
 
 ## Recommended Local Claude Deny List
 
