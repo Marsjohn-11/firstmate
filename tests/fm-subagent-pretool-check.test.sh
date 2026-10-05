@@ -319,7 +319,9 @@ test_raw_fast_path_skips_jq_without_changing_decisions() {
     '{"tool_name":"Ag\\ent"}' \
     '{"tool_name":"Ag\"ent"}' \
     '{"tool_name":"Agent"}' \
-    '{"toolName":"spawn.x"}'; do
+    '{"toolName":"spawn.x"}' \
+    '{"tool_name":"\u0054ask"}' \
+    '{"tool_name":"\u0041\u0067\u0065\u006e\u0074"}'; do
     rm -f "$marker"
     [ "$(stdin_rc "$fakebin" "$payload")" = 2 ] || fail "delegation-shaped payload must still deny: $payload"
     [ -e "$marker" ] || fail "delegation-shaped payload skipped jq: $payload"
@@ -330,6 +332,36 @@ test_raw_fast_path_skips_jq_without_changing_decisions() {
   [ "$(stdin_rc "$fakebin" "$payload")" = 0 ] || fail "a stem outside the tool name must not deny"
   [ -e "$marker" ] || fail "a stem anywhere in the payload must reach jq"
   pass "the raw stdin fast path allows stem-free payloads without jq and leaves every decision unchanged"
+}
+
+# Build a single-line payload of exactly <bytes> bytes from ASCII prefix and
+# suffix around stem-free padding, so the raw-scan size bound is tested exactly.
+sized_payload() {  # <bytes> <prefix> <suffix>
+  local pad=$(( $1 - ${#2} - ${#3} )) fill
+  printf -v fill '%*s' "$pad" ''
+  printf '%s%s%s' "$2" "${fill// /x}" "$3"
+}
+
+test_raw_fast_path_size_bound() {
+  local fakebin="$TMP_ROOT/recording-jq" marker="$TMP_ROOT/jq-calls" size payload
+  local bash_pre='{"tool_name":"Bash","tool_input":{"command":"' agent_pre='{"tool_name":"Agent","tool_input":{"prompt":"' post='"}}'
+  make_recording_jq "$fakebin" "$marker"
+  payload=$(sized_payload 65536 "$bash_pre" "$post")
+  [ "${#payload}" -eq 65536 ] || fail "fixture payload must be exactly 65536 bytes, got ${#payload}"
+  rm -f "$marker"
+  [ "$(stdin_rc "$fakebin" "$payload")" = 0 ] || fail "a stem-free payload at the 64 KiB bound must allow"
+  [ ! -e "$marker" ] || fail "a stem-free payload at the 64 KiB bound must not start jq"
+  for size in 65537 65538 262144; do
+    payload=$(sized_payload "$size" "$bash_pre" "$post")
+    rm -f "$marker"
+    [ "$(stdin_rc "$fakebin" "$payload")" = 0 ] || fail "a stem-free $size-byte payload must still allow"
+    [ -e "$marker" ] || fail "a $size-byte payload over the 64 KiB bound must reach jq"
+    payload=$(sized_payload "$size" "$agent_pre" "$post")
+    rm -f "$marker"
+    [ "$(stdin_rc "$fakebin" "$payload")" = 2 ] || fail "a delegation-shaped $size-byte payload must still deny"
+    [ -e "$marker" ] || fail "a delegation-shaped $size-byte payload must reach jq"
+  done
+  pass "payloads over 64 KiB skip the raw scan for jq and keep every decision unchanged"
 }
 
 # Reference model of the classification: ASCII lowercase, keep [a-z0-9], then
@@ -386,4 +418,5 @@ test_stdin_transports_and_output_shapes
 test_malformed_transport_fails_open
 test_missing_jq_stdin_transport_fails_open
 test_raw_fast_path_skips_jq_without_changing_decisions
+test_raw_fast_path_size_bound
 test_generated_names_match_reference_model
