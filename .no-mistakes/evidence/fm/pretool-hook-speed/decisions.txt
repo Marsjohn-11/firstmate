@@ -1,0 +1,47 @@
+### cd guard decisions (base vs head)
+ls\ -la                base[rc=0 out=0B] head[rc=0 out=0B] same
+git\ status            base[rc=0 out=0B] head[rc=0 out=0B] same
+cd\ /tmp               base[rc=2 out=0B] head[rc=2 out=0B] same
+cd\ /tmp\ \&\&\ ls     base[rc=2 out=0B] head[rc=2 out=0B] same
+pushd\ /tmp            base[rc=2 out=0B] head[rc=2 out=0B] same
+popd                   base[rc=2 out=0B] head[rc=2 out=0B] same
+c\'d\'\ /tmp           base[rc=2 out=0B] head[rc=2 out=0B] same
+c\"d\"\ /tmp           base[rc=2 out=0B] head[rc=2 out=0B] same
+c\\d\ /tmp             base[rc=2 out=0B] head[rc=2 out=0B] same
+$'c\\\nd /tmp'         base[rc=2 out=0B] head[rc=2 out=0B] same
+\$\'\\x63d\'\ /tmp     base[rc=2 out=0B] head[rc=2 out=0B] same
+npx\ cdk\ deploy       base[rc=0 out=0B] head[rc=0 out=0B] same
+echo\ abcd             base[rc=0 out=0B] head[rc=0 out=0B] same
+ls\ /mnt/cdrom         base[rc=0 out=0B] head[rc=0 out=0B] same
+\(cd\ sub\;\ make\)    base[rc=0 out=0B] head[rc=0 out=0B] same
+echo\ hi\;\ cd\ ..     base[rc=2 out=0B] head[rc=2 out=0B] same
+builtin\ cd\ /         base[rc=2 out=0B] head[rc=2 out=0B] same
+env\ cd\ /             base[rc=0 out=0B] head[rc=0 out=0B] same
+cd mismatches: 0
+
+### subagent guard decisions (base vs head)
+Read               base[rc=0 out=0B] head[rc=0 out=0B] same
+Bash               base[rc=0 out=0B] head[rc=0 out=0B] same
+Write              base[rc=0 out=0B] head[rc=0 out=0B] same
+Edit               base[rc=0 out=0B] head[rc=0 out=0B] same
+Grep               base[rc=0 out=0B] head[rc=0 out=0B] same
+Glob               base[rc=0 out=0B] head[rc=0 out=0B] same
+TodoWrite          base[rc=0 out=0B] head[rc=0 out=0B] same
+WebFetch           base[rc=0 out=0B] head[rc=0 out=0B] same
+Task               base[rc=2 out=0B] head[rc=2 out=0B] same
+Agent              base[rc=2 out=0B] head[rc=2 out=0B] same
+agent              base[rc=2 out=0B] head[rc=2 out=0B] same
+Sub_Agent          base[rc=2 out=0B] head[rc=2 out=0B] same
+spawn-worker       base[rc=2 out=0B] head[rc=2 out=0B] same
+mcp__foo__task     base[rc=0 out=0B] head[rc=0 out=0B] same
+TaskCreate         base[rc=0 out=0B] head[rc=0 out=0B] same
+Explore            base[rc=0 out=0B] head[rc=0 out=0B] same
+ExitPlanMode       base[rc=0 out=0B] head[rc=0 out=0B] same
+Delegate           base[rc=2 out=0B] head[rc=2 out=0B] same
+launch_subagent    base[rc=2 out=0B] head[rc=2 out=0B] same
+Write+400KB-content base[rc=0 out=0B] head[rc=0 out=0B]
+Task+400KB-content base[rc=2 out=0B] head[rc=2 out=0B]
+Write+stem-words base[rc=0 out=0B] head[rc=0 out=0B]
+unicode-escaped-Task base[rc=2 out=0B] head[rc=2 out=0B]
+unicode-escaped-cd base[rc=2 out=0B] head[rc=2 out=0B]
+subagent mismatches: 0

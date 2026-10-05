@@ -1,0 +1,17 @@
+case (load=0 busy loops, N=30)          base_ms  head_ms
+cd-guard Bash 'ls -la && git status'         27       14
+cd-guard Bash 'cd /tmp && ls' (deny)        215      231
+subagent Read                                29       14
+subagent Write 16KB                          21       21
+subagent Write 1MB                          101      120
+subagent Task (deny)                         40       34
+cd-guard Read (non-Bash payload)             20        8
+
+case (load=8 busy loops, N=20)          base_ms  head_ms
+cd-guard Bash 'ls -la && git status'         93       37
+cd-guard Bash 'cd /tmp && ls' (deny)        965      898
+subagent Read                               114       60
+subagent Write 16KB                          79       42
+subagent Write 1MB                          370      282
+subagent Task (deny)                        124       91
+cd-guard Read (non-Bash payload)             71       31

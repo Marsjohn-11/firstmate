@@ -1,0 +1,6 @@
+round1 base 1MB Write: 91 ms
+round1 head 1MB Write: 115 ms
+round2 base 1MB Write: 90 ms
+round2 head 1MB Write: 97 ms
+round3 base 1MB Write: 84 ms
+round3 head 1MB Write: 88 ms
