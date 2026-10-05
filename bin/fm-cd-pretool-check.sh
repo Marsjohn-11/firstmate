@@ -119,26 +119,6 @@ has_cd_letters() {  # <text> <gap-class>
   [[ $1 =~ $re ]]
 }
 
-# Return 0 when command $1 may hold a command word whose value is exactly cd,
-# pushd, or popd - the only words the policy denies. Without a command or
-# process substitution or a line continuation, every byte of a word other than a
-# quote or backslash is a byte of its value, so such a word appears with only
-# quotes or backslashes between its letters and is bounded on each side, past
-# any quotes or backslashes, by the command's edge or a byte that cannot extend
-# the word. A letter or underscore always extends it on the left, and a letter,
-# digit, or underscore on the right; a digit on the left may end an inline
-# redirection target such as >&1, so it never narrows. "abcd" and "cdk"
-# therefore never reach the policy. A substitution contributes no value bytes
-# and a continuation joins lines, so either one returns 0 without narrowing.
-may_hold_cd_word() {  # <command>
-  local LC_ALL=C q="[\\\"']*" re
-  case "$1" in
-    *"\$("*|*'`'*|*'<('*|*'>('*|*\\$'\n'*) return 0 ;;
-  esac
-  re="(^|[^A-Za-z_\\\"'])$q(c${q}d|p${q}u${q}s${q}h${q}d|p${q}o${q}p${q}d)$q([^A-Za-z0-9_\\\"']|\$)"
-  [[ $1 =~ $re ]]
-}
-
 # Return 0 unless raw JSON payload $1 provably extracts to a command the
 # prefilter below would fast-allow. A JSON string carries each command byte
 # literally or as an escape, and every escape this search does not model starts
@@ -155,6 +135,11 @@ raw_may_hold_cd() {  # <payload>
   has_cd_letters "$1" "[\\\"'nr]"
 }
 
+case ${BASH_SOURCE[0]} in
+  */*) SELF_DIR=${BASH_SOURCE[0]%/*}; SELF_DIR=${SELF_DIR:-/} ;;
+  *) SELF_DIR=. ;;
+esac
+
 if [ "$CMD_SET" -eq 0 ]; then
   PAYLOAD=$(cat 2>/dev/null || true)
   [ -n "$PAYLOAD" ] || exit 0
@@ -162,14 +147,14 @@ if [ "$CMD_SET" -eq 0 ]; then
   raw_may_hold_cd "$PAYLOAD" || exit 0
   command -v jq >/dev/null 2>&1 || exit 0
   # shellcheck source=bin/fm-hook-host-lib.sh
-  . "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/fm-hook-host-lib.sh"
+  . "$(cd -- "$SELF_DIR" && pwd)/fm-hook-host-lib.sh"
   # Cursor's own registration passes --cursor. Without it a Cursor-delivered
   # payload is the Claude-settings duplicate Cursor also loads, already
   # evaluated by that registration, so this copy allows without re-classifying.
   if [ "$CURSOR_MODE" -eq 0 ] && fm_hook_payload_is_foreign_host "$PAYLOAD"; then
     exit 0
   fi
-  CMD=$(printf '%s' "$PAYLOAD" | jq -r '(.toolInput.command // .tool_input.command // empty)' 2>/dev/null) || exit 0
+  CMD=$(jq -r '(.toolInput.command // .tool_input.command // empty)' <<<"$PAYLOAD" 2>/dev/null) || exit 0
 fi
 
 [ -n "$CMD" ] || exit 0
@@ -178,11 +163,10 @@ case "$CMD" in
   *"\$'"*|*'$"'*) ;;
   *)
     has_cd_letters "$CMD" "[\\\"'"$'\n\r'"]" || exit 0
-    may_hold_cd_word "$CMD" || exit 0
     ;;
 esac
 
-SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P) || exit 0
+SCRIPT_DIR=$(CDPATH='' cd -- "$SELF_DIR" 2>/dev/null && pwd -P) || exit 0
 FM_ROOT=${FM_ROOT_OVERRIDE:-$(CDPATH='' cd -- "$SCRIPT_DIR/.." 2>/dev/null && pwd -P)} || exit 0
 
 # Scope to a plain, non-worktree firstmate checkout, where git-dir equals

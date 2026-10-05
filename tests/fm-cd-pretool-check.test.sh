@@ -404,24 +404,6 @@ test_raw_stdin_fast_path_skips_jq() {
   pass "cd-guard: raw stdin fast path allows cd-free payloads without jq and still denies escaped cd"
 }
 
-test_word_boundary_skips_node() {
-  local fakebin marker="$TMP_ROOT/wordpath" cmd rc
-  fakebin=$(make_recording_fakebin "$TMP_ROOT/wordpath-fake" "$marker")
-  for cmd in 'abcd project' 'cdk deploy' 'ls /mnt/cdrom' 'git log --format=%h abcdef' "echo 'xcd'" 'popdx; pushdy'; do
-    rm -f "$marker-node"
-    rc=0; PATH="$fakebin" "$CHECK" --claude --command "$cmd" >/dev/null 2>&1 || rc=$?
-    expect_code 0 "$rc" "cd only inside a word must allow: $cmd"
-    [ ! -e "$marker-node" ] || fail "cd only inside a word still started node: $cmd"
-  done
-  # A substitution, a line continuation, or a digit edge must still delegate.
-  for cmd in 'abcd $(true)' 'abcd `true`' $'ab\\\ncd' 'echo x >&1cd projects/foo' 'cd'; do
-    rm -f "$marker-node"
-    rc=0; PATH="$fakebin" "$CHECK" --claude --command "$cmd" >/dev/null 2>&1 || rc=$?
-    [ -e "$marker-node" ] || fail "command needing the policy skipped node: $cmd"
-  done
-  pass "cd-guard: cd inside a longer word allows without node; substitutions, continuations, and digit edges still delegate"
-}
-
 # Model of the original prefilter: strip quotes, backslashes, CR, and LF, then
 # look for a cd/pushd/popd substring unless a quoting-decoder marker is present.
 original_prefilter_passes() {  # <command>
@@ -530,7 +512,6 @@ test_fail_open_missing_node
 test_fail_open_missing_jq_on_stdin
 test_prefilter_skips_node_without_cd_substring
 test_raw_stdin_fast_path_skips_jq
-test_word_boundary_skips_node
 test_generated_commands_match_policy
 test_policy_cli_direct
 test_scripts_are_shellcheck_clean
