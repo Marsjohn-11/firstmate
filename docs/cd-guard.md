@@ -84,7 +84,9 @@ It does not permit `cd /home/project`, because an absolute-path `cd` remains a p
 - Cursor sends stdin JSON at `.tool_input.command` and adds `--cursor`, which renders the deny as Cursor's own returned decision object.
 
 Processing order is cheapest-first: a strict-superset prefilter, then the primary-checkout scope, then the Node policy owner.
-The prefilter removes ordinary single quotes, double quotes, backslashes, carriage returns, and newlines before fast-allowing any command that carries no `cd`, `pushd`, or `popd` substring and no quoting-decoder marker (`$'` ANSI-C or `$"` locale), so quoted or escaped command-word fragments delegate to the policy while most commands never pay for the git scoping calls or the Node process.
+The prefilter fast-allows any command that carries no `cd`, `pushd`, or `popd` letter run, where single quotes, double quotes, backslashes, carriage returns, and newlines may sit between the letters, and no quoting-decoder marker (`$'` ANSI-C or `$"` locale), so quoted or escaped command-word fragments delegate to the policy while most commands never pay for the git scoping calls or the Node process.
+On the stdin path the same search first runs over the raw JSON payload, so most tool calls are allowed before any `jq` process starts.
+A command with such a run also fast-allows when no run is a whole shell word, such as `abcd` or `cdk`, unless it carries a command or process substitution or a line continuation, which always delegate.
 The quoting-decoder marker set is coupled to the classifier's decoder set in `bin/fm-arm-command-policy.mjs`: adding any new quote or expansion form the classifier decodes requires extending the prefilter marker set in the same change, or it stops being a strict superset.
 
 Empty stdin, unparseable JSON, missing `jq` on the stdin path, missing Node, a missing policy owner, or an invalid policy response all fail open with exit 0 and no output.

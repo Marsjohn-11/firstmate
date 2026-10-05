@@ -95,9 +95,71 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
+# Strict-superset prefilter (transport only; owns zero classification
+# semantics). The classifier joins quoted, escaped, and line-continued fragments
+# within a shell word, so the cd/pushd/popd search lets backslashes, quotes,
+# newlines, and carriage returns sit between the letters, and ordinary quoted or
+# escaped fragments cannot hide a deniable cwd change from the policy owner. A
+# quoting-decoder marker - a $ immediately followed by a single quote (ANSI-C
+# $'...') or a double quote (bash locale $"...") - delegates too, because the
+# classifier decodes those and can reconstruct cd from bytes this search cannot
+# see. This marker set is COUPLED to the classifier's decoder set in
+# bin/fm-arm-command-policy.mjs: adding any new quote/expansion form the
+# classifier decodes REQUIRES extending it here in the same change, or the
+# prefilter stops being a strict superset. Deliberate deeper obfuscation is out
+# of scope by the same agent-mistake threat model the policy uses.
+# Every search is a byte-wise regex, so the common path forks nothing and stays
+# linear in the command length.
+
+# Return 0 when $1 holds cd, pushd, or popd with only bytes from gap class $2
+# between the letters.
+has_cd_letters() {  # <text> <gap-class>
+  local LC_ALL=C gap="$2*" re
+  re="c${gap}d|p${gap}u${gap}s${gap}h${gap}d|p${gap}o${gap}p${gap}d"
+  [[ $1 =~ $re ]]
+}
+
+# Return 0 when command $1 may hold a command word whose value is exactly cd,
+# pushd, or popd - the only words the policy denies. Without a command or
+# process substitution or a line continuation, every byte of a word other than a
+# quote or backslash is a byte of its value, so such a word appears with only
+# quotes or backslashes between its letters and is bounded on each side, past
+# any quotes or backslashes, by the command's edge or a byte that cannot extend
+# the word. A letter or underscore always extends it on the left, and a letter,
+# digit, or underscore on the right; a digit on the left may end an inline
+# redirection target such as >&1, so it never narrows. "abcd" and "cdk"
+# therefore never reach the policy. A substitution contributes no value bytes
+# and a continuation joins lines, so either one returns 0 without narrowing.
+may_hold_cd_word() {  # <command>
+  local LC_ALL=C q="[\\\"']*" re
+  case "$1" in
+    *"\$("*|*'`'*|*'<('*|*'>('*|*\\$'\n'*) return 0 ;;
+  esac
+  re="(^|[^A-Za-z_\\\"'])$q(c${q}d|p${q}u${q}s${q}h${q}d|p${q}o${q}p${q}d)$q([^A-Za-z0-9_\\\"']|\$)"
+  [[ $1 =~ $re ]]
+}
+
+# Return 0 unless raw JSON payload $1 provably extracts to a command the
+# prefilter below would fast-allow. A JSON string carries each command byte
+# literally or as an escape, and every escape this search does not model starts
+# with \u, which delegates, as do a quoting-decoder marker and any control byte
+# (raw text jq could re-render with inserted escapes). Otherwise each decoded
+# byte the prefilter strips is a quote, a backslash, or the letter n or r after
+# an escaping backslash in the raw text, so the same search with n and r added
+# to the gap is a strict superset of that prefilter over the whole payload.
+raw_may_hold_cd() {  # <payload>
+  local LC_ALL=C
+  case "$1" in
+    *'\u'*|*"\$'"*|*'$"'*|*'$\"'*|*[[:cntrl:]]*) return 0 ;;
+  esac
+  has_cd_letters "$1" "[\\\"'nr]"
+}
+
 if [ "$CMD_SET" -eq 0 ]; then
   PAYLOAD=$(cat 2>/dev/null || true)
   [ -n "$PAYLOAD" ] || exit 0
+  # Raw-payload fast path, decided before any jq fork.
+  raw_may_hold_cd "$PAYLOAD" || exit 0
   command -v jq >/dev/null 2>&1 || exit 0
   # shellcheck source=bin/fm-hook-host-lib.sh
   . "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/fm-hook-host-lib.sh"
@@ -112,31 +174,11 @@ fi
 
 [ -n "$CMD" ] || exit 0
 
-# Strict-superset prefilter (transport only; owns zero classification
-# semantics). Strip syntax bytes that the classifier joins within a shell word
-# before looking for cd/pushd/popd, so ordinary quoted or escaped fragments
-# cannot hide a deniable cwd change from the policy owner. A quoting-decoder
-# marker - a $ immediately followed by a
-# single quote (ANSI-C $'...') or a double quote (bash locale $"...") - delegates
-# too, because the classifier decodes those and can reconstruct cd from bytes
-# this substring test cannot see. This marker set is COUPLED to the classifier's
-# decoder set in bin/fm-arm-command-policy.mjs: adding any new quote/expansion
-# form the classifier decodes REQUIRES extending it here in the same change, or
-# the prefilter stops being a strict superset. Deliberate deeper obfuscation is
-# out of scope by the same agent-mistake threat model the policy uses.
-PREFILTER=$CMD
-PREFILTER=${PREFILTER//\\/}
-PREFILTER=${PREFILTER//\"/}
-PREFILTER=${PREFILTER//\'/}
-PREFILTER=${PREFILTER//$'\n'/}
-PREFILTER=${PREFILTER//$'\r'/}
 case "$CMD" in
   *"\$'"*|*'$"'*) ;;
   *)
-    case "$PREFILTER" in
-      *cd*|*pushd*|*popd*) ;;
-      *) exit 0 ;;
-    esac
+    has_cd_letters "$CMD" "[\\\"'"$'\n\r'"]" || exit 0
+    may_hold_cd_word "$CMD" || exit 0
     ;;
 esac
 
@@ -155,9 +197,11 @@ FM_ROOT=${FM_ROOT_OVERRIDE:-$(CDPATH='' cd -- "$SCRIPT_DIR/.." 2>/dev/null && pw
 [ -f "$FM_ROOT/AGENTS.md" ] || exit 0
 [ -d "$FM_ROOT/bin" ] || exit 0
 command -v git >/dev/null 2>&1 || exit 0
-GIT_DIR=$(git -C "$FM_ROOT" rev-parse --git-dir 2>/dev/null) || exit 0
-GIT_COMMON_DIR=$(git -C "$FM_ROOT" rev-parse --git-common-dir 2>/dev/null) || exit 0
-[ "$GIT_DIR" = "$GIT_COMMON_DIR" ] || exit 0
+# One rev-parse prints git-dir then git-common-dir, one per line, so the two
+# are equal exactly when the output is one value, a newline, and that value.
+GIT_DIRS=$(git -C "$FM_ROOT" rev-parse --git-dir --git-common-dir 2>/dev/null) || exit 0
+HALF=$(( (${#GIT_DIRS} - 1) / 2 ))
+[ "$GIT_DIRS" = "${GIT_DIRS:0:HALF}"$'\n'"${GIT_DIRS:0:HALF}" ] || exit 0
 
 POLICY="$FM_ROOT/bin/fm-cd-command-policy.mjs"
 command -v node >/dev/null 2>&1 || exit 0

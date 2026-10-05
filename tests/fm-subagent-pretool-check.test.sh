@@ -276,6 +276,102 @@ test_missing_jq_stdin_transport_fails_open() {
   pass "missing jq for stdin transport fails open rather than denying every tool call"
 }
 
+
+# A fake jq that records each call and then defers to the real one, so a test
+# can prove which payloads the raw fast path decides without starting jq.
+make_recording_jq() {  # <dir> <marker>
+  local dir=$1 marker=$2 real_jq
+  real_jq=$(command -v jq) || fail "test needs jq to wrap"
+  mkdir -p "$dir"
+  cat > "$dir/jq" <<EOF
+#!/usr/bin/env bash
+printf 'called\n' >> "$marker"
+exec "$real_jq" "\$@"
+EOF
+  chmod +x "$dir/jq"
+}
+
+stdin_rc() {  # <path-prefix> <payload>
+  local rc=0
+  printf '%s' "$2" \
+    | env PATH="${1:+$1:}$PATH" FM_ROOT_OVERRIDE="$PRIMARY" FM_HOME="$PRIMARY" FM_STATE_OVERRIDE="$STATE" \
+      "$CHECK" --claude > "$OUT" 2> "$ERR" || rc=$?
+  printf '%s' "$rc"
+}
+
+test_raw_fast_path_skips_jq_without_changing_decisions() {
+  local fakebin="$TMP_ROOT/recording-jq" marker="$TMP_ROOT/jq-calls" payload
+  make_recording_jq "$fakebin" "$marker"
+  for payload in \
+    '{"tool_name":"Bash","tool_input":{"command":"git status && ls -la"}}' \
+    '{"tool_name":"Read","tool_input":{"file_path":"/home/x/README.md"}}' \
+    '{"toolName":"run_terminal_command","toolInput":{"command":"ls"}}'; do
+    rm -f "$marker"
+    [ "$(stdin_rc "$fakebin" "$payload")" = 0 ] || fail "stem-free payload must allow: $payload"
+    [ ! -e "$marker" ] || fail "stem-free payload still started jq: $payload"
+  done
+  # Each of these spells a stem only through bytes normalization drops, a case
+  # change, or a \u escape, so the fast path must hand it to jq and still deny.
+  for payload in \
+    '{"tool_name":"AGENT"}' \
+    '{"tool_name":"Send_Message"}' \
+    '{"tool_name":"Ag\tent"}' \
+    '{"tool_name":"Ag\\ent"}' \
+    '{"tool_name":"Ag\"ent"}' \
+    '{"tool_name":"Agent"}' \
+    '{"toolName":"spawn.x"}'; do
+    rm -f "$marker"
+    [ "$(stdin_rc "$fakebin" "$payload")" = 2 ] || fail "delegation-shaped payload must still deny: $payload"
+    [ -e "$marker" ] || fail "delegation-shaped payload skipped jq: $payload"
+  done
+  # A stem elsewhere in the payload reaches jq but the tool name still decides.
+  payload='{"tool_name":"Bash","tool_input":{"command":"bin/fm-spawn.sh agent task"}}'
+  rm -f "$marker"
+  [ "$(stdin_rc "$fakebin" "$payload")" = 0 ] || fail "a stem outside the tool name must not deny"
+  [ -e "$marker" ] || fail "a stem anywhere in the payload must reach jq"
+  pass "the raw stdin fast path allows stem-free payloads without jq and leaves every decision unchanged"
+}
+
+# Reference model of the classification: ASCII lowercase, keep [a-z0-9], then
+# exact exclusions and stem substrings. The guard must agree with it for every
+# generated name on both transports.
+reference_decision() {  # <tool-name>
+  local tool=$1 normalized stem
+  case "$tool" in mcp__*) printf allow; return ;; esac
+  normalized=$(printf '%s' "$tool" | LC_ALL=C tr '[:upper:]' '[:lower:]' | LC_ALL=C tr -cd 'a-z0-9')
+  for stem in taskoutput taskstop taskget tasklist cronlist bashoutput killshell taskcreate taskupdate; do
+    [ "$normalized" != "$stem" ] || { printf allow; return; }
+  done
+  for stem in agent subagent task workflow cron schedul worktree delegate spawn dispatch handoff remote sendmessage monitor; do
+    case "$normalized" in *"$stem"*) printf deny; return ;; esac
+  done
+  printf allow
+}
+
+test_generated_names_match_reference_model() {
+  local frags i k name expected rc payload got count=0
+  frags=(Agent agent AGENT Task task Output Stop Create Update Get List _ - ' ' . Send Message Cron Schedul Work tree Flow Remote Monitor Spawn Dispatch Hand off Bash Read Edit x 1 'mcp__' $'\xc3\xa9' $'\xe2\x84\xaa' K Kill Shell Delegate Sub)
+  RANDOM=4242
+  for ((i = 0; i < 150; i++)); do
+    name=""
+    for ((k = RANDOM % 4 + 1; k > 0; k--)); do
+      name+=${frags[RANDOM % ${#frags[@]}]}
+    done
+    [ -n "$name" ] || continue
+    expected=$(reference_decision "$name")
+    rc=0
+    run_tool "$name" || rc=$?
+    got=allow; [ "$rc" -ne 2 ] || got=deny
+    [ "$got" = "$expected" ] || fail "--tool '$name' gave $got, reference model says $expected"
+    payload=$(jq -cn --arg name "$name" '{tool_name:$name,tool_input:{command:"ls"}}')
+    rc=$(stdin_rc "" "$payload")
+    got=allow; [ "$rc" -ne 2 ] || got=deny
+    [ "$got" = "$expected" ] || fail "stdin '$name' gave $got, reference model says $expected"
+    count=$((count + 1))
+  done
+  pass "$count generated tool names classify identically to the reference model on both transports"
+}
+
 test_guard_denies_every_currently_known_delegation_tool
 test_guard_denies_hypothetical_future_tools
 test_guard_allows_ordinary_and_observe_only_tools
@@ -289,3 +385,5 @@ test_secondmate_home_is_in_scope
 test_stdin_transports_and_output_shapes
 test_malformed_transport_fails_open
 test_missing_jq_stdin_transport_fails_open
+test_raw_fast_path_skips_jq_without_changing_decisions
+test_generated_names_match_reference_model
