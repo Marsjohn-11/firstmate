@@ -80,7 +80,7 @@ Seeding that setting into the per-task `KIRO_HOME` suppresses the modal, and a p
 ## Rendered surface (V2 TUI)
 
 - Composer glyph: `›` (U+203A), the same glyph codex draws.
-- Idle placeholder: `ask a question or describe a task` (followed by a `↵` hint), drawn in truecolor near-gray `38;2;158;158;158` at luminance 158. That clears the shared 128 ghost ceiling, so the near-achromatic ceiling in `fm_composer_strip_ghost` is what strips it back to the bare glyph on a styled capture; an unstyled one degrades to `unknown` through the bare-row rule.
+- Idle placeholder: `ask a question or describe a task` (followed by a `↵` hint), drawn in truecolor near-gray `38;2;158;158;158` at luminance 158. That clears the shared 128 ghost ceiling, so the near-achromatic ceiling in `fm_composer_strip_ghost` is what strips it back to the bare glyph on a styled capture. kiro-cli 2.28.0 draws the same row in the default foreground, which no stripper removes; the `↵` hint, which typed input never renders (verified live on 2.28.0), is what `FM_COMPOSER_HINTED_IDLE_RE_DEFAULT` matches, so that row and an unstyled capture read `empty` while the placeholder words typed as input read `pending`.
 - Busy footer: `› Kiro is working · Type to steer · Ctrl+S to queue`. The delivery guard matches the harness-named `Kiro is working` literal, not the bare `esc to cancel` token kiro also renders in its tool region and shares with agy. It is never a recorded worker state, and its one reachable consumer is the harness-less union in `FM_DELIVERY_BUSY_REGEX_DEFAULT` that the tmux submit core reads to acknowledge a submit.
 `FM_DELIVERY_KIRO_BUSY_REGEX_DEFAULT` is registered per the fleet convention that every verified harness declares its own signature, and has no caller today: away-mode injection reads the primary harness and the pending-reply observation reads a secondmate's harness, neither of which kiro can ever be.
 
@@ -139,7 +139,7 @@ Classifying a capture of a live kiro idle pane with tmux's actual descriptor (`s
 Two earlier claims in this record were wrong and are corrected here.
 The verdict is portably reproducible from a real capture, so it never needed the live tool.
 The descriptor tmux passes is `styled=1 cursor=1 identity=1 rows=0`, not `rows=6`; the earlier `empty` measurement used a descriptor tmux does not send and was therefore not evidence about the real pane.
-Restoring the absent kiro entry to the fleet-wide idle-placeholder set still changes no verdict, which remains measured, so that omission stays correct.
+Restoring the absent kiro entry to the fleet-wide idle-placeholder set still changes no verdict, which remains measured, so that omission stays correct; the hinted idle set above is what reads the 2.28.0 default-foreground row `empty`.
 
 Three of the guard's other assertions are weaker than the vendor surface its header names, and strengthening them is not attempted here.
 Its resume-line check passes whether or not `--resume-id` appears, so a release that drops that line leaves the guard green.

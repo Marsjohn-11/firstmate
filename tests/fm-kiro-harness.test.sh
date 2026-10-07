@@ -252,12 +252,24 @@ test_kiro_composer_glyph_and_placeholder() {
   [ "$state" = empty ] \
     || fail "kiro's 256-colour idle row must read empty, never pending, got '$state'"
 
-  # An UNSTYLED capture cannot ghost-strip, so the bare-row path degrades any
-  # trailing text to `unknown` rather than a false `pending`.
+  # kiro-cli 2.28.0 draws the same placeholder in the DEFAULT foreground, so
+  # nothing strips it; the `↵` submit hint, which typed input never renders,
+  # is what proves the composer idle (verified live, kiro-cli 2.28.0). This
+  # row read `pending` and deferred every steer to an idle 2.28.0 worker.
+  screen=$'firstmate · claude-sonnet-5 · ◔ 2%\n'"${esc}[39m›  ask a question or describe a task ↵"$'\n /copy to clipboard'
+  state=$(fm_composer_classify_screen "$caps" "$screen" 1)
+  [ "$state" = empty ] \
+    || fail "kiro 2.28.0's default-foreground idle row must read empty, got '$state'"
+  # An UNSTYLED capture of the idle row carries the same hint proof.
   state=$(fm_composer_classify_screen "$caps_plain" "$plain")
-  [ "$state" = unknown ] \
-    || fail "kiro's unstyled idle row must read unknown, never pending, got '$state'"
-  pass "fm-composer-lib: kiro's › composer is empty and its real idle row is empty styled, unknown plain"
+  [ "$state" = empty ] \
+    || fail "kiro's unstyled idle row must read empty, got '$state'"
+  # The placeholder words TYPED into kiro render with no hint and stay pending.
+  screen=$'firstmate · claude-sonnet-5 · ◔ 2%\n'"${esc}[39m› ask a question or describe a task"
+  state=$(fm_composer_classify_screen "$caps" "$screen" 1)
+  [ "$state" = pending ] \
+    || fail "the kiro placeholder words typed as input must read pending, got '$state'"
+  pass "fm-composer-lib: kiro's › composer and its real idle row read empty in every colour, typed text pending"
 }
 
 test_kiro_delivery_footer_matches_and_is_scoped() {

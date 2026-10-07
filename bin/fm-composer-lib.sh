@@ -551,12 +551,19 @@ FM_COMPOSER_SHELL_PROMPT_GLYPHS=$(printf '%s\n' '>' '$' '%' '#')
 # `Add a follow-up` once a turn has completed (verified live on cursor-agent
 # 2026.08.11-e8db854). Devin renders the anchored `Ask Devin to build features,
 # fix bugs, or work on your code` as dim text after its `❭` glyph (verified
-# live, devin 3000.11.1). kiro's bare `›` composer needs no entry: the ghost
-# strip removes its near-gray `ask a question or describe a task` placeholder,
-# so the bare-row path already reads the lone glyph as `empty`, and an entry
-# would change no verdict. FM_COMPOSER_IDLE_RE overrides for an unverified harness;
-# matching is case-insensitive.
+# live, devin 3000.11.1). kiro's bare `›` composer needs no entry here: see
+# FM_COMPOSER_HINTED_IDLE_RE_DEFAULT below. FM_COMPOSER_IDLE_RE overrides for an
+# unverified harness; matching is case-insensitive.
 FM_COMPOSER_IDLE_RE_DEFAULT='^Type a message\.\.\.$|^Ask anything(\.\.\.|…)|^Plan, search, build anything$|^Add a follow-up$|^Ask Devin to build features, fix bugs, or work on your code$'
+
+# Idle placeholders that carry a submit hint typed input never renders, so the
+# whole anchored row proves an empty composer whatever its colour. kiro-cli
+# 2.21.x draws `ask a question or describe a task ↵` in near-gray, which the
+# ghost strip removes; 2.28.0 draws the same row in the default foreground,
+# which no stripper can remove. Typed text, even the placeholder words, renders
+# with no `↵` (verified live, kiro-cli 2.28.0), so this match reads `empty` even
+# on a styled capture where an FM_COMPOSER_IDLE_RE collision reads `pending`.
+FM_COMPOSER_HINTED_IDLE_RE_DEFAULT='^ask a question or describe a task ↵$'
 
 # Opencode draws a mode/model footer line INSIDE its left-bar composer
 # ("Build · GPT-5.5 Fast OpenAI · high"). It is composer furniture, not typed
@@ -773,6 +780,10 @@ fm_composer_classify_content() {  # <bordered> <content> [idle_re] [idle_case] [
   fi
   fm_composer_normalize_trim_var content
   [ -n "$content" ] || { printf 'empty'; return 0; }
+  if [ -n "$idle_re" ] \
+     && fm_composer_idle_matches "$content" "$FM_COMPOSER_HINTED_IDLE_RE_DEFAULT" sensitive; then
+    printf 'empty'; return 0
+  fi
   fm_composer_idle_matches "$content" "$idle_re" "$idle_case" && idle_collision=1
   # Ghost stripping can leave a REMNANT of an idle placeholder rather than
   # emptying it, because a terminal draws the cell under its cursor in reverse
