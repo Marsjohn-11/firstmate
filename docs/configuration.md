@@ -587,6 +587,7 @@ The duty lives in the mate's charter (`bin/fm-brief.sh --secondmate ... --lookou
 Each pass reads the flagship's watcher beacon and away posture over SSH.
 A stale beacon during away mode is recorded on both vessels and then repaired with the same watcher arm the Claude Stop hook starts for its handling successor, retried with backoff.
 On a home where `state/.afk` gives supervision to the away daemon, the lookout never arms a watcher: it leaves a live daemon alone, even a slow one, and treats a dead daemon as a failed recovery, since it cannot revive the daemon from outside.
+A live daemon whose beacon stays stale for `daemon_stall_secs` is still left alone, but the mate takes the con.
 A flagship that does not answer is recorded on the mate and delivered to the flagship once it answers again.
 It never kills a process on the flagship, deletes nothing, and posts to no external channel.
 
@@ -611,6 +612,7 @@ Set it up in the mate home:
 | `name` | `flagship` | Label for this lookout's records |
 | `stale_secs` | `900` | Beacon age, and silent time, that counts as down |
 | `idle_secs` | `1800` | Age of the oldest unacknowledged queued wake that counts as an idle primary |
+| `daemon_stall_secs` | 2 x `stale_secs` | How long a live away daemon's beacon may stay stale, from when the lookout first saw it, before the mate takes the con |
 | `backoff_base_secs` / `backoff_max_secs` | `300` / `3600` | Restart retry backoff, doubling from base to max |
 | `connect_timeout_secs` / `ssh_timeout_secs` | `5` / `8` | SSH connect bound and per-call bound |
 | `pass_budget_secs` | `25` | Whole-pass bound, under the watcher's 30-second check bound; a restart without time left waits for the next pass |

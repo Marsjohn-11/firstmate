@@ -12,7 +12,9 @@
 #   beacon fresh        nothing, beyond ending an earlier episode
 #   beacon stale        record it on both vessels, then restart the flagship's
 #                       watcher with `recover`, retrying with backoff; on a
-#                       daemon home it checks the away daemon instead
+#                       daemon home it checks the away daemon instead, and
+#                       takes the con when a live daemon's beacon stays stale
+#                       for daemon_stall_secs
 #   flagship idle       its beacon is fresh but its oldest queued wake has gone
 #                       unacknowledged for idle_secs: the primary session is
 #                       making no progress, which a restart cannot fix
@@ -24,7 +26,9 @@
 # cannot rewake an idle primary session. While state/.afk exists the away
 # daemon owns supervision, so `recover` never arms a watcher there: a live
 # daemon is left alone, even when slow, and a dead one counts as a failed
-# recovery, because a lookout cannot revive it from outside.
+# recovery, because a lookout cannot revive it from outside. A live daemon
+# whose beacon stays stale for daemon_stall_secs from the episode's start is
+# still left alone, but the mate takes the con.
 #
 # TAKING THE CON. When the flagship cannot be recovered - recovery failed, it
 # stayed silent for stale_secs after last reading away, or it is idle - the
@@ -71,7 +75,8 @@
 #                                        route defaults to its parent home
 #   flagship_root=<flagship code root>   default flagship_home
 #   name=flagship                        label for this lookout's records
-#   stale_secs=900  idle_secs=1800  backoff_base_secs=300  backoff_max_secs=3600
+#   stale_secs=900  idle_secs=1800  daemon_stall_secs=<2 x stale_secs>
+#   backoff_base_secs=300  backoff_max_secs=3600
 #   connect_timeout_secs=5  ssh_timeout_secs=8  pass_budget_secs=25
 #   login_shell=yes|no  take_the_con=on|off  self_name=<this mate's id>
 #   The review queue, all unset by default:
@@ -607,7 +612,7 @@ save() {
 }
 
 cmd_watch() {
-  local out rc beat away queue idle stale idle_secs base max t line left kind
+  local out rc beat away queue idle stale idle_secs stall base max t line left kind
   load_flagship
   mkdir -p "$OBS" || die "cannot create $OBS"
   lock_take || return 0
@@ -615,6 +620,7 @@ cmd_watch() {
   PASS_BUDGET=$(num_or "$(cfg pass_budget_secs 25)" 25)
   stale=$(num_or "$(cfg stale_secs 900)" 900)
   idle_secs=$(num_or "$(cfg idle_secs 1800)" 1800)
+  stall=$(num_or "$(cfg daemon_stall_secs $((stale * 2)))" $((stale * 2)))
   base=$(num_or "$(cfg backoff_base_secs 300)" 300)
   max=$(num_or "$(cfg backoff_max_secs 3600)" 3600)
   episode=$(st_get episode ok)
@@ -711,6 +717,11 @@ cmd_watch() {
       : > "$OBS/sending"
       event daemon-alive "left the flagship's supervision to its live away daemon: $(clean "$(printf '%s\n' "$line" | tail -n 1)")"
       next_attempt=$((t + base))
+      if [ "$CON" = no ] && [ $((t - since)) -ge "$stall" ]; then
+        event daemon-stalled "daemon alive but supervision stalled: the beacon has been stale for $((t - since))s (threshold ${stall}s)"
+        save
+        take_the_con "the flagship's away daemon is alive but supervision has stalled for $((t - since))s"
+      fi
     else
       case "$line" in *'watcher: '*) : > "$OBS/sending" ;; esac
       failures=$((failures + 1))

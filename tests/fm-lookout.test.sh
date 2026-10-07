@@ -323,7 +323,31 @@ case_daemon_home_alive_is_left_alone() {
   watch
   assert_equals "$before" "$(grep -c 'daemon-alive' "$MATE/state/lookout/flagship/events.log")" "the daemon was rechecked before the backoff elapsed"
   kill "$DAEMON_PID" 2>/dev/null || true
-  pass "on a daemon home with a live away daemon the lookout arms no watcher, takes no con, and leaves the daemon alone"
+  pass "on a daemon home with a live away daemon below the stall threshold the lookout arms no watcher, takes no con, and leaves the daemon alone"
+}
+
+case_daemon_home_stalled_takes_the_con() {
+  make_pair daemon-stalled
+  printf 'backoff_base_secs=1\ndaemon_stall_secs=2\n' >> "$MATE/config/lookout"
+  make_daemon_home alive
+  age_beacon 4000
+  watch
+  assert_equals '' "$OUT" "a live daemon below the stall threshold woke the mate"
+  on_mate claimed CR-100 >/dev/null && fail "the mate claimed a review before the stall threshold"
+  sleep 3
+  age_beacon 4000
+  watch
+  expect_code 0 "$RC" "stalled daemon watch"
+  assert_equals 0 "$(arm_runs)" "a watcher was armed beside a live away daemon"
+  kill -0 "$DAEMON_PID" 2>/dev/null || fail "the live away daemon was touched"
+  assert_contains "$(MATE_LOG)" 'daemon alive but supervision stalled' "the stall was not recorded"
+  assert_contains "$OUT" 'lookout: took the con from flagship (the flagship'"'"'s away daemon is alive but supervision has stalled' "a stalled daemon home did not hand the mate the con"
+  on_mate claimed CR-100 >/dev/null || fail "the mate did not claim CR-100 from a stalled daemon home"
+  : > "$FLAG/state/.last-watcher-beat"
+  watch
+  assert_contains "$OUT" 'lookout: handed the con back to flagship' "the con was not handed back once the beacon was fresh"
+  kill "$DAEMON_PID" 2>/dev/null || true
+  pass "a live away daemon whose beacon stays stale past daemon_stall_secs is left alone while the mate takes the con, and a fresh beacon hands it back"
 }
 
 case_daemon_home_dead_takes_the_con() {
@@ -365,5 +389,6 @@ case_slow_flagship_and_reused_lock
 case_claim_rules
 case_stand_registers_a_watcher_check
 case_daemon_home_alive_is_left_alone
+case_daemon_home_stalled_takes_the_con
 case_daemon_home_dead_takes_the_con
 case_con_keys_match_on_an_idle_flagship
