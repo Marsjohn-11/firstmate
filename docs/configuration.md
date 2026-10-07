@@ -556,11 +556,12 @@ See [`wedge-alarm.md`](wedge-alarm.md) for the current channel reference, [`veri
 ## Batten down before away mode (config/batten-down)
 
 Before `/afk` writes an away record, `bin/fm-afk-launch.sh enter` battens down: `bin/fm-batten-down.sh` checks that the machine can survive an unattended night.
-A failed check refuses entry with exit 4, names the fix on its own line, and writes no away record, so the captain is not away yet.
+A failed check on the first away entry refuses it with exit 4, names the fix on its own line, and writes no away record, so the captain is not away yet.
 When the captain asks to enter anyway, `enter --skip-batten-down` does, and quiet mode is never gated.
+While already away, a refresh or new words skip the gate, and any failed check prints as a warning.
 
-The check reads free disk on the volume holding `FM_HOME`, the 1-minute load average, swap in use, the Midway session cookie's expiry, and the watcher beacon while work is under way.
-The Midway check never runs `mwinit`, and it applies only where `mwinit` is installed or the cookie file exists.
+The check reads free disk on the volume holding `FM_HOME`, the 1-minute load average, swap in use, and the watcher beacon while work is under way.
+Opting in adds the Midway session cookie's expiry, which never runs `mwinit`.
 It also lists the largest reclaimable build caches it finds, with how to reclaim each, and deletes nothing.
 
 The optional local, gitignored `config/batten-down` holds one `key=value` per line, and `#` starts a comment.
@@ -570,9 +571,11 @@ The optional local, gitignored `config/batten-down` holds one `key=value` per li
 | `min_free_gb` | `100` | Minimum free disk, in GB |
 | `max_load` | 8 x logical CPUs | Maximum 1-minute load average |
 | `max_swap_gb` | `40` | Maximum swap in use, in GB |
+| `midway` | `off` | `on` checks the Midway session |
 | `min_midway_hours` | `10` | Minimum Midway session time left, in hours |
-| `midway` | `on` | `off` skips the Midway check |
 | `midway_cookie` | `~/.midway/cookie` | The Midway cookie file |
+| `polygate` | `off` | `on` lists PolyGate caches whose daemon is not running |
+| `brazil` | `off` | `on` lists `~/brazil-pkg-cache` |
 
 Each key has an `FM_BATTEN_DOWN_<KEY>` environment override, such as `FM_BATTEN_DOWN_MIN_FREE_GB`.
 `FM_BATTEN_DOWN=off` skips the whole check for one run.
@@ -588,8 +591,10 @@ A stale beacon during away mode is recorded on both vessels and then repaired wi
 A flagship that does not answer is recorded on the mate and delivered to the flagship once it answers again.
 It never kills a process on the flagship, deletes nothing, and posts to no external channel.
 
-When the flagship cannot be recovered, the mate takes the con of the overnight reviews it can build itself: it claims them and its watcher wakes it to drive them, while every ROUTE line to another desk is recorded as not delivered.
-When the flagship's heartbeat returns or the captain is back, the mate hands the con back and keeps each claim until it releases it.
+A beating watcher over a primary session that leaves queued wakes unacknowledged for `idle_secs` is idle, which a restart cannot fix.
+When the flagship cannot be recovered or is idle, the mate takes the con of the overnight reviews it can build itself: it claims them and its watcher wakes it to drive them, while every ROUTE line to another desk is recorded as not delivered.
+The review queue is opt-in configuration; with none set, taking the con is recorded and claims nothing.
+When the flagship's watcher beats and its queue moves again, or the captain is back, the mate hands the con back and keeps each claim until it releases it.
 A driver on the flagship honours those claims by running `bin/fm-lookout.sh claimed <review>` before driving a review.
 Every event reaches the main firstmate on the mate's [parent channel](secondmate-parent-channel.md), and the flagship's return brief lists what the lookout saw, did, and still claims.
 
@@ -606,14 +611,19 @@ Set it up in the mate home:
 | `flagship_root` | `flagship_home` | The flagship's Firstmate code root |
 | `name` | `flagship` | Label for this lookout's records |
 | `stale_secs` | `900` | Beacon age, and silent time, that counts as down |
+| `idle_secs` | `1800` | Age of the oldest unacknowledged queued wake that counts as an idle primary |
 | `backoff_base_secs` / `backoff_max_secs` | `300` / `3600` | Restart retry backoff, doubling from base to max |
-| `connect_timeout_secs` / `ssh_timeout_secs` | `5` / `10` | SSH connect bound and per-call bound, sized so a pass fits the watcher's 30-second check bound |
+| `connect_timeout_secs` / `ssh_timeout_secs` | `5` / `8` | SSH connect bound and per-call bound |
+| `pass_budget_secs` | `25` | Whole-pass bound, under the watcher's 30-second check bound; a restart without time left waits for the next pass |
 | `login_shell` | `yes` | Run the remote command in the flagship user's login shell, for its PATH |
 | `take_the_con` | `on` | `off` records the failure but takes the con of no reviews |
 | `self_name` | the mate's id | This mate's name in ROUTE lines and claims |
-| `self_hint` | `mini` | Ledger host-hint word for reviews this mate builds |
-| `ledger` / `routes` | `data/cr-dm-watch/overnight-ledger.md` / `state/cr-driver.status` | The flagship's review ledger and ROUTE lines, relative to `flagship_home` |
+| `routes` | unset | Status file holding `ROUTE <review-url> to <desk>: <reason>` lines, relative to `flagship_home` |
 | `route_window_secs` | `86400` | How old a ROUTE line may be and still count |
+| `ledger` | unset | Markdown review table, relative to `flagship_home` |
+| `ledger_columns` | unset | `<url>,<needs>,<hint>`: the 1-based table cells holding the review URL, what it needs, and its host hint |
+| `ledger_skip` | unset | Regex; rows whose needs cell matches are done |
+| `self_hint` | unset | Host-hint word naming this mate; the ledger is read only when `ledger`, `ledger_columns`, and `self_hint` are all set |
 
 `FM_LOOKOUT_SSH` replaces the `ssh` command.
 The script header owns the record files, claim format, and every subcommand.

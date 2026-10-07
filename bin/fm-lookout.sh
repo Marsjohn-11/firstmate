@@ -12,6 +12,9 @@
 #   beacon fresh        nothing, beyond ending an earlier episode
 #   beacon stale        record it on both vessels, then restart the flagship's
 #                       watcher with `recover`, retrying with backoff
+#   flagship idle       its beacon is fresh but its oldest queued wake has gone
+#                       unacknowledged for idle_secs: the primary session is
+#                       making no progress, which a restart cannot fix
 #   flagship silent     record it here, queued for the flagship's return brief
 #
 # `recover` reuses the arm the Claude Stop hook starts for its handling
@@ -19,15 +22,17 @@
 # one status line. It restores the watcher and its durable wake queue; it
 # cannot rewake an idle primary session.
 #
-# TAKING THE CON. When the flagship cannot be recovered - recovery failed, or
-# it stayed silent for stale_secs after last reading away - the mate takes the
-# con of the overnight review queue. From its copy of the flagship's review
-# ledger and ROUTE lines, synced while the flagship answered, it claims every
-# unclaimed review it can build itself (ROUTE lines naming self_name, ledger
-# rows whose host hint names self_hint) and records every ROUTE line to another
-# desk as not delivered. It HANDS THE CON BACK when the flagship's beacon is
-# fresh again or the captain is back; claims stay with the mate until it
-# releases each one.
+# TAKING THE CON. When the flagship cannot be recovered - recovery failed, it
+# stayed silent for stale_secs after last reading away, or it is idle - the
+# mate takes the con of the overnight review queue. From its copy of the
+# flagship's ROUTE lines and review ledger, synced while the flagship answered,
+# it claims every unclaimed review it can build itself (ROUTE lines naming
+# self_name, ledger rows whose host-hint cell names self_hint) and records every
+# ROUTE line to another desk as not delivered. The queue is opt-in: with no
+# routes and no complete ledger configuration the con is recorded as taken
+# with nothing to claim. It HANDS THE CON BACK when the flagship's beacon is
+# fresh and its queue moving again, or the captain is back; claims stay with
+# the mate until it releases each one.
 #
 # CLAIMS. A claim is a line in a home's state/.review-claims.log
 # (<epoch> TAB <review> TAB claim|release TAB <holder> TAB <detail>); the last
@@ -50,10 +55,11 @@
 #   flagship  state/.lookout.log                     every lookout's events
 #   both      state/.review-claims.log               claims
 #
-# It never kills a process on the flagship (its own ssh client is bounded by
-# fm_run_timed so a pass stays inside the watcher's 30 s check bound), deletes
-# nothing (its lock is a pid file it overwrites), and posts to no external
-# channel.
+# It never kills a process on the flagship, deletes nothing (its lock is a pid
+# file it empties on exit), and posts to no external channel. Every ssh call is
+# bounded by fm_run_timed inside a pass budget (pass_budget_secs) that stays
+# under the watcher's 30 s check bound, and state is saved before a restart is
+# tried, so a pass cut short never loses an episode.
 #
 # Config (mate): config/lookout, one key=value per line.
 #   flagship_host=<ssh destination>      required
@@ -61,11 +67,16 @@
 #                                        route defaults to its parent home
 #   flagship_root=<flagship code root>   default flagship_home
 #   name=flagship                        label for this lookout's records
-#   stale_secs=900  backoff_base_secs=300  backoff_max_secs=3600
-#   connect_timeout_secs=5  ssh_timeout_secs=10  login_shell=yes|no
-#   take_the_con=on|off  self_name=<this mate's id>  self_hint=mini
-#   ledger=data/cr-dm-watch/overnight-ledger.md  routes=state/cr-driver.status
+#   stale_secs=900  idle_secs=1800  backoff_base_secs=300  backoff_max_secs=3600
+#   connect_timeout_secs=5  ssh_timeout_secs=8  pass_budget_secs=25
+#   login_shell=yes|no  take_the_con=on|off  self_name=<this mate's id>
+#   The review queue, all unset by default:
+#   routes=<status file with ROUTE lines, relative to flagship_home>
 #   route_window_secs=86400
+#   ledger=<markdown review table, relative to flagship_home>
+#   ledger_columns=<url>,<needs>,<hint>  1-based table cells
+#   ledger_skip=<regex>                  rows whose needs cell matches are done
+#   self_hint=<word>                     host-hint word naming this mate
 #
 # Usage:
 #   fm-lookout.sh stand                      mate: register the lookout check
@@ -97,7 +108,7 @@ CFG_FILE="$CONFIG/lookout"
 CLAIMS="$STATE/.review-claims.log"
 FLAGSHIP_LOG="$STATE/.lookout.log"
 CHECK_ID=lookout
-ARM_CONFIRM=8
+ARM_CONFIRM=6
 TAB=$(printf '\t')
 
 # shellcheck source=bin/fm-timeout-lib.sh
@@ -245,7 +256,7 @@ cmd_claimed() {  # <review>
 # --- flagship side ------------------------------------------------------------
 
 cmd_probe() {
-  local ledger='' routes='' m age away
+  local ledger='' routes='' m age away queue
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --ledger) [ "$#" -ge 2 ] || die "--ledger needs a path"; ledger=$2; shift 2 ;;
@@ -264,7 +275,11 @@ cmd_probe() {
   if [ -e "$STATE/.afk" ] || [ "$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-afk-contract.sh" mode 2>/dev/null)" = away ]; then
     away=yes
   fi
-  printf 'beat_age=%s\naway=%s\n' "$age" "$away"
+  # Age of the oldest wake still waiting in the durable queue (rows start with
+  # their epoch; bin/fm-wake-lib.sh owns the format): how long the primary
+  # session has left queued work unacknowledged.
+  queue=$(awk -F '\t' -v now="$(now)" '$1 ~ /^[0-9]+$/ && (min == "" || $1 < min) { min = $1 } END { if (min == "") print "none"; else print now - min }' "$STATE/.wake-queue" 2>/dev/null)
+  printf 'beat_age=%s\naway=%s\nqueue_age=%s\n' "$age" "$away" "${queue:-none}"
   printf -- '--- ledger\n'
   [ -z "$ledger" ] || [ ! -f "$FM_HOME/$ledger" ] || cat "$FM_HOME/$ledger"
   printf -- '--- routes\n'
@@ -455,23 +470,32 @@ sync_probe() {  # <probe-output>
 
 # ROUTE lines inside the window: "<url>\t<dest>\t<reason>".
 route_lines() {  # <cutoff-epoch>
-  sed -n "s/^[a-z-]* \\[at=\\([0-9]*\\)\\][^:]*: ROUTE \\([^ ]*\\) to \\([^:]*\\): \\(.*\\)\$/\\1$TAB\\2$TAB\\3$TAB\\4/p" "$OBS/routes.txt" \
+  sed -n "s/^[a-z-]*[^:]*\\[at=\\([0-9]*\\)\\][^:]*: ROUTE \\([^ ]*\\) to \\([^:]*\\): \\(.*\\)\$/\\1$TAB\\2$TAB\\3$TAB\\4/p" "$OBS/routes.txt" \
     | awk -F '\t' -v cut="$1" '$1 >= cut { printf "%s\t%s\t%s\n", $2, $3, $4 }'
 }
 
+# The ledger is usable only when its columns and this mate's host hint are set.
+ledger_ready() {
+  [ -s "$OBS/ledger.md" ] && [ -n "$(cfg self_hint '')" ] \
+    && printf '%s' "$(cfg ledger_columns '')" | grep -Eq '^[1-9][0-9]*,[1-9][0-9]*,[1-9][0-9]*$'
+}
+
 # Reviews this mate builds: "<review>\t<url>\t<why>" from ROUTE lines naming
-# self_name and from ledger rows whose host hint names self_hint.
+# self_name and from ledger rows whose host-hint cell names self_hint.
 self_reviews() {  # <route-cutoff-epoch>
-  local self hint
+  local self hint cols
   self=$(self_name)
-  hint=$(cfg self_hint mini | tr '[:upper:]' '[:lower:]')
+  hint=$(cfg self_hint '' | tr '[:upper:]' '[:lower:]')
+  cols=$(cfg ledger_columns '')
   {
-    [ ! -f "$OBS/routes.txt" ] || route_lines "$1" | awk -F '\t' -v me="$self" '$2 == me { printf "%s\troute: %s\n", $1, $3 }'
-    [ ! -f "$OBS/ledger.md" ] || awk -F '|' -v hint="$hint" '
-      $2 ~ /CR-[0-9]/ {
-        url = $2; gsub(/^ +| +$/, "", url); needs = $6; gsub(/^ +| +$/, "", needs)
-        h = " " tolower($8) " "; gsub(/[^a-z0-9-]/, " ", h)
-        if (needs ~ /^(green|unreadable)/) next
+    [ ! -s "$OBS/routes.txt" ] || route_lines "$1" | awk -F '\t' -v me="$self" '$2 == me { printf "%s\troute: %s\n", $1, $3 }'
+    ! ledger_ready || awk -F '|' -v hint="$hint" -v cols="$cols" -v skip="$(cfg ledger_skip '')" '
+      BEGIN { split(cols, c, ","); u = c[1] + 1; n = c[2] + 1; k = c[3] + 1 }
+      NF > k && $u !~ /^ *(:?-+:? *)?$/ {
+        url = $u; gsub(/^ +| +$/, "", url); needs = $n; gsub(/^ +| +$/, "", needs)
+        if (url !~ /^https?:/) next
+        h = " " tolower($k) " "; gsub(/[^a-z0-9-]/, " ", h)
+        if (skip != "" && needs ~ skip) next
         if (index(h, " " hint " ") == 0) next
         printf "%s\tledger: %s\n", url, needs
       }' "$OBS/ledger.md"
@@ -480,14 +504,20 @@ self_reviews() {  # <route-cutoff-epoch>
   done | awk -F '\t' '!seen[$1]++'
 }
 
+# Sets CON to what this pass leaves standing: yes when the con was taken with
+# a queue to drive, empty when there was none to take.
+CON=no
 take_the_con() {  # <reason>
   local cutoff list review url why held dest claimed=0 skipped=0 undelivered=0 names='' routes='' line
   if [ "$(cfg take_the_con on)" = off ]; then
     event con-off "take_the_con is off in config/lookout; did not take the con ($1)"
+    CON=empty
     return 0
   fi
-  if [ ! -s "$OBS/ledger.md" ] && [ ! -s "$OBS/routes.txt" ]; then
-    event con-skipped "no synced review ledger or ROUTE lines to take the con of ($1)"
+  if ! ledger_ready && [ ! -s "$OBS/routes.txt" ]; then
+    event con-skipped "no review queue is configured or synced, so there is nothing to take the con of ($1)"
+    report "note [key=lookout-con-$NAME-$(st_get since 0)]: lookout: the flagship needs the con ($1), but no review queue is configured for this mate"
+    CON=empty
     return 0
   fi
   cutoff=$(( $(now) - $(num_or "$(cfg route_window_secs 86400)" 86400) ))
@@ -518,35 +548,52 @@ EOF
   line="took the con of $claimed review(s) this mate builds:${names:- none}; $skipped already held elsewhere; $undelivered ROUTE line(s) to other desks not delivered${routes} ($1)"
   event took-the-con "$line"
   report "working [key=lookout-con-$NAME-$(st_get since 0)]: lookout: $line"
+  CON=yes
   printf 'lookout: took the con from %s (%s). Drive these reviews to green under your lookout duty:%s. Release each with bin/fm-lookout.sh release <review> when it is done or handed back.\n' \
     "$NAME" "$1" "${names:- none}"
 }
 
-hand_back_the_con() {  # <reason>
+hand_back_the_con() {  # <standing-con> <reason>
   local held='' review state holder line
   while IFS="$TAB" read -r review state holder; do
     [ "$state" = claim ] && [ "$holder" = "$(self_name)" ] && held="$held $review"
   done <<EOF
 $( [ ! -f "$CLAIMS" ] || sort -t "$TAB" -k1,1n -s "$CLAIMS" | awk -F '\t' '{ s[$2] = $3; h[$2] = $4 } END { for (r in s) printf "%s\t%s\t%s\n", r, s[r], h[r] }')
 EOF
-  line="handed the con back ($1); still claimed by $(self_name) until released:${held:- none}"
+  line="handed the con back ($2); still claimed by $(self_name) until released:${held:- none}"
   event handed-back-the-con "$line"
   report "resolved [key=lookout-con-$NAME-$(st_get since 0)]: lookout: $line"
+  [ "$1" = yes ] || return 0
   printf 'lookout: handed the con back to %s (%s). Take no new reviews from the con; finish or hand back each one you still hold (%s) and release it with bin/fm-lookout.sh release <review>.\n' \
-    "$NAME" "$1" "${held# }"
+    "$NAME" "$2" "${held# }"
+}
+
+# The pass lock is a pid file, emptied on exit; a stored pid counts only while
+# it is still a lookout pass, so a reused pid never wedges the lookout.
+lock_take() {
+  local pid
+  pid=$(cat "$OBS/lock" 2>/dev/null)
+  if [ -n "$pid" ] && [ "$pid" != "$$" ] && kill -0 "$pid" 2>/dev/null \
+    && ps -p "$pid" -o command= 2>/dev/null | grep -q 'fm-lookout'; then
+    return 1
+  fi
+  printf '%s\n' "$$" > "$OBS/lock"
+  trap ': > "$OBS/lock"' EXIT
+}
+
+save() {
+  st_save episode="$episode" since="$since" failures="$failures" next_attempt="$next_attempt" last_away="$last_away" con="$CON"
 }
 
 cmd_watch() {
-  local out rc beat away episode since failures next_attempt last_away con stale base max t lockpid line
+  local out rc beat away queue idle stale idle_secs base max t line left kind
   load_flagship
   mkdir -p "$OBS" || die "cannot create $OBS"
-  lockpid=$(cat "$OBS/lock" 2>/dev/null)
-  if [ -n "$lockpid" ] && [ "$lockpid" != "$$" ] && kill -0 "$lockpid" 2>/dev/null; then
-    return 0
-  fi
-  printf '%s\n' "$$" > "$OBS/lock"
-  SSH_BOUND=$(num_or "$(cfg ssh_timeout_secs 10)" 10)
+  lock_take || return 0
+  SSH_BOUND=$(num_or "$(cfg ssh_timeout_secs 8)" 8)
+  PASS_BUDGET=$(num_or "$(cfg pass_budget_secs 25)" 25)
   stale=$(num_or "$(cfg stale_secs 900)" 900)
+  idle_secs=$(num_or "$(cfg idle_secs 1800)" 1800)
   base=$(num_or "$(cfg backoff_base_secs 300)" 300)
   max=$(num_or "$(cfg backoff_max_secs 3600)" 3600)
   episode=$(st_get episode ok)
@@ -554,10 +601,11 @@ cmd_watch() {
   failures=$(st_get failures 0)
   next_attempt=$(st_get next_attempt 0)
   last_away=$(st_get last_away no)
-  con=$(st_get con no)
+  CON=$(st_get con no)
   t=$(now)
+  SECONDS=0
 
-  out=$(remote "$SSH_BOUND" probe --ledger "$(cfg ledger data/cr-dm-watch/overnight-ledger.md)" --routes "$(cfg routes state/cr-driver.status)" 2>&1)
+  out=$(remote "$SSH_BOUND" probe --ledger "$(cfg ledger '')" --routes "$(cfg routes '')" 2>&1)
   rc=$?
   if [ "$rc" -ne 0 ] || ! sync_probe "$out"; then
     line=$(printf '%s\n' "$out" | tail -n 1)
@@ -567,32 +615,54 @@ cmd_watch() {
       event silent "the flagship did not answer over SSH (exit $rc: $(clean "$line")); it last read away=$last_away"
       report "note [key=lookout-silent-$NAME-$since]: lookout: the flagship $F_HOST did not answer over SSH; it last read away=$last_away"
     fi
-    if [ "$con" = no ] && [ "$last_away" = yes ] && [ $((t - since)) -ge "$stale" ]; then
+    if [ "$CON" = no ] && [ "$last_away" = yes ] && [ $((t - since)) -ge "$stale" ]; then
       take_the_con "the flagship has been silent for $((t - since))s"
-      con=yes
     fi
-    st_save episode="$episode" since="$since" failures="$failures" next_attempt="$next_attempt" last_away="$last_away" con="$con"
+    save
     return 0
   fi
 
   beat=$(printf '%s\n' "$out" | sed -n 's/^beat_age=//p' | head -n 1)
   case "$beat" in ''|*[!0-9]*) beat=never ;; esac
   away=$(printf '%s\n' "$out" | sed -n 's/^away=//p' | head -n 1)
+  queue=$(printf '%s\n' "$out" | sed -n 's/^queue_age=//p' | head -n 1)
+  idle=no
+  case "$queue" in ''|*[!0-9]*) ;; *) [ "$queue" -lt "$idle_secs" ] || idle=yes ;; esac
   [ "$episode" != silent ] || event answers "the flagship answers again after $((t - since))s"
+  last_away=$away
 
-  if [ "$away" != yes ] || { [ "$beat" != never ] && [ "$beat" -lt "$stale" ]; }; then
+  if [ "$away" != yes ] || { [ "$beat" != never ] && [ "$beat" -lt "$stale" ] && [ "$idle" = no ]; }; then
     if [ "$episode" != ok ]; then
-      if [ "$away" = yes ]; then
-        event fresh "the flagship's watcher beacon is fresh again (${beat}s old)"
-      else
+      if [ "$away" != yes ]; then
         event present "the flagship is no longer in away mode"
+      elif [ "$episode" = idle ]; then
+        event moving "the flagship's queue is moving again"
+      else
+        event fresh "the flagship's watcher beacon is fresh again (${beat}s old)"
       fi
     fi
-    if [ "$con" = yes ]; then
-      if [ "$away" = yes ]; then hand_back_the_con "the flagship's watcher beacon is ${beat}s old"; else hand_back_the_con "the captain is back"; fi
+    if [ "$CON" != no ]; then
+      if [ "$away" = yes ]; then kind="the flagship's watcher is beating and its queue is moving"; else kind="the captain is back"; fi
+      hand_back_the_con "$CON" "$kind"
     fi
     flush_pending
-    st_save episode=ok since=0 failures=0 next_attempt=0 last_away="$away" con=no
+    episode=ok since=0 failures=0 next_attempt=0 CON=no
+    save
+    return 0
+  fi
+
+  if [ "$beat" != never ] && [ "$beat" -lt "$stale" ]; then
+    # The watcher beats but the primary leaves queued wakes unacknowledged: a
+    # restart cannot help, so the mate keeps the queue moving instead.
+    if [ "$episode" != idle ]; then
+      [ "$episode" != ok ] || since=$t
+      episode=idle
+      event idle "the flagship's watcher beats but its oldest queued wake has waited ${queue}s unacknowledged during away mode (threshold ${idle_secs}s)"
+      report "note [key=lookout-idle-$NAME-$since]: lookout: the flagship's primary session has left queued wakes unacknowledged for ${queue}s during away mode"
+    fi
+    [ "$CON" != no ] || take_the_con "the flagship's primary session has made no progress for ${queue}s"
+    flush_pending
+    save
     return 0
   fi
 
@@ -602,11 +672,13 @@ cmd_watch() {
     event stale "the flagship's watcher beacon is ${beat}s old during away mode (threshold ${stale}s)"
     report "note [key=lookout-stale-$NAME-$since]: lookout: the flagship's watcher beacon is ${beat}s old during away mode; restarting it"
   fi
-  if [ "$t" -ge "$next_attempt" ]; then
-    # One call carries the queued records and the recovery, so the stale
-    # event reaches the flagship before the restart is tried.
+  save
+  left=$((PASS_BUDGET - SECONDS))
+  if [ "$t" -ge "$next_attempt" ] && [ "$left" -ge $((ARM_CONFIRM + 4)) ]; then
+    # One call carries the queued records and the restart, so the stale event
+    # reaches the flagship before the restart is tried.
     batch_pending
-    if line=$(REMOTE_INPUT="$OBS/sending" remote $((SSH_BOUND + ARM_CONFIRM + 2)) recover --observer "$(self_name)" 2>&1); then
+    if line=$(REMOTE_INPUT="$OBS/sending" remote "$left" recover --observer "$(self_name)" 2>&1); then
       : > "$OBS/sending"
       event recovered "restarted the flagship's watcher: $(clean "$(printf '%s\n' "$line" | tail -n 1)")"
       report "note: lookout: restarted the flagship's watcher"
@@ -620,13 +692,11 @@ cmd_watch() {
       next_attempt=$((t + next_attempt))
       event recovery-failed "could not restart the flagship's watcher (attempt $failures, next try after $(iso "$next_attempt")): $(clean "$(printf '%s\n' "$line" | tail -n 1)")"
       [ "$failures" -ne 1 ] || report "note [key=lookout-recovery-failed-$NAME-$since]: lookout: could not restart the flagship's watcher; retrying with backoff"
-      if [ "$con" = no ]; then
-        take_the_con "the flagship's watcher could not be restarted"
-        con=yes
-      fi
+      save
+      [ "$CON" != no ] || take_the_con "the flagship's watcher could not be restarted"
     fi
   fi
-  st_save episode="$episode" since="$since" failures="$failures" next_attempt="$next_attempt" last_away="$away" con="$con"
+  save
   return 0
 }
 

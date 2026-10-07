@@ -9,24 +9,26 @@
 #   disk     free space on the volume holding FM_HOME, at least min_free_gb
 #   load     the 1-minute load average, at most max_load
 #   swap     swap in use, at most max_swap_gb
-#   midway   the Midway session cookie outlives min_midway_hours; read from the
-#            cookie file's expiry and never by running mwinit. It applies only
-#            where mwinit is installed or the cookie file exists.
+#   midway   opt-in (midway=on): the Midway session cookie outlives
+#            min_midway_hours, read from the cookie file's expiry and never by
+#            running mwinit
 #   watcher  a fresh watcher beacon (state/.last-watcher-beat) while the home
 #            needs supervision (bin/fm-supervision-lib.sh owns that predicate);
 #            the grace is fm_poll_derived_grace unless FM_GUARD_GRACE is set
 #
 # It then lists the largest reclaimable build caches it finds and deletes
-# nothing: /private/tmp (or /tmp) *-dd and bzl-* directories idle 3h+, PolyGate
-# intermediate_artifacts whose daemon is not running, Bazel output bases idle 2
-# days+, and ~/brazil-pkg-cache. Sizing runs one du over every candidate under a
+# nothing: /private/tmp (or /tmp) *-dd and bzl-* directories idle 3h+ and Bazel
+# output bases idle 2 days+, plus, when opted in, PolyGate
+# intermediate_artifacts whose daemon is not running (polygate=on) and
+# ~/brazil-pkg-cache (brazil=on). Sizing runs one du over every candidate under a
 # time budget, so the whole check stays a few seconds even under heavy load and
 # never forks per file; a du that overruns is stopped and the candidates are
 # listed unsized.
 #
 # Config: config/batten-down, one key=value per line, # comments allowed.
 #   min_free_gb=100  max_load=<8 x logical CPUs>  max_swap_gb=40
-#   min_midway_hours=10  midway=on|off  midway_cookie=~/.midway/cookie
+#   midway=off|on  min_midway_hours=10  midway_cookie=~/.midway/cookie
+#   polygate=off|on  brazil=off|on
 # Each key has an FM_BATTEN_DOWN_<KEY> environment override, and
 # FM_BATTEN_DOWN=off skips the whole check for one run. An invalid value
 # fails its check rather than being guessed.
@@ -184,18 +186,14 @@ check_swap() {
 # --- midway -------------------------------------------------------------------
 check_midway() {
   local mode min cookie expiry now left
-  mode=$(cfg midway on)
-  [ "$mode" != off ] || { ok "midway: check turned off in $CFG_FILE"; return; }
+  mode=$(cfg midway off)
+  [ "$mode" = on ] || return 0
   min=$(cfg min_midway_hours 10)
   is_number "$min" || { bad "midway: min_midway_hours '$min' is not a number; fix $CFG_FILE"; return; }
   cookie=$(cfg midway_cookie "$HOME/.midway/cookie")
   case $cookie in \~/*) cookie=$HOME/${cookie#??} ;; esac
   if [ ! -f "$cookie" ]; then
-    if command -v mwinit >/dev/null 2>&1; then
-      bad "midway: no session cookie at $cookie; run mwinit, then /afk again"
-    else
-      ok "midway: not used on this machine (no mwinit, no cookie)"
-    fi
+    bad "midway: no session cookie at $cookie; run mwinit, then /afk again"
     return
   fi
   expiry=$(awk -F '\t' '$6 == "session" && $1 ~ /midway-auth\.amazon\.com$/ && $5 + 0 > m { m = $5 + 0 } END { printf "%d", m }' "$cookie" 2>/dev/null)
@@ -234,7 +232,7 @@ add_candidate() {  # <path> <hint>
 }
 
 collect_caches() {
-  local tmp live d hash idle bazel base
+  local tmp live='' d hash idle bazel base
   tmp=$(seam FM_BATTEN_DOWN_TMP_ROOT) || { tmp=/private/tmp; [ -d "$tmp" ] || tmp=/tmp; }
   idle=()
   for d in "$tmp"/*-dd "$tmp"/bzl-*; do
@@ -246,8 +244,9 @@ collect_caches() {
     done < <(find "${idle[@]}" -maxdepth 0 -type d -mmin +180 -print 2>/dev/null)
   fi
   # shellcheck disable=SC2009 # one ps lists every daemon's work dir; pgrep output differs by platform
-  live=$(ps -axo command= 2>/dev/null | grep -o 'polygate/[a-f0-9]*' | sort -u)
+  [ "$(cfg polygate off)" != on ] || live=$(ps -axo command= 2>/dev/null | grep polygated | grep -o 'polygate/[a-f0-9]*' | sort -u)
   for d in "$HOME"/.cache/polygate/*/intermediate_artifacts; do
+    [ "$(cfg polygate off)" = on ] || break
     [ -d "$d" ] || continue
     hash=${d%/intermediate_artifacts}
     hash=${hash##*/}
@@ -266,7 +265,7 @@ collect_caches() {
       [ -n "$d" ] && add_candidate "$d" "Bazel output base idle 2 days+; chmod -R u+w, then delete"
     done < <(find "${bazel[@]}" -maxdepth 0 -type d -mtime +1 -print 2>/dev/null)
   done
-  [ ! -d "$HOME/brazil-pkg-cache" ] || add_candidate "$HOME/brazil-pkg-cache" "run brazil-package-cache clean --days 7"
+  [ "$(cfg brazil off)" != on ] || [ ! -d "$HOME/brazil-pkg-cache" ] || add_candidate "$HOME/brazil-pkg-cache" "run brazil-package-cache clean --days 7"
 }
 
 # One du over every candidate, bounded by fm_run_timed at

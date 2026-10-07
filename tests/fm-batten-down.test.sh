@@ -19,7 +19,8 @@ export CLAUDECODE=1 FM_TEST_HARNESS=claude
 TMP_ROOT=$(fm_test_tmproot batten-down)
 
 # A home with a healthy machine reading: 500 GB free, load 1.5, 1 GB swap,
-# Midway valid for 20 h, no work under way, and an empty temp root.
+# a Midway cookie valid for 20 h (read only when midway=on), no work under
+# way, and an empty temp root.
 make_home() {  # <name> -> prints the home path
   local home="$TMP_ROOT/$1" now
   mkdir -p "$home/state" "$home/config" "$home/tmp" "$home/user"
@@ -58,7 +59,9 @@ case_healthy_machine_passes_and_enters() {
   expect_code 0 "$RC" "healthy check"
   assert_contains "$OUT" 'batten-down check: shipshape for the night' "a healthy machine did not pass"
   assert_contains "$OUT" 'ok    disk: 500.0 GB free' "the disk line is missing"
-  assert_contains "$OUT" 'ok    midway: session lasts' "the midway line is missing"
+  assert_not_contains "$OUT" 'midway:' "the Midway check ran without being turned on"
+  run_batten "$home" FM_BATTEN_DOWN_MIDWAY=on
+  assert_contains "$OUT" 'ok    midway: session lasts' "the opted-in midway line is missing"
   assert_contains "$OUT" 'ok    watcher: not needed' "an idle home should not need a watcher"
   run_enter "$home" --words 'redrive the reviews'
   expect_code 0 "$RC" "healthy enter"
@@ -88,25 +91,23 @@ case_each_failure_refuses_entry() {
   assert_refused 'low disk' 'FAIL  disk: 40.0 GB free' FM_BATTEN_DOWN_TEST_FREE_KB=$((40 * 1048576))
   assert_refused 'high load' 'FAIL  load: 1-minute load 700.2 (maximum 64)' FM_BATTEN_DOWN_TEST_LOAD=700.2 FM_BATTEN_DOWN_MAX_LOAD=64
   assert_refused 'large swap' 'FAIL  swap: 60.0 GB in use (maximum 40 GB); only a reboot reclaims swap' FM_BATTEN_DOWN_TEST_SWAP_MB=61440
-  fakebin=$(fm_fakebin "$TMP_ROOT/mw")
-  fm_fake_exit0 "$fakebin" mwinit
   assert_refused 'missing midway' 'FAIL  midway: no session cookie at /nonexistent/cookie; run mwinit, then /afk again' \
-    FM_BATTEN_DOWN_MIDWAY_COOKIE=/nonexistent/cookie PATH="$fakebin:$PATH"
+    FM_BATTEN_DOWN_MIDWAY=on FM_BATTEN_DOWN_MIDWAY_COOKIE=/nonexistent/cookie
 
   home=$(make_home no-midway)
-  run_batten "$home" FM_BATTEN_DOWN_MIDWAY_COOKIE=/nonexistent/cookie PATH=/usr/bin:/bin
-  expect_code 0 "$RC" "no midway here"
-  assert_contains "$OUT" 'ok    midway: not used on this machine' "a machine without Midway was refused"
-  pass "a machine with neither mwinit nor a cookie skips the Midway check"
+  run_batten "$home" FM_BATTEN_DOWN_MIDWAY_COOKIE=/nonexistent/cookie
+  expect_code 0 "$RC" "midway off by default"
+  assert_not_contains "$OUT" 'midway:' "the Midway check ran without being turned on"
+  pass "the Midway check is off unless config turns it on"
 
   home=$(make_home short-midway)
   now=$(date +%s)
   printf '#HttpOnly_midway-auth.amazon.com\tFALSE\t/\tTRUE\t%s\tsession\tvalue\n' $((now + 7200)) > "$home/cookie"
-  run_batten "$home"
+  run_batten "$home" FM_BATTEN_DOWN_MIDWAY=on
   expect_code 1 "$RC" "short midway"
   assert_contains "$OUT" 'FAIL  midway: session lasts only 2.0 h (minimum 10 h); run mwinit' "a session ending in 2 h was not refused"
   printf '#HttpOnly_midway-auth.amazon.com\tFALSE\t/\tTRUE\t%s\tsession\tvalue\n' $((now - 60)) > "$home/cookie"
-  run_batten "$home"
+  run_batten "$home" FM_BATTEN_DOWN_MIDWAY=on
   expect_code 1 "$RC" "expired midway"
   assert_contains "$OUT" 'FAIL  midway: the session expired at' "an expired session was not refused"
   pass "a Midway session that ends inside the window or already ended fails the check"
@@ -159,11 +160,27 @@ case_cache_report_lists_and_deletes_nothing() {
   assert_contains "$OUT" "$home/tmp/old-dd  (build dir idle 3h+" "an idle -dd dir was not listed"
   assert_contains "$OUT" "$home/tmp/bzl-old" "an idle bzl- dir was not listed"
   assert_not_contains "$OUT" "$home/tmp/fresh-dd" "a fresh build dir was listed"
+  assert_not_contains "$OUT" 'polygate/abc123' "a PolyGate cache was listed without being turned on"
+  assert_not_contains "$OUT" 'brazil-package-cache' "the brazil package cache was listed without being turned on"
+  run_batten "$home" FM_BATTEN_DOWN_POLYGATE=on FM_BATTEN_DOWN_BRAZIL=on
   assert_contains "$OUT" "polygate/abc123/intermediate_artifacts  (PolyGate cache with no running daemon" "a dead PolyGate cache was not listed"
   assert_contains "$OUT" 'brazil-package-cache clean --days 7' "the brazil package cache was not listed"
   assert_present "$home/tmp/old-dd/file" "the report deleted a cache"
   assert_present "$home/user/.cache/polygate/abc123/intermediate_artifacts" "the report deleted a PolyGate cache"
   pass "the cache report lists idle caches with how to reclaim them and deletes nothing"
+}
+
+case_refresh_while_away_only_warns() {
+  local home
+  home=$(make_home refresh)
+  run_enter "$home" --words 'redrive the reviews'
+  expect_code 0 "$RC" "first entry"
+  run_enter "$home" --words 'redrive the reviews, then rest' -- FM_BATTEN_DOWN_TEST_FREE_KB=$((40 * 1048576))
+  expect_code 0 "$RC" "words replaced while away"
+  assert_contains "$OUT" 'FAIL  disk: 40.0 GB free' "the failing check was not shown on a refresh"
+  assert_contains "$OUT" 'warning: already away, so the failed checks above do not block this update' "the refresh did not explain the warning"
+  assert_equals 'redrive the reviews, then rest' "$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$ROOT/bin/fm-afk-contract.sh" words)" "new words while away were not recorded"
+  pass "while already away, new words land and failed checks only warn"
 }
 
 case_off_switch() {
@@ -179,4 +196,5 @@ case_healthy_machine_passes_and_enters
 case_each_failure_refuses_entry
 case_override_enters_anyway
 case_cache_report_lists_and_deletes_nothing
+case_refresh_while_away_only_warns
 case_off_switch
