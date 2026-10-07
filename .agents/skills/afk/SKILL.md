@@ -25,7 +25,7 @@ Hold-for-return is the default and the only reach profile this release records: 
    It writes `state/.afk-contract` at once, with no separate confirmation step, then prints the entry announcement and the record's read-back.
    The words are the whole mandate: `bin/fm-afk-contract.sh` records them exactly as given, with no clause fields, verbs, ids, or merge-grant list, and by the captain's mandate no parser, tokenizer, classifier, or grammar reads them anywhere.
    Read `bin/fm-afk-contract.sh --help` for the flags rather than memorizing them.
-   `enter` first battens down before the night watch (`bin/fm-batten-down.sh`): disk, load, swap, Midway, and the watcher beacon.
+   `enter` first battens down before the night watch (`bin/fm-batten-down.sh`): disk, load, swap, the watcher beacon, and Midway when opted in.
    When a check fails on the first entry, `enter` exits 4 and writes no record, so the captain is not away yet; relay each failed line and its fix, plus the reclaimable caches it lists, and enter again once they fix it, or with `--skip-batten-down` when they explicitly ask to go anyway.
    While already away, a refresh or new words are recorded and failed checks only warn; relay those warnings too.
    Plain `/afk` with no words is a valid entry with no mandate; the announcement says no instructions were recorded.
