@@ -341,6 +341,7 @@ case_daemon_home_stalled_takes_the_con() {
   assert_equals 0 "$(arm_runs)" "a watcher was armed beside a live away daemon"
   kill -0 "$DAEMON_PID" 2>/dev/null || fail "the live away daemon was touched"
   assert_contains "$(MATE_LOG)" 'daemon alive but supervision stalled' "the stall was not recorded"
+  assert_equals 1 "$(grep -c 'daemon-alive' "$MATE/state/lookout/flagship/events.log")" "the live daemon was recorded more than once in one episode"
   assert_contains "$OUT" 'lookout: took the con from flagship (the flagship'"'"'s away daemon is alive but supervision has stalled' "a stalled daemon home did not hand the mate the con"
   on_mate claimed CR-100 >/dev/null || fail "the mate did not claim CR-100 from a stalled daemon home"
   : > "$FLAG/state/.last-watcher-beat"

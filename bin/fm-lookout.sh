@@ -608,7 +608,7 @@ lock_take() {
 }
 
 save() {
-  st_save episode="$episode" since="$since" failures="$failures" next_attempt="$next_attempt" last_away="$last_away" con="$CON"
+  st_save episode="$episode" since="$since" failures="$failures" next_attempt="$next_attempt" last_away="$last_away" daemon="$daemon" con="$CON"
 }
 
 cmd_watch() {
@@ -628,6 +628,7 @@ cmd_watch() {
   failures=$(st_get failures 0)
   next_attempt=$(st_get next_attempt 0)
   last_away=$(st_get last_away no)
+  daemon=$(st_get daemon no)
   CON=$(st_get con no)
   t=$(now)
   SECONDS=0
@@ -673,7 +674,7 @@ cmd_watch() {
       hand_back_the_con "$CON" "$kind"
     fi
     flush_pending
-    episode=ok since=0 failures=0 next_attempt=0 CON=no
+    episode=ok since=0 failures=0 next_attempt=0 daemon=no CON=no
     save
     return 0
   fi
@@ -715,7 +716,8 @@ cmd_watch() {
       next_attempt=0
     elif [ "$rc" -eq 3 ]; then
       : > "$OBS/sending"
-      event daemon-alive "left the flagship's supervision to its live away daemon: $(clean "$(printf '%s\n' "$line" | tail -n 1)")"
+      [ "$daemon" = yes ] || event daemon-alive "left the flagship's supervision to its live away daemon: $(clean "$(printf '%s\n' "$line" | tail -n 1)")"
+      daemon=yes
       next_attempt=$((t + base))
       if [ "$CON" = no ] && [ $((t - since)) -ge "$stall" ]; then
         event daemon-stalled "daemon alive but supervision stalled: the beacon has been stale for $((t - since))s (threshold ${stall}s)"
