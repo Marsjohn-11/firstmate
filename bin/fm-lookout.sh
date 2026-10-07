@@ -11,7 +11,8 @@
 #
 #   beacon fresh        nothing, beyond ending an earlier episode
 #   beacon stale        record it on both vessels, then restart the flagship's
-#                       watcher with `recover`, retrying with backoff
+#                       watcher with `recover`, retrying with backoff; on a
+#                       daemon home it checks the away daemon instead
 #   flagship idle       its beacon is fresh but its oldest queued wake has gone
 #                       unacknowledged for idle_secs: the primary session is
 #                       making no progress, which a restart cannot fix
@@ -20,7 +21,10 @@
 # `recover` reuses the arm the Claude Stop hook starts for its handling
 # successor: bin/fm-watch-arm.sh, detached on the flagship and confirmed by its
 # one status line. It restores the watcher and its durable wake queue; it
-# cannot rewake an idle primary session.
+# cannot rewake an idle primary session. While state/.afk exists the away
+# daemon owns supervision, so `recover` never arms a watcher there: a live
+# daemon is left alone, even when slow, and a dead one counts as a failed
+# recovery, because a lookout cannot revive it from outside.
 #
 # TAKING THE CON. When the flagship cannot be recovered - recovery failed, it
 # stayed silent for stale_secs after last reading away, or it is idle - the
@@ -87,7 +91,9 @@
 #                                            the files to sync
 #   fm-lookout.sh recover [--observer <name>]
 #                                            flagship: append delivered records
-#                                            from stdin, then start the arm
+#                                            from stdin, then start the arm;
+#                                            exit 3 when a live away daemon
+#                                            owns supervision
 #   fm-lookout.sh record                     flagship: append delivered records
 #   fm-lookout.sh claim <review> [--holder <name>] [--detail <text>]
 #   fm-lookout.sh release <review> [--holder <name>]
@@ -308,11 +314,18 @@ append_new() {  # <file> <lines>
   [ -z "$new" ] || printf '%s\n' "$new" >> "$1"
 }
 
+# The away daemon's pid while it holds its lock; bin/fm-afk-start.sh owns the
+# lock and its liveness test.
+away_daemon_pid() {
+  # shellcheck disable=SC2016 # $1 expands in the child shell
+  FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" bash -c '. "$1" && set +e && daemon_lock_held_by_live_daemon && daemon_lock_pid' _ "$SCRIPT_DIR/fm-afk-start.sh"
+}
+
 # Record what the lookout sent, then start the watcher arm detached, the way
 # the Claude Stop hook starts its handling successor, and report the arm's one
-# status line.
+# status line. A daemon home gets no arm.
 cmd_recover() {
-  local observer=unknown arm out deadline budget line
+  local observer=unknown arm out deadline budget line pid
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --observer) [ "$#" -ge 2 ] || die "--observer needs a name"; observer=$2; shift 2 ;;
@@ -321,6 +334,14 @@ cmd_recover() {
   done
   [ -d "$STATE" ] || die "no state directory at $STATE"
   cmd_record || return 1
+  if [ -e "$STATE/.afk" ]; then
+    if pid=$(away_daemon_pid); then
+      printf 'watcher: away daemon pid=%s is alive and owns supervision; left it alone (requested by %s)\n' "$pid" "$observer"
+      return 3
+    fi
+    printf 'watcher: FAILED - the away daemon owns supervision here and is not running; a lookout cannot revive it from outside (requested by %s)\n' "$observer"
+    return 1
+  fi
   arm="$SCRIPT_DIR/fm-watch-arm.sh"
   [ "${FM_TEST_SEAM:-}" != 1 ] || [ -z "${FM_LOOKOUT_ARM:-}" ] || arm=$FM_LOOKOUT_ARM
   out="$STATE/.lookout-recover.out"
@@ -516,7 +537,7 @@ take_the_con() {  # <reason>
   fi
   if ! ledger_ready && [ ! -s "$OBS/routes.txt" ]; then
     event con-skipped "no review queue is configured or synced, so there is nothing to take the con of ($1)"
-    report "note [key=lookout-con-$NAME-$(st_get since 0)]: lookout: the flagship needs the con ($1), but no review queue is configured for this mate"
+    report "note [key=lookout-con-$NAME-$since]: lookout: the flagship needs the con ($1), but no review queue is configured for this mate"
     CON=empty
     return 0
   fi
@@ -547,7 +568,7 @@ EOF
   fi
   line="took the con of $claimed review(s) this mate builds:${names:- none}; $skipped already held elsewhere; $undelivered ROUTE line(s) to other desks not delivered${routes} ($1)"
   event took-the-con "$line"
-  report "working [key=lookout-con-$NAME-$(st_get since 0)]: lookout: $line"
+  report "working [key=lookout-con-$NAME-$since]: lookout: $line"
   CON=yes
   printf 'lookout: took the con from %s (%s). Drive these reviews to green under your lookout duty:%s. Release each with bin/fm-lookout.sh release <review> when it is done or handed back.\n' \
     "$NAME" "$1" "${names:- none}"
@@ -562,7 +583,7 @@ $( [ ! -f "$CLAIMS" ] || sort -t "$TAB" -k1,1n -s "$CLAIMS" | awk -F '\t' '{ s[$
 EOF
   line="handed the con back ($2); still claimed by $(self_name) until released:${held:- none}"
   event handed-back-the-con "$line"
-  report "resolved [key=lookout-con-$NAME-$(st_get since 0)]: lookout: $line"
+  report "resolved [key=lookout-con-$NAME-$since]: lookout: $line"
   [ "$1" = yes ] || return 0
   printf 'lookout: handed the con back to %s (%s). Take no new reviews from the con; finish or hand back each one you still hold (%s) and release it with bin/fm-lookout.sh release <review>.\n' \
     "$NAME" "$2" "${held# }"
@@ -678,12 +699,18 @@ cmd_watch() {
     # One call carries the queued records and the restart, so the stale event
     # reaches the flagship before the restart is tried.
     batch_pending
-    if line=$(REMOTE_INPUT="$OBS/sending" remote "$left" recover --observer "$(self_name)" 2>&1); then
+    line=$(REMOTE_INPUT="$OBS/sending" remote "$left" recover --observer "$(self_name)" 2>&1)
+    rc=$?
+    if [ "$rc" -eq 0 ]; then
       : > "$OBS/sending"
       event recovered "restarted the flagship's watcher: $(clean "$(printf '%s\n' "$line" | tail -n 1)")"
       report "note: lookout: restarted the flagship's watcher"
       failures=0
       next_attempt=0
+    elif [ "$rc" -eq 3 ]; then
+      : > "$OBS/sending"
+      event daemon-alive "left the flagship's supervision to its live away daemon: $(clean "$(printf '%s\n' "$line" | tail -n 1)")"
+      next_attempt=$((t + base))
     else
       case "$line" in *'watcher: '*) : > "$OBS/sending" ;; esac
       failures=$((failures + 1))

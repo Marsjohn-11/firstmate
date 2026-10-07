@@ -88,7 +88,7 @@ assert_refused() {  # <label> <expected-line> [env assignments...]
 
 case_each_failure_refuses_entry() {
   local home now fakebin
-  assert_refused 'low disk' 'FAIL  disk: 40.0 GB free' FM_BATTEN_DOWN_TEST_FREE_KB=$((40 * 1048576))
+  assert_refused 'low disk' 'FAIL  disk: 40.0 GB free on' FM_BATTEN_DOWN_TEST_FREE_KB=$((40 * 1048576))
   assert_refused 'high load' 'FAIL  load: 1-minute load 700.2 (maximum 64)' FM_BATTEN_DOWN_TEST_LOAD=700.2 FM_BATTEN_DOWN_MAX_LOAD=64
   assert_refused 'large swap' 'FAIL  swap: 60.0 GB in use (maximum 40 GB); only a reboot reclaims swap' FM_BATTEN_DOWN_TEST_SWAP_MB=61440
   assert_refused 'missing midway' 'FAIL  midway: no session cookie at /nonexistent/cookie; run mwinit, then /afk again' \
@@ -125,11 +125,26 @@ case_each_failure_refuses_entry() {
   assert_contains "$OUT" 'ok    watcher: beacon' "a fresh beacon was not accepted"
   pass "a stale watcher beacon fails while work is under way and a fresh one passes"
 
+  home=$(make_home small-volume)
+  run_batten "$home" FM_BATTEN_DOWN_TEST_FREE_KB=$((30 * 1048576)) FM_BATTEN_DOWN_TEST_TOTAL_KB=$((256 * 1048576))
+  expect_code 0 "$RC" "small volume"
+  assert_contains "$OUT" 'ok    disk: 30.0 GB free' "30 GB free on a 256 GB volume was refused"
+  assert_contains "$OUT" '(minimum 25.6 GB)' "the default floor is not 10% of the volume"
+  run_batten "$home" FM_BATTEN_DOWN_TEST_FREE_KB=$((15 * 1048576)) FM_BATTEN_DOWN_TEST_TOTAL_KB=$((128 * 1048576))
+  expect_code 1 "$RC" "tiny volume"
+  assert_contains "$OUT" 'FAIL  disk: 15.0 GB free' "15 GB free passed the 20 GB absolute floor"
+  assert_contains "$OUT" '(minimum 20.0 GB)' "the default floor dropped below 20 GB"
+  pass "the default disk floor is 10% of the volume and never under 20 GB"
+
   home=$(make_home config)
   printf '# tuned\nmin_free_gb=600\n' > "$home/config/batten-down"
   run_batten "$home"
   expect_code 1 "$RC" "configured disk floor"
   assert_contains "$OUT" '(minimum 600 GB)' "config/batten-down did not set the disk floor"
+  printf 'min_free_gb=10\n' > "$home/config/batten-down"
+  run_batten "$home" FM_BATTEN_DOWN_TEST_FREE_KB=$((15 * 1048576)) FM_BATTEN_DOWN_TEST_TOTAL_KB=$((900 * 1048576))
+  expect_code 0 "$RC" "configured floor below the relative default"
+  assert_contains "$OUT" '(minimum 10 GB)' "min_free_gb did not replace the relative default"
   printf 'min_free_gb=lots\n' > "$home/config/batten-down"
   run_batten "$home"
   expect_code 1 "$RC" "invalid config"
@@ -151,7 +166,7 @@ case_override_enters_anyway() {
 case_cache_report_lists_and_deletes_nothing() {
   local home
   home=$(make_home caches)
-  mkdir -p "$home/tmp/old-dd" "$home/tmp/fresh-dd" "$home/tmp/bzl-old" "$home/user/.cache/polygate/abc123/intermediate_artifacts" "$home/user/brazil-pkg-cache"
+  mkdir -p "$home/tmp/old-dd" "$home/tmp/fresh-dd" "$home/tmp/bzl-old"
   printf 'x\n' > "$home/tmp/old-dd/file"
   fm_touch_epoch $(( $(date +%s) - 20000 )) "$home/tmp/old-dd" "$home/tmp/bzl-old"
   run_batten "$home"
@@ -160,13 +175,7 @@ case_cache_report_lists_and_deletes_nothing() {
   assert_contains "$OUT" "$home/tmp/old-dd  (build dir idle 3h+" "an idle -dd dir was not listed"
   assert_contains "$OUT" "$home/tmp/bzl-old" "an idle bzl- dir was not listed"
   assert_not_contains "$OUT" "$home/tmp/fresh-dd" "a fresh build dir was listed"
-  assert_not_contains "$OUT" 'polygate/abc123' "a PolyGate cache was listed without being turned on"
-  assert_not_contains "$OUT" 'brazil-package-cache' "the brazil package cache was listed without being turned on"
-  run_batten "$home" FM_BATTEN_DOWN_POLYGATE=on FM_BATTEN_DOWN_BRAZIL=on
-  assert_contains "$OUT" "polygate/abc123/intermediate_artifacts  (PolyGate cache with no running daemon" "a dead PolyGate cache was not listed"
-  assert_contains "$OUT" 'brazil-package-cache clean --days 7' "the brazil package cache was not listed"
   assert_present "$home/tmp/old-dd/file" "the report deleted a cache"
-  assert_present "$home/user/.cache/polygate/abc123/intermediate_artifacts" "the report deleted a PolyGate cache"
   pass "the cache report lists idle caches with how to reclaim them and deletes nothing"
 }
 

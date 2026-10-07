@@ -568,14 +568,12 @@ The optional local, gitignored `config/batten-down` holds one `key=value` per li
 
 | Key | Default | Meaning |
 | --- | --- | --- |
-| `min_free_gb` | `100` | Minimum free disk, in GB |
+| `min_free_gb` | 10% of the volume, at least 20 GB | Minimum free disk, in GB; a set value replaces the relative default |
 | `max_load` | 8 x logical CPUs | Maximum 1-minute load average |
 | `max_swap_gb` | `40` | Maximum swap in use, in GB |
 | `midway` | `off` | `on` checks the Midway session |
 | `min_midway_hours` | `10` | Minimum Midway session time left, in hours |
 | `midway_cookie` | `~/.midway/cookie` | The Midway cookie file |
-| `polygate` | `off` | `on` lists PolyGate caches whose daemon is not running |
-| `brazil` | `off` | `on` lists `~/brazil-pkg-cache` |
 
 Each key has an `FM_BATTEN_DOWN_<KEY>` environment override, such as `FM_BATTEN_DOWN_MIN_FREE_GB`.
 `FM_BATTEN_DOWN=off` skips the whole check for one run.
@@ -588,6 +586,7 @@ A second mate can keep a lookout on the flagship, the main firstmate's home, so 
 The duty lives in the mate's charter (`bin/fm-brief.sh --secondmate ... --lookout`, owned by `secondmate-provisioning`), and `bin/fm-lookout.sh stand` registers the lookout as a custom check in the mate's own watcher, so it runs on every check sweep with no separate scheduler.
 Each pass reads the flagship's watcher beacon and away posture over SSH.
 A stale beacon during away mode is recorded on both vessels and then repaired with the same watcher arm the Claude Stop hook starts for its handling successor, retried with backoff.
+On a home where `state/.afk` gives supervision to the away daemon, the lookout never arms a watcher: it leaves a live daemon alone, even a slow one, and treats a dead daemon as a failed recovery, since it cannot revive the daemon from outside.
 A flagship that does not answer is recorded on the mate and delivered to the flagship once it answers again.
 It never kills a process on the flagship, deletes nothing, and posts to no external channel.
 

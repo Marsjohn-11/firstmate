@@ -2,10 +2,12 @@
 # tests/fm-lookout.test.sh - a second mate's lookout on the flagship
 # (bin/fm-lookout.sh). A mate home keeps a lookout on a flagship home through a
 # fake ssh that runs the remote command locally, or fails like a host that does
-# not answer. A fake watcher arm stands in for bin/fm-watch-arm.sh.
+# not answer. A fake watcher arm stands in for bin/fm-watch-arm.sh, and a fake
+# fm-supervise-daemon.sh holding the daemon lock stands in for the away daemon.
 # Covers a fresh beacon, a stale beacon that recovers, a failed recovery with
 # backoff that takes the con, a silent flagship whose con is taken and handed
-# back, the parent-channel facts, the claim the flagship honours, the
+# back, a daemon home whose away daemon is alive or dead, the parent-channel
+# facts and their matching con keys, the claim the flagship honours, the
 # return-brief lines, and standing the lookout as a watcher check.
 set -u
 
@@ -40,7 +42,11 @@ fi
 touch "$FM_HOME/state/.last-watcher-beat"
 echo 'watcher: started pid=4242 (beacon fresh)'
 SH
-chmod +x "$FAKEBIN/fake-ssh" "$FAKEBIN/fake-arm"
+cat > "$FAKEBIN/fm-supervise-daemon.sh" <<'SH'
+#!/usr/bin/env bash
+sleep 60
+SH
+chmod +x "$FAKEBIN/fake-ssh" "$FAKEBIN/fake-arm" "$FAKEBIN/fm-supervise-daemon.sh"
 
 export FM_TEST_SEAM=1 FM_LOOKOUT_SSH="$FAKEBIN/fake-ssh" FM_LOOKOUT_ARM="$FAKEBIN/fake-arm"
 
@@ -52,14 +58,15 @@ LEDGER_ROWS='| Review | Title | Package(s) | Published | Needs | Last activity |
 | https://code.amazon.com/reviews/CR-103 | Done | RewindApp | draft | green, ready to publish (no redrive needed) | 10-05 22:54Z | mini |
 | https://code.amazon.com/reviews/CR-104 | Held | RewindApp | draft | dry run red: https://build.example/4 | 10-05 22:54Z | mini |'
 
-# A flagship home in away mode with a fresh beacon, its review ledger and
-# ROUTE lines, and a remote second-mate home keeping a lookout on it.
+# A flagship home with an away record and a fresh beacon, its review ledger
+# and ROUTE lines, and a remote second-mate home keeping a lookout on it.
 make_pair() {  # <name> [stale-secs] -> sets FLAG and MATE
   local name=$1 stale=${2:-900} now
   FLAG="$TMP_ROOT/$name/flagship"
   MATE="$TMP_ROOT/$name/mate"
   mkdir -p "$FLAG/state" "$FLAG/data/cr-dm-watch" "$MATE/state" "$MATE/config"
-  : > "$FLAG/state/.afk"
+  FM_HOME="$FLAG" FM_STATE_OVERRIDE="$FLAG/state" "$ROOT/bin/fm-afk-contract.sh" enter --words 'redrive the reviews' >/dev/null 2>&1 \
+    || fail "could not write the flagship's away record"
   : > "$FLAG/state/.last-watcher-beat"
   printf '%s\n' "$LEDGER_ROWS" > "$FLAG/data/cr-dm-watch/overnight-ledger.md"
   now=$(date +%s)
@@ -106,7 +113,7 @@ case_fresh_beacon_does_nothing() {
   assert_absent "$FLAG/state/.lookout.log" "a fresh beacon wrote to the flagship"
   assert_equals 0 "$(arm_runs)" "a fresh beacon started a recovery"
   age_beacon 5000
-  rm -f "$FLAG/state/.afk"
+  rm -f "$FLAG/state/.afk-contract"
   watch
   assert_equals 0 "$(arm_runs)" "a stale beacon outside away mode started a recovery"
   pass "a fresh beacon, or a stale one outside away mode, records nothing, recovers nothing, and wakes no one"
@@ -285,6 +292,69 @@ case_stand_registers_a_watcher_check() {
   pass "stand registers the lookout as this home's watcher check, stand-down retires it, and stand refuses without a flagship"
 }
 
+# Make the flagship a daemon home: state/.afk, and with "alive" a running
+# fm-supervise-daemon.sh holding state/.supervise-daemon.lock.
+make_daemon_home() {  # alive|dead
+  : > "$FLAG/state/.afk"
+  mkdir -p "$FLAG/state/.supervise-daemon.lock"
+  if [ "$1" = alive ]; then
+    "$FAKEBIN/fm-supervise-daemon.sh" >/dev/null 2>&1 &
+    DAEMON_PID=$!
+  else
+    DAEMON_PID=999999
+  fi
+  printf '%s\n' "$DAEMON_PID" > "$FLAG/state/.supervise-daemon.lock/pid"
+}
+
+case_daemon_home_alive_is_left_alone() {
+  local before
+  make_pair daemon-alive
+  make_daemon_home alive
+  age_beacon 4000
+  watch
+  expect_code 0 "$RC" "daemon-alive watch"
+  assert_equals '' "$OUT" "a live away daemon woke the mate"
+  assert_equals 0 "$(arm_runs)" "a watcher was armed on a daemon home"
+  assert_contains "$(MATE_LOG)" "left the flagship's supervision to its live away daemon: watcher: away daemon pid=$DAEMON_PID is alive" "the live daemon was not recorded"
+  assert_not_contains "$(MATE_LOG)" 'took-the-con' "the con was taken while the away daemon lives"
+  assert_not_contains "$(MATE_LOG)" 'restarted the flagship' "leaving a live daemon alone was recorded as a restart"
+  on_mate claimed CR-100 >/dev/null && fail "the mate claimed a review while the away daemon lives"
+  before=$(grep -c 'daemon-alive' "$MATE/state/lookout/flagship/events.log")
+  watch
+  assert_equals "$before" "$(grep -c 'daemon-alive' "$MATE/state/lookout/flagship/events.log")" "the daemon was rechecked before the backoff elapsed"
+  kill "$DAEMON_PID" 2>/dev/null || true
+  pass "on a daemon home with a live away daemon the lookout arms no watcher, takes no con, and leaves the daemon alone"
+}
+
+case_daemon_home_dead_takes_the_con() {
+  make_pair daemon-dead
+  make_daemon_home dead
+  age_beacon 4000
+  watch
+  expect_code 0 "$RC" "daemon-dead watch"
+  assert_equals 0 "$(arm_runs)" "a watcher was armed on a daemon home"
+  assert_contains "$(MATE_LOG)" 'the away daemon owns supervision here and is not running; a lookout cannot revive it from outside' "the dead daemon was not reported"
+  assert_contains "$OUT" 'lookout: took the con from flagship (the flagship'"'"'s watcher could not be restarted)' "a dead away daemon did not hand the mate the con"
+  on_mate claimed CR-100 >/dev/null || fail "the mate did not claim CR-100 from a dead daemon home"
+  pass "on a daemon home with a dead away daemon the lookout arms no watcher, reports it cannot revive it, and takes the con"
+}
+
+case_con_keys_match_on_an_idle_flagship() {
+  local now working resolved
+  make_pair con-keys
+  now=$(date +%s)
+  printf '%s\t7\tsignal\treview.status\tsignal: review.status\n' $((now - 4000)) > "$FLAG/state/.wake-queue"
+  watch
+  : > "$FLAG/state/.wake-queue"
+  watch
+  working=$(PARENT | sed -n 's/.*working \[key=\(lookout-con-[^]]*\)\].*/\1/p' | tail -n 1)
+  resolved=$(PARENT | sed -n 's/.*resolved \[key=\(lookout-con-[^]]*\)\].*/\1/p' | tail -n 1)
+  [ -n "$working" ] || fail "taking the con published no keyed working phase"
+  assert_equals "$working" "$resolved" "the handback did not resolve the con phase it opened"
+  [ "$working" != lookout-con-flagship-0 ] || fail "the con phase was keyed by a stale episode start"
+  pass "an idle flagship's con opens and resolves one parent-channel phase under the same key"
+}
+
 case_fresh_beacon_does_nothing
 case_stale_beacon_recovers
 case_failed_recovery_takes_the_con
@@ -294,3 +364,6 @@ case_unconfigured_queue_takes_nothing
 case_slow_flagship_and_reused_lock
 case_claim_rules
 case_stand_registers_a_watcher_check
+case_daemon_home_alive_is_left_alone
+case_daemon_home_dead_takes_the_con
+case_con_keys_match_on_an_idle_flagship

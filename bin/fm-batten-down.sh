@@ -6,7 +6,8 @@
 # (--skip-batten-down; docs/configuration.md "Batten down before away mode").
 #
 # Checks, each one line, each naming the fix when it fails:
-#   disk     free space on the volume holding FM_HOME, at least min_free_gb
+#   disk     free space on the volume holding FM_HOME, at least 10% of the
+#            volume and never under 20 GB, or min_free_gb when set
 #   load     the 1-minute load average, at most max_load
 #   swap     swap in use, at most max_swap_gb
 #   midway   opt-in (midway=on): the Midway session cookie outlives
@@ -18,17 +19,15 @@
 #
 # It then lists the largest reclaimable build caches it finds and deletes
 # nothing: /private/tmp (or /tmp) *-dd and bzl-* directories idle 3h+ and Bazel
-# output bases idle 2 days+, plus, when opted in, PolyGate
-# intermediate_artifacts whose daemon is not running (polygate=on) and
-# ~/brazil-pkg-cache (brazil=on). Sizing runs one du over every candidate under a
+# output bases idle 2 days+. Sizing runs one du over every candidate under a
 # time budget, so the whole check stays a few seconds even under heavy load and
 # never forks per file; a du that overruns is stopped and the candidates are
 # listed unsized.
 #
 # Config: config/batten-down, one key=value per line, # comments allowed.
-#   min_free_gb=100  max_load=<8 x logical CPUs>  max_swap_gb=40
+#   min_free_gb=<GB, replaces the relative default>
+#   max_load=<8 x logical CPUs>  max_swap_gb=40
 #   midway=off|on  min_midway_hours=10  midway_cookie=~/.midway/cookie
-#   polygate=off|on  brazil=off|on
 # Each key has an FM_BATTEN_DOWN_<KEY> environment override, and
 # FM_BATTEN_DOWN=off skips the whole check for one run. An invalid value
 # fails its check rather than being guessed.
@@ -38,7 +37,7 @@
 #   fails, 2 on a usage error.
 #
 # Test seams (only with FM_TEST_SEAM=1): FM_BATTEN_DOWN_TEST_FREE_KB,
-# FM_BATTEN_DOWN_TEST_LOAD, FM_BATTEN_DOWN_TEST_SWAP_MB, and
+# FM_BATTEN_DOWN_TEST_TOTAL_KB, FM_BATTEN_DOWN_TEST_LOAD, FM_BATTEN_DOWN_TEST_SWAP_MB, and
 # FM_BATTEN_DOWN_TMP_ROOT replace the machine readings and the temp root.
 set -u
 
@@ -105,20 +104,25 @@ bad() { REPORT="$REPORT  FAIL  $1"$'\n'; FAILED=1; }
 
 # --- disk ---------------------------------------------------------------------
 check_disk() {
-  local min free_kb mount line
-  min=$(cfg min_free_gb 100)
-  is_number "$min" || { bad "disk: min_free_gb '$min' is not a number; fix $CFG_FILE"; return; }
+  local min free_kb total_kb mount line
+  min=$(cfg min_free_gb '')
+  [ -z "$min" ] || is_number "$min" || { bad "disk: min_free_gb '$min' is not a number; fix $CFG_FILE"; return; }
   mount=$FM_HOME
   if free_kb=$(seam FM_BATTEN_DOWN_TEST_FREE_KB); then
-    :
+    total_kb=$(seam FM_BATTEN_DOWN_TEST_TOTAL_KB) || total_kb=$((1000 * 1048576))
   else
     line=$(df -Pk "$FM_HOME" 2>/dev/null | tail -n 1)
     # shellcheck disable=SC2086 # field split of df's one data row
     set -- $line
+    total_kb=${2:-}
     free_kb=${4:-}
     mount=${6:-$FM_HOME}
   fi
   case "$free_kb" in ''|*[!0-9]*) bad "disk: could not read free space for $FM_HOME"; return ;; esac
+  if [ -z "$min" ]; then
+    case "$total_kb" in ''|*[!0-9]*) bad "disk: could not read the size of $mount"; return ;; esac
+    min=$(awk -v t="$total_kb" 'BEGIN { m = t / 1048576 / 10; if (m < 20) m = 20; printf "%.1f", m }')
+  fi
   if awk -v f="$free_kb" -v m="$min" 'BEGIN { exit !(f / 1048576 >= m) }'; then
     ok "disk: $(awk -v f="$free_kb" 'BEGIN { printf "%.1f", f / 1048576 }') GB free on $mount (minimum $min GB)"
   else
@@ -232,7 +236,7 @@ add_candidate() {  # <path> <hint>
 }
 
 collect_caches() {
-  local tmp live='' d hash idle bazel base
+  local tmp d hash idle bazel base
   tmp=$(seam FM_BATTEN_DOWN_TMP_ROOT) || { tmp=/private/tmp; [ -d "$tmp" ] || tmp=/tmp; }
   idle=()
   for d in "$tmp"/*-dd "$tmp"/bzl-*; do
@@ -243,16 +247,6 @@ collect_caches() {
       [ -n "$d" ] && add_candidate "$d" "build dir idle 3h+; delete it"
     done < <(find "${idle[@]}" -maxdepth 0 -type d -mmin +180 -print 2>/dev/null)
   fi
-  # shellcheck disable=SC2009 # one ps lists every daemon's work dir; pgrep output differs by platform
-  [ "$(cfg polygate off)" != on ] || live=$(ps -axo command= 2>/dev/null | grep polygated | grep -o 'polygate/[a-f0-9]*' | sort -u)
-  for d in "$HOME"/.cache/polygate/*/intermediate_artifacts; do
-    [ "$(cfg polygate off)" = on ] || break
-    [ -d "$d" ] || continue
-    hash=${d%/intermediate_artifacts}
-    hash=${hash##*/}
-    case $'\n'"$live"$'\n' in *$'\n'"polygate/$hash"$'\n'*) continue ;; esac
-    add_candidate "$d" "PolyGate cache with no running daemon; delete intermediate_artifacts"
-  done
   for base in "$HOME/Library/Caches/bazel/_bazel_${USER:-$(id -un)}" "$HOME/.cache/bazel/_bazel_${USER:-$(id -un)}"; do
     [ -d "$base" ] || continue
     bazel=()
@@ -265,7 +259,6 @@ collect_caches() {
       [ -n "$d" ] && add_candidate "$d" "Bazel output base idle 2 days+; chmod -R u+w, then delete"
     done < <(find "${bazel[@]}" -maxdepth 0 -type d -mtime +1 -print 2>/dev/null)
   done
-  [ "$(cfg brazil off)" != on ] || [ ! -d "$HOME/brazil-pkg-cache" ] || add_candidate "$HOME/brazil-pkg-cache" "run brazil-package-cache clean --days 7"
 }
 
 # One du over every candidate, bounded by fm_run_timed at
