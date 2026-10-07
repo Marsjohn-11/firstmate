@@ -14,7 +14,7 @@ Scope: V2 engine only (`--agent-engine v2`). The v3/KAS engine is out of scope a
 - Host: Amazon Linux 2 (Linux 5.10, x86_64).
 - Tool: `kiro-cli 2.21.4`, installed via toolbox at `~/.toolbox/bin/kiro-cli` (a bash sandbox shim that runs `aim sandbox --client kiro-cli`, whose descendant is the compiled bun/node binary).
 - Auth: a signed-in account. On this Amazon Linux 2 host auth state lives in the XDG data dir `~/.local/share/kiro-cli/data.sqlite3`, not under `KIRO_HOME`. That path does not exist on macOS, so both the location and the untouched-by-relocation premise resting on it are Amazon Linux 2 measurements only - see "What is NOT verified" for the macOS gap and what it costs.
-- Two measurements in this record rest on a later build: the idle composer's placeholder colour (`38;2;158;158;158`) and its 256-colour encoding (`38;5;247`) were measured on `kiro-cli 2.21.5` on macOS. Every other claim here was measured on 2.21.4 on the Amazon Linux 2 host above.
+- Three measurements in this record rest on later builds: the idle composer's placeholder colour (`38;2;158;158;158`) and its 256-colour encoding (`38;5;247`) were measured on `kiro-cli 2.21.5` on macOS, and the default-foreground idle row with its `↵` hint was measured on `kiro-cli 2.28.0`. Every other claim here was measured on 2.21.4 on the Amazon Linux 2 host above.
 
 ## Agent-config hooks are claude-shaped (V2)
 
