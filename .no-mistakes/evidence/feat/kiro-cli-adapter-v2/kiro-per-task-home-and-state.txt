@@ -1,0 +1,85 @@
+== meta
+window=primary:fm-kiro-scout-1
+endpoint_task_id=kiro-scout-1
+worktree=/tmp/fm-lab.gbe9qB/pool/.treehouse/kirolab-e30b9c/1/kirolab
+project=/tmp/fm-lab.gbe9qB/src/kirolab
+harness=kiro
+kind=scout
+tasktmp=/tmp/fm-kiro-scout-1
+model=default
+effort=low
+busy_gen=g1791406244.855478.21965
+spawn_gen=s1791406245.849814.28896
+decisions_reviewed=1
+decision_keys=
+== busy-state
+v1 gen=g1791406244.855478.21965 seq=3 state=idle source=kiro-hook event=stop ts=1791406301
+== status
+done [at=1791406297]: README.md has 1 line (wc -l); report written
+== report
+# Scout Report: README.md line count
+
+## Captain's intent
+Report how many lines README.md has.
+
+## What I did
+Ran `wc -l` on `README.md` at the worktree root, as specified by the firstmate spec.
+
+## Evidence
+Command and output:
+
+```
+$ wc -l README.md
+1 README.md
+```
+
+File contents (for context):
+
+```
+hello
+== agents/firstmate.json
+{"name":"firstmate","description":"Firstmate per-task crewmate agent (busy-state and turn-end hooks)","tools":["*"],"allowedTools":["*"],"hooks":{"userPromptSubmit":[{"command":"/tmp/fm-lab.gbe9qB/state/kiro-scout-1.kiro-home/hooks/user-prompt-submit"}],"stop":[{"command":"/tmp/fm-lab.gbe9qB/state/kiro-scout-1.kiro-home/hooks/stop"}]}}
+
+== hooks
+total 8
+-rwxr-xr-x. 1 marsjohn amazon 313 Oct  7 20:50 stop
+-rwxr-xr-x. 1 marsjohn amazon 270 Oct  7 20:50 user-prompt-submit
+-- /tmp/fm-lab.gbe9qB/state/kiro-scout-1.kiro-home/hooks/stop
+#!/bin/sh
+touch '/tmp/fm-lab.gbe9qB/state/kiro-scout-1.turn-ended'
+'/home/marsjohn/.no-mistakes/worktrees/912b065c2da1/01M4C1TGHY8AW5VEW9FTWBXJG9/bin/fm-busy-event.sh' apply '/tmp/fm-lab.gbe9qB/state' 'kiro-scout-1' idle --gen 'g1791406244.855478.21965' --source kiro-hook --event stop 2>/dev/null || true
+exit 0
+-- /tmp/fm-lab.gbe9qB/state/kiro-scout-1.kiro-home/hooks/user-prompt-submit
+#!/bin/sh
+'/home/marsjohn/.no-mistakes/worktrees/912b065c2da1/01M4C1TGHY8AW5VEW9FTWBXJG9/bin/fm-busy-event.sh' apply '/tmp/fm-lab.gbe9qB/state' 'kiro-scout-1' busy --gen 'g1791406244.855478.21965' --source kiro-hook --event user-prompt-submit 2>/dev/null || true
+exit 0
+== settings
+cli.json
+feed_state.json
+survey_state.json
+{"chat.disableTrustAllConfirmation":true}
+{"release-2.28.0":1}{
+  "session-feedback": {
+    "eligible": true,
+    "lastShownAt": null,
+    "lastCompletedAt": null,
+    "dismissCount": 0,
+    "sampledAtRate": 1
+  },
+  "workflow-churn": {
+    "eligible": true,
+    "lastShownAt": null,
+    "lastCompletedAt": null,
+    "dismissCount": 0,
+    "sampledAtRate": 1
+  },
+  "workflows-quality": {
+    "eligible": true,
+    "lastShownAt": null,
+    "lastCompletedAt": null,
+    "dismissCount": 0,
+    "sampledAtRate": 1
+  }
+}
+== worktree .kiro?
+ls: cannot access '/tmp/fm-lab.gbe9qB/pool/.treehouse/kirolab-e30b9c/1/kirolab/.kiro': No such file or directory

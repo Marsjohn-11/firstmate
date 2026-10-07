@@ -1,0 +1,1 @@
+v1 gen=g1791406244.855478.21965 seq=3 state=idle source=kiro-hook event=stop ts=1791406301

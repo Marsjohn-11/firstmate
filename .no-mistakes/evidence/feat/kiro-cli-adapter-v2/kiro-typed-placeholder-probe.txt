@@ -1,0 +1,9 @@
+composer_state=pending
+agent_state=alive
+pane_current_command=kiro-cli
+ancestry pid=860017 comm=kiro-cli -> comm kiro
+ancestry pid=860043 comm=aim -> comm kiro
+ancestry pid=860075 comm=launcher -> comm kiro
+ancestry pid=860294 comm=creds_agent -> comm kiro
+ancestry pid=860967 comm=aim <defunct> -> comm kiro
+crew_state: state: done · source: status-log · README.md has 1 line (wc -l); report written

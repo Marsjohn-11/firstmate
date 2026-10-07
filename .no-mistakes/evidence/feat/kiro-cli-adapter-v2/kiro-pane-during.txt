@@ -1,0 +1,50 @@
+• The complete subcommand requires an origin-id: complete <origin-id> (--none | <task-id>...). My origin is this scout task. Let me determine the origin id. The task/origin identity here is the scout
+  task — likely kiro-scout-1. Let me check for configured origin metadata.
+• Shell echo "== env FM/scout =="; env | grep -iE 'FM_|SCOUT|ORIGIN|TASK' 2>/dev/null; echo "== state dir =="; ls -la /tmp/fm-lab.gbe9qB/state/ 2>/dev/null; echo "== config dir =="; ls -la
+  /tmp/fm-lab.gbe9qB/config/ 2>/dev/null; echo "== data dir =="; ls -la /tmp/fm-lab.gbe9qB/data/ 2>/dev/null
+    ╰ output:
+        == env FM/scout ==
+        KIRO_HOME=/tmp/fm-lab.gbe9qB/state/kiro-scout-1.kiro-home
+        FM_TASK_ID=kiro-scout-1
+        GOTMPDIR=/tmp/fm-kiro-scout-1/gotmp
+        FM_TASK_INBOX=/tmp/fm-lab.gbe9qB/state/kiro-scout-1.inbox
+        ...+21 lines
+    (ctrl+o to toggle)
+
+• FM_TASK_ID=kiro-scout-1 is my origin id, FM_HOME=/tmp/fm-lab.gbe9qB. There's no fleet-ledger in config (status hook will skip that part). Let me run the completion gate with the origin id and
+  --none.
+• Shell HOLD='/home/marsjohn/.no-mistakes/worktrees/912b065c2da1/01M4C1TGHY8AW5VEW9FTWBXJG9/bin/fm-captain-hold.sh'; "$HOLD" complete kiro-scout-1 --none; echo "EXIT=$?"
+    ╰ output:
+        complete: kiro-scout-1 captain-call inventory reviewed
+        EXIT=0
+
+• Completion gate passed. Now I'll append the done status line.
+• Shell EPOCH=$(date +%s); echo "done [at=$EPOCH]: README.md has 1 line (wc -l); report written" >> '/tmp/fm-lab.gbe9qB/state/kiro-scout-1.status' && { [ ! -e '/tmp/fm-lab.gbe9qB/config/fleet-ledger'
+  ] || '/home/marsjohn/.no-mistakes/worktrees/912b065c2da1/01M4C1TGHY8AW5VEW9FTWBXJG9/bin/fm-fleet-ledger.sh' appended '/tmp/fm-lab.gbe9qB/config' '/tmp/fm-lab.gbe9qB/state/kiro-scout-1.status'
+  >/dev/null 2>&1 || true; }; echo "status appended with epoch $EPOCH"
+    ╰ output:
+        status appended with epoch 1791406297
+
+• Done.
+
+  Finding: README.md has 1 line.
+
+  Evidence:
+  - wc -l README.md → 1 README.md
+  - File content: hello (single line with trailing newline)
+
+  I wrote the standalone report to /tmp/fm-lab.gbe9qB/data/kiro-scout-1/report.md, passed the shared completion gate (fm-captain-hold.sh complete kiro-scout-1 --none — no unresolved captain decisions,
+  since this is a read-only measurement), and appended the done status line. The inbox was empty, so no messages to acknowledge.
+
+▸ Credits: turn 0.84 • session 0.84 | Time: 43s
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Trust All Tools active, confirmations are off · /quit to exit
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+firstmate · auto · ◔ 3% · Midway: 12h 26m                                                                                           /tmp/fm-lab.gbe9qB/pool/.treehouse/kirolab-e30b9c/1/kirolab · (HEAD)
+
+›  ask a question or describe a task ↵
+                                                                                                                                                                                     /copy to clipboard
+
+
+

@@ -1,0 +1,5 @@
+ esc to cancel · ↵ to select
+Session ended.
+Resume with: kiro-cli --resume-id d63ef48c-82af-42f9-8d8c-071da3206abe
+(26-10-07 20:58:25) <0> [/tmp/fm-lab.gbe9qB/pool/.treehouse/kirolab-e30b9c/1/kirolab]
+dev-dsk-marsjohn-2b-6aeb1dcc %

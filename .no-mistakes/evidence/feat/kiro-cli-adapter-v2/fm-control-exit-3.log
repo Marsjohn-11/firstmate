@@ -1,0 +1,2 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.gbe9qB
+stopped kiro-scout-3 harness=kiro backend=tmux endpoint=primary:fm-kiro-scout-3 worktree=/tmp/fm-lab.gbe9qB/pool/.treehouse/kirolab-e30b9c/1/kirolab

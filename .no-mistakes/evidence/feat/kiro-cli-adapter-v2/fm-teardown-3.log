@@ -1,0 +1,17 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.gbe9qB
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: reaping leaked worktree process(es) for kiro-scout-3: 1180554
+teardown: force-killing leaked worktree process(es) for kiro-scout-3: 1180554
+A new version of treehouse is available: v2.0.1 → v3.1.2
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown kiro-scout-3 complete (window primary:fm-kiro-scout-3, worktree /tmp/fm-lab.gbe9qB/pool/.treehouse/kirolab-e30b9c/1/kirolab)
+Backlog: kiro-scout-3 just finished (this home keeps no markdown backlog at /tmp/fm-lab.gbe9qB/data/backlog.md). Update /tmp/fm-lab.gbe9qB/data/backlog.md - move kiro-scout-3 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+RC=0

@@ -1,0 +1,3 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.gbe9qB
+spawned kiro-scout-3 harness=kiro kind=scout window=primary:fm-kiro-scout-3 worktree=/tmp/fm-lab.gbe9qB/pool/.treehouse/kirolab-e30b9c/1/kirolab
+RC=0

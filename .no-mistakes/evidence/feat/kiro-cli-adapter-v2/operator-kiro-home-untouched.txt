@@ -1,0 +1,23 @@
+files under ~/.kiro modified since lab creation (2026-10-07 20:50:17.366089133 +0000):
+/home/marsjohn/.kiro/settings
+/home/marsjohn/.kiro/agents
+/home/marsjohn/.kiro/crew
+/home/marsjohn/.kiro/settings/mcp.json
+/home/marsjohn/.kiro/settings/aim-creds-agent-permissions-state.json
+/home/marsjohn/.kiro/agents/kirocrew.json
+/home/marsjohn/.kiro/agents/kirocrew-lite.json
+/home/marsjohn/.kiro/agents/kirocrew-knowledge.json
+/home/marsjohn/.kiro/agents/kirocrew-research.json
+/home/marsjohn/.kiro/agents/kirocrew-heartbeat.json
+/home/marsjohn/.kiro/agents/kirocrew-conductor.json
+/home/marsjohn/.kiro/agents/kirocrew-pipeline-conductor.json
+/home/marsjohn/.kiro/agents/kirocrew-ledger-conductor.json
+/home/marsjohn/.kiro/agents/kirocrew-security-conductor.json
+/home/marsjohn/.kiro/agents/kirocrew-worker.json
+/home/marsjohn/.kiro/agents/kirocrew-guest.json
+/home/marsjohn/.kiro/agents/AtlasAICapabilities-atlas.json
+/home/marsjohn/.kiro/agents/AmazonBuilderCoreAIAgents-amzn-builder.json
+/home/marsjohn/.kiro/agents/AmazonBuilderCoreAIAgents-amzn-pipeline-assistant.json
+/home/marsjohn/.kiro/agents/AmazonBuilderCoreAIAgents-pipeline-assistant.json
+(end)
+0

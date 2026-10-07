@@ -1,0 +1,22 @@
+ok - fm-harness.sh: ancestry detects the kiro-cli command
+ok - fm-harness.sh: ancestry rejects unrelated kiro mentions
+ok - fm-harness.sh: kiro's ancestry outranks an inherited CLAUDECODE (markerless harness)
+ok - fm-agent-process-lib: kiro-cli is an agent, unrelated names are not
+ok - fm-control-lib: kiro control mechanics are Escape / single / /quit, crewmate-scout only
+ok - fm-control-lib: kiro wiring paths are the out-of-tree hook config and its two hook scripts
+ok - fm-busy-lib: kiro-hook is kiro's trusted source and is scoped to kiro
+ok - fm-busy-lib: the kiro-hook record is kiro's only state source; no record is unknown
+ok - fm-composer-lib: kiro's › composer and its real idle row read empty in every colour, typed text pending
+ok - fm-composer-lib: the kiro delivery footer matches busy, its idle row does not, and the union sees it
+ok - fm-spawn: kiro launch carries brief, V2 engine, agent, model, effort with cleared markers
+ok - fm-spawn: kiro writes an out-of-tree per-task hook config and trust setting, never the worktree's .kiro/
+ok - fm-spawn: kiro passes the full effort vocabulary including xhigh
+ok - fm-spawn: an unlisted kiro model refuses before any pane is created
+ok - fm-spawn: a kiro hook path containing whitespace refuses before any pane is created
+ok - fm-spawn: a pretty-printed kiro listing validates listed models and refuses unlisted ones
+ok - fm-spawn: a kiro listing with no readable model_id establishes nothing and launches
+ok - fm-spawn: an unreachable kiro listing establishes nothing and launches
+ok - fm-spawn: a hung kiro listing is cut off and launches unvalidated
+ok - fm-spawn: a kiro secondmate launch is refused
+ok - fm-teardown: kiro's per-task home is removed on teardown
+exit=0
