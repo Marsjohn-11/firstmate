@@ -260,15 +260,25 @@ test_kiro_composer_glyph_and_placeholder() {
   state=$(fm_composer_classify_screen "$caps" "$screen" 1)
   [ "$state" = empty ] \
     || fail "kiro 2.28.0's default-foreground idle row must read empty, got '$state'"
-  # An UNSTYLED capture of the idle row carries the same hint proof.
-  state=$(fm_composer_classify_screen "$caps_plain" "$plain")
+  # An UNSTYLED capture of the idle row carries the same hint proof, with the
+  # `/copy to clipboard` footer the real tool draws below it.
+  state=$(fm_composer_classify_screen "$caps_plain" "$plain"$'\n /copy to clipboard')
   [ "$state" = empty ] \
     || fail "kiro's unstyled idle row must read empty, got '$state'"
+  # A CURSORLESS read (every non-tmux backend) has no cursor to stop the
+  # composer at its row; the hinted row must not absorb the footer below it.
+  # This read was `pending` live on kiro-cli 2.28.0.
+  state=$(fm_composer_classify_screen $'styled=1\ncursor=0\nidentity=1\nrows=0' "$screen")
+  [ "$state" = empty ] \
+    || fail "kiro 2.28.0's idle row read cursorlessly must read empty, got '$state'"
   # The placeholder words TYPED into kiro render with no hint and stay pending.
   screen=$'firstmate · claude-sonnet-5 · ◔ 2%\n'"${esc}[39m› ask a question or describe a task"
   state=$(fm_composer_classify_screen "$caps" "$screen" 1)
   [ "$state" = pending ] \
     || fail "the kiro placeholder words typed as input must read pending, got '$state'"
+  state=$(fm_composer_classify_screen $'styled=1\ncursor=0\nidentity=1\nrows=0' "$screen"$'\n /copy to clipboard')
+  [ "$state" = pending ] \
+    || fail "the kiro placeholder words typed as input must read pending cursorlessly, got '$state'"
   pass "fm-composer-lib: kiro's › composer and its real idle row read empty in every colour, typed text pending"
 }
 

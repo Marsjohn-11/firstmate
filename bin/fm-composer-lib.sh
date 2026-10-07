@@ -1649,7 +1649,17 @@ _fm_composer_select_cursorless() {
   fi
   if [ "$FM_COMPOSER_SELECTED_KIND" = bare ]; then
     next=$((FM_COMPOSER_SELECTED_LAST + 1))
-    while :; do
+    # A hinted idle placeholder is the whole composer, so the row below it
+    # (kiro's `/copy to clipboard` footer) is never wrapped input.
+    trimmed=$(_fm_composer_screen_row "$FM_COMPOSER_SELECTED_FIRST" "$plain")
+    fm_composer_normalize_trim_var trimmed
+    if fm_composer_leading_agent_glyph_var glyph "$trimmed"; then
+      trimmed=${trimmed#*"$glyph"}
+      fm_composer_normalize_trim_var trimmed
+      fm_composer_idle_matches "$trimmed" "$FM_COMPOSER_HINTED_IDLE_RE_DEFAULT" sensitive \
+        && next=-1
+    fi
+    while [ "$next" -ge 0 ]; do
       raw=$(_fm_composer_screen_row "$next" "$plain")
       trimmed=$raw
       fm_composer_normalize_trim_var trimmed
