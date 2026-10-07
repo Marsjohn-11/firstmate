@@ -1,0 +1,229 @@
+#!/usr/bin/env bash
+# tests/fm-lookout.test.sh - a second mate's lookout on the flagship
+# (bin/fm-lookout.sh). A mate home keeps a lookout on a flagship home through a
+# fake ssh that runs the remote command locally, or fails like a host that does
+# not answer. A fake watcher arm stands in for bin/fm-watch-arm.sh.
+# Covers a fresh beacon, a stale beacon that recovers, a failed recovery with
+# backoff that takes the con, a silent flagship whose con is taken and handed
+# back, the parent-channel facts, the claim the flagship honours, the
+# return-brief lines, and standing the lookout as a watcher check.
+set -u
+
+# shellcheck source=tests/lib.sh
+. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+
+LOOKOUT="$ROOT/bin/fm-lookout.sh"
+TMP_ROOT=$(fm_test_tmproot lookout)
+FAKEBIN=$(fm_fakebin "$TMP_ROOT")
+
+# ssh [options] -- <host> <command>: run <command> locally, or exit 255 like a
+# host that does not answer while $FAKE_SSH_DOWN exists.
+cat > "$FAKEBIN/fake-ssh" <<'SH'
+#!/usr/bin/env bash
+while [ "$#" -gt 0 ] && [ "$1" != -- ]; do shift; done
+shift
+host=$1
+shift
+[ ! -e "${FAKE_SSH_DOWN:-/nonexistent}" ] || { echo "ssh: connect to host $host port 22: Operation timed out" >&2; exit 255; }
+exec /bin/sh -c "$1"
+SH
+# The watcher arm stand-in: counts its runs and reports the status line its
+# mode file asks for.
+cat > "$FAKEBIN/fake-arm" <<'SH'
+#!/usr/bin/env bash
+printf 'run\n' >> "$FAKE_ARM_RUNS"
+if [ "$(cat "$FAKE_ARM_MODE" 2>/dev/null)" = fail ]; then
+  echo 'watcher: FAILED - no live watcher with a fresh beacon'
+  exit 1
+fi
+touch "$FM_HOME/state/.last-watcher-beat"
+echo 'watcher: started pid=4242 (beacon fresh)'
+SH
+chmod +x "$FAKEBIN/fake-ssh" "$FAKEBIN/fake-arm"
+
+export FM_TEST_SEAM=1 FM_LOOKOUT_SSH="$FAKEBIN/fake-ssh" FM_LOOKOUT_ARM="$FAKEBIN/fake-arm"
+
+LEDGER_ROWS='| Review | Title | Package(s) | Published | Needs | Last activity | Host hint |
+|---|---|---|---|---|---|---|
+| https://code.amazon.com/reviews/CR-100 | iOS fix | RewindApp | draft | conflict: needs rebase | 10-05 22:54Z | mini |
+| https://code.amazon.com/reviews/CR-101 | Android fix | RewindApp | draft | dry run red: https://build.example/1 | 10-05 22:54Z | brownfield-desk |
+| https://code.amazon.com/reviews/CR-102 | Both halves | RewindApp | draft | AutoSDE open (1 comments) | 10-05 22:54Z | mini (iOS half), brownfield-desk (Android half) |
+| https://code.amazon.com/reviews/CR-103 | Done | RewindApp | draft | green, ready to publish (no redrive needed) | 10-05 22:54Z | mini |
+| https://code.amazon.com/reviews/CR-104 | Held | RewindApp | draft | dry run red: https://build.example/4 | 10-05 22:54Z | mini |'
+
+# A flagship home in away mode with a fresh beacon, its review ledger and
+# ROUTE lines, and a remote second-mate home keeping a lookout on it.
+make_pair() {  # <name> [stale-secs] -> sets FLAG and MATE
+  local name=$1 stale=${2:-900} now
+  FLAG="$TMP_ROOT/$name/flagship"
+  MATE="$TMP_ROOT/$name/mate"
+  mkdir -p "$FLAG/state" "$FLAG/data/cr-dm-watch" "$MATE/state" "$MATE/config"
+  : > "$FLAG/state/.afk"
+  : > "$FLAG/state/.last-watcher-beat"
+  printf '%s\n' "$LEDGER_ROWS" > "$FLAG/data/cr-dm-watch/overnight-ledger.md"
+  now=$(date +%s)
+  {
+    printf 'progress [at=%s]: ROUTE https://code.amazon.com/reviews/CR-105 to mini-capacity: dry run red (iOS).\n' "$now"
+    printf 'progress [at=%s]: ROUTE https://code.amazon.com/reviews/CR-106 to devdesk-linux: 1 AutoSDE comment open, fix in code.\n' "$now"
+    printf 'progress [at=%s]: ROUTE https://code.amazon.com/reviews/CR-107 to beefy: conflict, needs rebase.\n' "$now"
+    printf 'progress [at=%s]: ROUTE https://code.amazon.com/reviews/CR-108 to beefy: from last week.\n' $((now - 200000))
+  } > "$FLAG/state/cr-driver.status"
+  printf 'schema=fm-secondmate-parent.v1\nroute=remote\nparent_host=laptop\n' > "$MATE/.fm-secondmate-parent"
+  printf 'mini-capacity\n' > "$MATE/.fm-secondmate-home"
+  cat > "$MATE/config/lookout" <<EOF
+flagship_host=laptop
+flagship_home=$FLAG
+flagship_root=$ROOT
+stale_secs=$stale
+backoff_base_secs=300
+login_shell=no
+self_hint=mini
+EOF
+  export FAKE_ARM_RUNS="$TMP_ROOT/$name/arm-runs" FAKE_ARM_MODE="$TMP_ROOT/$name/arm-mode" FAKE_SSH_DOWN="$TMP_ROOT/$name/down"
+}
+
+watch() { OUT=$(FM_HOME="$MATE" "$LOOKOUT" watch 2>&1); RC=$?; }
+on_flagship() { FM_HOME="$FLAG" "$LOOKOUT" "$@"; }
+on_mate() { FM_HOME="$MATE" "$LOOKOUT" "$@"; }
+arm_runs() { [ -f "$FAKE_ARM_RUNS" ] && wc -l < "$FAKE_ARM_RUNS" | tr -d ' ' || echo 0; }
+age_beacon() { fm_touch_epoch $(( $(date +%s) - $1 )) "$FLAG/state/.last-watcher-beat"; }
+MATE_LOG() { cat "$MATE/state/lookout/flagship/events.log" 2>/dev/null; }
+FLAG_LOG() { cat "$FLAG/state/.lookout.log" 2>/dev/null; }
+PARENT() { cat "$MATE/state/parent-replies.status" 2>/dev/null; }
+
+case_fresh_beacon_does_nothing() {
+  make_pair fresh
+  watch
+  expect_code 0 "$RC" "fresh watch"
+  assert_equals '' "$OUT" "a fresh watch woke the mate"
+  assert_equals '' "$(MATE_LOG)" "a fresh beacon recorded an event"
+  assert_absent "$FLAG/state/.lookout.log" "a fresh beacon wrote to the flagship"
+  assert_equals 0 "$(arm_runs)" "a fresh beacon started a recovery"
+  age_beacon 5000
+  rm -f "$FLAG/state/.afk"
+  watch
+  assert_equals 0 "$(arm_runs)" "a stale beacon outside away mode started a recovery"
+  pass "a fresh beacon, or a stale one outside away mode, records nothing, recovers nothing, and wakes no one"
+}
+
+case_stale_beacon_recovers() {
+  make_pair stale
+  age_beacon 4000
+  watch
+  expect_code 0 "$RC" "stale watch"
+  assert_equals '' "$OUT" "a recovered watch woke the mate"
+  assert_equals 1 "$(arm_runs)" "a stale beacon did not run the watcher arm once"
+  assert_contains "$(MATE_LOG)" 's old during away mode (threshold 900s)' "the stale event was not recorded on the mate"
+  assert_contains "$(FLAG_LOG)" "$(printf '\tmini-capacity\tstale\t')" "the stale event did not reach the flagship before the restart"
+  assert_contains "$(PARENT)" 'lookout: the flagship'"'"'s watcher beacon is' "the stale fact was not published on the parent channel"
+  assert_contains "$(PARENT)" 'lookout: restarted the flagship'"'"'s watcher' "the restart was not published on the parent channel"
+  watch
+  assert_contains "$(FLAG_LOG)" 'restarted the flagship'"'"'s watcher: watcher: started pid=4242' "the restart was not recorded on the flagship"
+  assert_contains "$(FLAG_LOG)" 'watcher beacon is fresh again' "the end of the episode was not recorded"
+  pass "a stale beacon is recorded on both vessels and the parent channel, then the watcher arm restarts it"
+}
+
+case_failed_recovery_takes_the_con() {
+  local before brief
+  make_pair failed
+  printf 'fail\n' > "$FAKE_ARM_MODE"
+  on_flagship claim CR-104 --holder flagship-driver >/dev/null || fail "the flagship driver could not claim CR-104"
+  age_beacon 4000
+  watch
+  expect_code 0 "$RC" "failed watch"
+  assert_contains "$OUT" 'lookout: took the con from flagship' "taking the con did not wake the mate"
+  assert_contains "$OUT" 'CR-105 CR-100 CR-102' "the mate was not told which reviews to drive"
+  assert_contains "$(MATE_LOG)" 'could not restart the flagship'"'"'s watcher (attempt 1' "the failed restart was not recorded"
+  assert_contains "$(MATE_LOG)" 'watcher: FAILED - no live watcher' "the arm's failure line was not kept"
+  assert_contains "$(MATE_LOG)" 'took the con of 3 review(s) this mate builds: CR-105 CR-100 CR-102; 1 already held elsewhere; 2 ROUTE line(s) to other desks not delivered' "the con summary is wrong"
+  assert_contains "$(MATE_LOG)" 'ROUTE https://code.amazon.com/reviews/CR-106 to devdesk-linux was not delivered' "an undelivered route was not recorded"
+  assert_not_contains "$(MATE_LOG)" 'CR-108' "a route outside the window was recorded"
+  assert_contains "$(PARENT)" 'working [key=lookout-con-flagship-' "taking the con was not published as a working phase"
+  assert_contains "$(PARENT)" 'could not restart the flagship' "the failed restart was not published"
+  on_mate claimed CR-100 | grep -F 'held by mini-capacity' >/dev/null || fail "the mate does not hold CR-100"
+  on_mate claimed CR-104 | grep -F 'held by flagship-driver' >/dev/null || fail "the mate took a review the flagship driver held"
+  on_mate claimed CR-101 >/dev/null && fail "an Android-only review was claimed by the mate"
+  on_mate claimed CR-103 >/dev/null && fail "a green review was claimed"
+  before=$(arm_runs)
+  watch
+  assert_equals "$before" "$(arm_runs)" "a retry ran before its backoff elapsed"
+  assert_equals '' "$OUT" "a second pass in the same episode woke the mate again"
+  printf 'ok\n' > "$FAKE_ARM_MODE"
+  : > "$FLAG/state/.last-watcher-beat"
+  watch
+  assert_contains "$OUT" 'lookout: handed the con back to flagship' "handing the con back did not wake the mate"
+  on_flagship claimed CR-100 | grep -F 'held by mini-capacity' >/dev/null || fail "the flagship does not see the mate's claim on CR-100"
+  on_flagship claim CR-100 --holder flagship-driver >/dev/null && fail "the flagship driver could double-drive a review the mate holds"
+  [ "$(grep -c "$(printf '\ttook-the-con\t')" "$FLAG/state/.lookout.log")" -eq 1 ] || fail "the con was taken twice in one episode"
+  brief=$(on_flagship brief --since 0)
+  assert_contains "$brief" 'lookout mini-capacity at ' "the return brief has no lookout lines"
+  assert_contains "$brief" 'lookout: CR-100 is still claimed by mini-capacity' "the return brief does not list the held claim"
+  pass "a failed restart backs off and takes the con of the mate's own reviews without taking a held one, and the flagship honours the claims"
+}
+
+case_silent_flagship_hands_back_the_con() {
+  local brief
+  make_pair silent 5
+  : > "$FLAG/state/.last-watcher-beat"
+  watch
+  assert_equals '' "$OUT" "the first pass woke the mate"
+  : > "$FAKE_SSH_DOWN"
+  watch
+  expect_code 0 "$RC" "silent watch"
+  assert_contains "$(MATE_LOG)" 'the flagship did not answer over SSH (exit 255' "the silence was not recorded on the mate"
+  assert_contains "$(PARENT)" 'lookout: the flagship laptop did not answer over SSH' "the silence was not published on the parent channel"
+  assert_absent "$FLAG/state/.lookout.log" "a silent flagship was written to"
+  assert_present "$MATE/state/lookout/flagship/pending" "the silence was not queued for the return brief"
+  sleep 6
+  watch
+  assert_contains "$OUT" 'lookout: took the con from flagship (the flagship has been silent for' "a silent away flagship's con was not taken"
+  on_mate claimed CR-100 >/dev/null || fail "the mate did not claim CR-100 while the flagship was silent"
+  rm -f "$FAKE_SSH_DOWN"
+  : > "$FLAG/state/.last-watcher-beat"
+  watch
+  assert_contains "$OUT" 'lookout: handed the con back to flagship' "the con was not handed back"
+  assert_contains "$(FLAG_LOG)" 'did not answer over SSH' "the queued silence did not reach the flagship"
+  assert_contains "$(FLAG_LOG)" "$(printf '\thanded-back-the-con\t')" "the handback was not recorded on the flagship"
+  assert_contains "$(PARENT)" 'resolved [key=lookout-con-flagship-' "the handback did not resolve the con phase on the parent channel"
+  on_flagship claimed CR-100 | grep -F 'held by mini-capacity' >/dev/null || fail "the flagship lost the mate's claim at handback"
+  on_mate release CR-100 >/dev/null || fail "the mate could not release CR-100"
+  watch
+  on_flagship claimed CR-100 >/dev/null && fail "the release did not reach the flagship"
+  brief=$(on_flagship brief --since 0)
+  assert_not_contains "$brief" 'CR-100 is still claimed' "the return brief lists a released claim"
+  assert_contains "$brief" 'CR-102 is still claimed by mini-capacity' "the return brief lost a held claim"
+  pass "a silent away flagship's con is taken after the threshold and handed back, with claims kept until released"
+}
+
+case_claim_rules() {
+  make_pair claims
+  on_flagship claim https://code.amazon.com/reviews/CR-200 --holder alpha >/dev/null || fail "a free review could not be claimed"
+  on_flagship claim CR-200 --holder beta >/dev/null && fail "a held review was claimed by another holder"
+  on_flagship release CR-200 --holder beta >/dev/null && fail "a non-holder released a claim"
+  on_flagship release CR-200 --holder alpha >/dev/null || fail "the holder could not release"
+  on_flagship claimed CR-200 >/dev/null && fail "a released review still reads held"
+  pass "a review has one holder, and only that holder releases it"
+}
+
+case_stand_registers_a_watcher_check() {
+  local out
+  make_pair stand
+  out=$(on_mate stand) || fail "stand failed: $out"
+  assert_contains "$out" 'lookout stood on the flagship laptop' "stand did not say what it stood"
+  assert_present "$MATE/state/lookout.check-trust" "stand did not register the watcher check"
+  age_beacon 4000
+  out=$(FM_HOME="$MATE" "$MATE/state/lookout.check.sh") || fail "the registered check did not run"
+  assert_equals 1 "$(arm_runs)" "the registered check did not keep the lookout"
+  out=$(on_mate stand-down) || fail "stand-down failed: $out"
+  assert_absent "$MATE/state/lookout.check.sh" "stand-down left the check"
+  rm -f "$MATE/config/lookout"
+  on_mate stand >/dev/null 2>&1 && fail "stand ran without a flagship configured"
+  pass "stand registers the lookout as this home's watcher check, stand-down retires it, and stand refuses without a flagship"
+}
+
+case_fresh_beacon_does_nothing
+case_stale_beacon_recovers
+case_failed_recovery_takes_the_con
+case_silent_flagship_hands_back_the_con
+case_claim_rules
+case_stand_registers_a_watcher_check

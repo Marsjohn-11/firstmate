@@ -12,6 +12,7 @@ Start with the directory layout, then use the setting reference for the behavior
 | Worker permissions, accounts, or environment | [Claude permission mode](#claude-permission-mode-configclaude-permission-mode), [worker account pin](#worker-account-pin-configclaude-account-configpi-account), [worker tool exclusions](#worker-tool-exclusions-configcrew-exclude-tools), and [worker launch environment](#worker-launch-environment-configlaunch-env-allowlist) |
 | Backlog, preferences, and memory | [Backlog backend](#backlog-backend-taskstoml--configbacklog-backend), [captain preferences](#captain-preferences-datacaptainmd--datacaptain-sharedmd), and [startup memory budget](#startup-memory-budget-configstartup-memory-budget) |
 | Supervision and presentation | [Pi supervision branch](#pi-supervision-branch), [supervision host](#supervision-host-configsupervision-host), and [Calm preference](#calm-preference-configcalm) |
+| Unattended away windows | [Batten down before away mode](#batten-down-before-away-mode-configbatten-down) and [second-mate lookout on the flagship](#second-mate-lookout-on-the-flagship-configlookout) |
 | Persistent secondmates | [Secondmate routes](#secondmate-routes-datasecondmatesmd) |
 | Per-run overrides and tuning | [Environment variables](#environment-variables) |
 
@@ -551,6 +552,71 @@ An absent file means `auto`, i.e. default-on on macOS: the alarm exists precisel
 
 A missing or failing channel logs and falls through to the next, never crashing the daemon.
 See [`wedge-alarm.md`](wedge-alarm.md) for the current channel reference, [`verification/supervision.md`](verification/supervision.md#wedge-alarm-channels) for active evidence, and [`examples/wedge-alarm`](examples/wedge-alarm) for a copyable config.
+
+## Batten down before away mode (config/batten-down)
+
+Before `/afk` writes an away record, `bin/fm-afk-launch.sh enter` battens down: `bin/fm-batten-down.sh` checks that the machine can survive an unattended night.
+A failed check refuses entry with exit 4, names the fix on its own line, and writes no away record, so the captain is not away yet.
+When the captain asks to enter anyway, `enter --skip-batten-down` does, and quiet mode is never gated.
+
+The check reads free disk on the volume holding `FM_HOME`, the 1-minute load average, swap in use, the Midway session cookie's expiry, and the watcher beacon while work is under way.
+The Midway check never runs `mwinit`, and it applies only where `mwinit` is installed or the cookie file exists.
+It also lists the largest reclaimable build caches it finds, with how to reclaim each, and deletes nothing.
+
+The optional local, gitignored `config/batten-down` holds one `key=value` per line, and `#` starts a comment.
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `min_free_gb` | `100` | Minimum free disk, in GB |
+| `max_load` | 8 x logical CPUs | Maximum 1-minute load average |
+| `max_swap_gb` | `40` | Maximum swap in use, in GB |
+| `min_midway_hours` | `10` | Minimum Midway session time left, in hours |
+| `midway` | `on` | `off` skips the Midway check |
+| `midway_cookie` | `~/.midway/cookie` | The Midway cookie file |
+
+Each key has an `FM_BATTEN_DOWN_<KEY>` environment override, such as `FM_BATTEN_DOWN_MIN_FREE_GB`.
+`FM_BATTEN_DOWN=off` skips the whole check for one run.
+An invalid value fails its check rather than falling back to the default.
+The script header owns the exact readings, cache candidates, and timing bound.
+
+## Second-mate lookout on the flagship (config/lookout)
+
+A second mate can keep a lookout on the flagship, the main firstmate's home, so a dead watcher there is noticed while the captain sleeps.
+The duty lives in the mate's charter (`bin/fm-brief.sh --secondmate ... --lookout`, owned by `secondmate-provisioning`), and `bin/fm-lookout.sh stand` registers the lookout as a custom check in the mate's own watcher, so it runs on every check sweep with no separate scheduler.
+Each pass reads the flagship's watcher beacon and away posture over SSH.
+A stale beacon during away mode is recorded on both vessels and then repaired with the same watcher arm the Claude Stop hook starts for its handling successor, retried with backoff.
+A flagship that does not answer is recorded on the mate and delivered to the flagship once it answers again.
+It never kills a process on the flagship, deletes nothing, and posts to no external channel.
+
+When the flagship cannot be recovered, the mate takes the con of the overnight reviews it can build itself: it claims them and its watcher wakes it to drive them, while every ROUTE line to another desk is recorded as not delivered.
+When the flagship's heartbeat returns or the captain is back, the mate hands the con back and keeps each claim until it releases it.
+A driver on the flagship honours those claims by running `bin/fm-lookout.sh claimed <review>` before driving a review.
+Every event reaches the main firstmate on the mate's [parent channel](secondmate-parent-channel.md), and the flagship's return brief lists what the lookout saw, did, and still claims.
+
+Set it up in the mate home:
+
+1. Write the mate's local, gitignored `config/lookout`, one `key=value` per line.
+2. Check SSH from the mate's host works without a prompt: `ssh -o BatchMode=yes <flagship_host> true`.
+3. Run `bin/fm-lookout.sh stand`; `bin/fm-lookout.sh stand-down` retires it.
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `flagship_host` | required | SSH destination of the flagship's host |
+| `flagship_home` | required on a remote route; a local route's parent home | The flagship's `FM_HOME` |
+| `flagship_root` | `flagship_home` | The flagship's Firstmate code root |
+| `name` | `flagship` | Label for this lookout's records |
+| `stale_secs` | `900` | Beacon age, and silent time, that counts as down |
+| `backoff_base_secs` / `backoff_max_secs` | `300` / `3600` | Restart retry backoff, doubling from base to max |
+| `connect_timeout_secs` / `ssh_timeout_secs` | `5` / `10` | SSH connect bound and per-call bound, sized so a pass fits the watcher's 30-second check bound |
+| `login_shell` | `yes` | Run the remote command in the flagship user's login shell, for its PATH |
+| `take_the_con` | `on` | `off` records the failure but takes the con of no reviews |
+| `self_name` | the mate's id | This mate's name in ROUTE lines and claims |
+| `self_hint` | `mini` | Ledger host-hint word for reviews this mate builds |
+| `ledger` / `routes` | `data/cr-dm-watch/overnight-ledger.md` / `state/cr-driver.status` | The flagship's review ledger and ROUTE lines, relative to `flagship_home` |
+| `route_window_secs` | `86400` | How old a ROUTE line may be and still count |
+
+`FM_LOOKOUT_SSH` replaces the `ssh` command.
+The script header owns the record files, claim format, and every subcommand.
 
 ## Trace context propagation (config/trace-context / FM_TRACE_CONTEXT)
 
@@ -2500,6 +2566,11 @@ FM_CRASH_BACKOFF=60                # seconds to wait after crossing the crash th
 FM_CRASH_NORMAL_SLEEP=5            # seconds to wait after an isolated watcher crash
 FM_LOG_MAX_BYTES=1048576           # daemon log size that triggers trimming
 FM_LOG_KEEP_LINES=2000             # daemon log lines kept when trimming
+# batten-down check (bin/fm-batten-down.sh); see "Batten down before away mode" above
+FM_BATTEN_DOWN=                    # off skips the check for one run
+FM_BATTEN_DOWN_SIZE_SECS=2         # bound on sizing the reclaimable caches; candidates are listed unsized past it
+# second-mate lookout (bin/fm-lookout.sh); see "Second-mate lookout on the flagship" above
+FM_LOOKOUT_SSH=ssh                 # the ssh command a lookout uses to reach the flagship
 # supervision host (bin/fm-supervision-host.sh); read only in a home that runs it
 FM_SUPERVISION_HOST_PARK_SECONDS=27000   # the host ends its park with a cycle-boundary wake after this long, under the Stop hook's 28800 s timeout
 FM_SUPERVISION_HOST_TURN_TIMEOUT=1200    # bound on one engine turn; a turn that hits it hands its wake to main
