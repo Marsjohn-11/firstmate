@@ -59,15 +59,16 @@ fragment=$(fm_claude_denied_mcp_servers_json "$LAB/config") || fail "the denylis
 [ -n "$fragment" ] || fail "the denylist library built no fragment from a non-empty file"
 
 servers_started() {  # <settings-json> <out-file>
-  local settings=$1 out=$2 pid i
+  local settings=$1 out=$2 pid pids
   : >"$out"
   (cd "$LAB/work" && claude -p --plugin-dir "$LAB/plugin" --settings "$settings" \
     --mcp-config "$LAB/mcp.json" -- 'Run no tools. Reply with the single word ok.' \
     >"$LAB/claude.out" 2>&1) &
   pid=$!
-  for i in $(seq 1 60); do
+  for _ in $(seq 1 60); do
     sleep 0.5
-    { ps -eo args= | grep -F "$LAB/server.sh" | grep -v grep || true; } >>"$out"
+    pids=$(pgrep -d, -f "$LAB/server.sh" || true)
+    [ -z "$pids" ] || ps -o args= -p "$pids" >>"$out" 2>/dev/null || true
     kill -0 "$pid" 2>/dev/null || break
   done
   wait "$pid" || fail "claude -p failed under $CLAUDE_VERSION: $(cat "$LAB/claude.out")"
@@ -77,8 +78,9 @@ servers_started() {  # <settings-json> <out-file>
 servers_started '{"feedbackDrafts":"off"}' "$LAB/baseline"
 servers_started "{\"feedbackDrafts\":\"off\"$fragment}" "$LAB/denied"
 
-grep -q 'plugin-copy' "$LAB/baseline" && grep -q 'config-copy' "$LAB/baseline" || fail \
-  "baseline session under $CLAUDE_VERSION did not start both probe servers, so the denied run would prove nothing: $(sort -u "$LAB/baseline")"
+if ! grep -q 'plugin-copy' "$LAB/baseline" || ! grep -q 'config-copy' "$LAB/baseline"; then
+  fail "baseline session under $CLAUDE_VERSION did not start both probe servers, so the denied run would prove nothing: $(sort -u "$LAB/baseline")"
+fi
 grep -q 'config-copy' "$LAB/denied" || fail \
   "claude $CLAUDE_VERSION denied the --mcp-config server too: $(sort -u "$LAB/denied")"
 grep -q 'plugin-copy' "$LAB/denied" && fail \
