@@ -26,16 +26,15 @@
 # result. Without it, failures are printed and returned to the direct caller
 # for tests and diagnostics.
 #
-# A worker that misses its deadline is killed mid-attempt, and one that dies
-# otherwise may not have run its own cleanup either, so after any worker
-# failure the parent removes that attempt's temporary files itself. Each worker
-# tags its temporary names with its parent's pid, so a concurrent attempt's
-# files are never touched. A missed deadline is also recorded in
-# state/.home-summary-refresh.backoff: one line holding the count of
-# consecutive deadline misses, with the file's mtime marking the latest one. A
-# successful publication removes the record. The watcher reads it to back off
-# its own refresh triggers (bin/fm-watch.sh home_summary_refresh_detached);
-# session start, spawn, and teardown ignore it.
+# A worker that misses its deadline is killed mid-attempt and may not have run
+# its own cleanup, so after a missed deadline the parent removes that attempt's
+# temporary files itself. Each worker tags its temporary names with its
+# parent's pid, so a concurrent attempt's files are never touched. A missed
+# deadline is also recorded in state/.home-summary-refresh.backoff: one line
+# holding the count of consecutive deadline misses, with the file's mtime
+# marking the latest one. A successful publication removes the record. The
+# watcher reads it to back off its own refresh triggers (bin/fm-watch.sh
+# home_summary_refresh_detached); session start, spawn, and teardown ignore it.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -225,8 +224,8 @@ home_summary_log_failure() {
   fi
 }
 
-# Parent side of a worker failure: a killed worker's EXIT trap may never have
-# run, so remove the temporary files this attempt tagged.
+# Parent side of a missed deadline: the killed worker's EXIT trap may never
+# have run, so remove the temporary files this attempt tagged.
 home_summary_reap_attempt() {
   rm -f -- "$STATE/.home-summary.json.$$."* "$STATE/.home-summary-error.$$."* \
     2>/dev/null || true
@@ -263,8 +262,10 @@ if [ "$HOME_SUMMARY_MODE" = parent ]; then
   else
     refresh_rc=$?
   fi
-  home_summary_reap_attempt
-  [ "$refresh_rc" -ne 124 ] || home_summary_record_deadline_miss
+  if [ "$refresh_rc" -eq 124 ]; then
+    home_summary_reap_attempt
+    home_summary_record_deadline_miss
+  fi
   if [ "$BEST_EFFORT" -eq 1 ]; then
     if [ "$refresh_rc" -eq 124 ]; then
       parent_error="refresh exceeded its ${HOME_SUMMARY_TIMEOUT}-second deadline"
