@@ -1,0 +1,31 @@
+== fm-send kirot1 (harness=kiro)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.0vNtg9
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+exit=0
+== fm-send kirot2 (harness=claude)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.0vNtg9
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+fm-send: doorbell skipped (composer visibly holds pending text); the steer is durably recorded at /tmp/fm-lab.0vNtg9/state/kirot2.inbox/001.msg and the watcher will re-ring
+exit=0
+--- pane kirotc after send
+    its handled/.
+• I'll check the inbox for messages and process them in order.
+↓ Shell echo "FM_TASK_INBOX=$FM_TASK_INBOX"; ls -1 "$FM_TASK_INBOX"/*.msg 2>/dev/null | sort -V
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ shell requires approval
+ ❯ Yes, single permission
+   Trust, always allow in this session
+   No (Tab to edit)
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ esc to close · ↑↓ to navigate · ↵ to select · Tab to edit
+--- pane kiro after send
+                                          Tip: Press Ctrl+O to expand a tool's full output, then again to collapse it.
+• Agent sandboxing is enabled — your AI agent receives short-lived AWS credentials instead of direct access to your ~/.aws directory. Learn more:
+  https://w.amazon.com/bin/view/BuilderTools/GenAIDevX/AgentSandboxing
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ✨ What's new: Cloud sessions, specs, expanded hooks, improved trust model and workflows.
+ ctrl+o to expand
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+kiro_default · auto · ◔ 8% · Midway: 18h 24m                                                                                          /tmp/fm-lab.0vNtg9/scratch
+›  ask a question or describe a task ↵
+                                                                                                                                             /copy to clipboard

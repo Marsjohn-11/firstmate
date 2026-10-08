@@ -1,0 +1,45 @@
+
+[38;5;174m ▐[48;5;16m▛███▛█[39m[49m   [1mClaude Code[0m [38;5;246mv2.1.288[39m
+[38;5;174m▝▜[48;5;16m█████[49m█▀[39m  [38;5;246mOpus (1M context) · Amazon Bedrock[39m
+[38;5;174m ▝▝   ▝▝ [39m  [38;5;246m/local/home/marsjohn/.no-mistakes/worktrees/912b065c2da1/01M4D6BKDSCNBQB5TWN9DZY98H[39m
+
+[38;5;174m▎[39m Claude Code usage is cleared for Business Data per the AI For Me Guidance.
+[38;5;174m▎[39m ITAR, PII, Customer Data, and more are strictly prohibited for use within this tool.
+[38;5;174m▎[39m Read more: https://w.amazon.com/bin/view/Security/AI-Security/AIforMe-Guidance#HDATAANDEXAMPLESQUICKREFERENCETABLE
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  [38;5;153m/[1mexit[0m[38;5;153m                                                           [1mExit[0m[38;5;153m the CLI[39m
+  [38;5;246m/context                                                        Visualize current context usage as a colored grid[39m
+  [38;5;246m/AmazonBuilderCoreAIAgents-core:wiki-edit                       (AmazonBuilderCoreAIAgents-core) Amazon internal wiki edit operations using the raw tool,[39m
+                                                                  [38;5;246mRustyAmazonWiki. When user asks to write, create, delete Amazon internal wiki pages. Or to …[39m
+[38;5;244m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m❯ [38;5;153m/exit[7m[39m [0m
+[38;5;244m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m  [36mOpus (1M context)[38;5;246m | Context: [32m0%[38;5;246m | Midway: [32m18h 30m[39m
+  [38;5;220m⏵⏵ auto mode on[38;5;246m (shift+tab to cycle)[39m

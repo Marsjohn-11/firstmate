@@ -1,0 +1,18 @@
+bin=/home/marsjohn/.no-mistakes/worktrees/912b065c2da1/01M4D6BKDSCNBQB5TWN9DZY98H/bin
+  target=primary:0.0  FM_COMPOSER_HARNESS=      -> empty
+  target=claudetc:0.0 FM_COMPOSER_HARNESS=      -> empty
+  target=kiro:0.0     FM_COMPOSER_HARNESS=      -> pending
+  target=kirotc:0.0   FM_COMPOSER_HARNESS=      -> pending
+  target=primary:0.0  FM_COMPOSER_HARNESS=kiro  -> empty
+  target=claudetc:0.0 FM_COMPOSER_HARNESS=kiro  -> empty
+  target=kiro:0.0     FM_COMPOSER_HARNESS=kiro  -> empty
+  target=kirotc:0.0   FM_COMPOSER_HARNESS=kiro  -> empty
+bin=/tmp/fm-old-e938be0/bin
+  target=primary:0.0  FM_COMPOSER_HARNESS=      -> empty
+  target=claudetc:0.0 FM_COMPOSER_HARNESS=      -> empty
+  target=kiro:0.0     FM_COMPOSER_HARNESS=      -> empty
+  target=kirotc:0.0   FM_COMPOSER_HARNESS=      -> empty
+  target=primary:0.0  FM_COMPOSER_HARNESS=kiro  -> empty
+  target=claudetc:0.0 FM_COMPOSER_HARNESS=kiro  -> empty
+  target=kiro:0.0     FM_COMPOSER_HARNESS=kiro  -> empty
+  target=kirotc:0.0   FM_COMPOSER_HARNESS=kiro  -> empty
