@@ -215,6 +215,7 @@ test_kiro_composer_glyph_and_placeholder() {
   local esc caps caps_plain row screen plain state stripped
   # The callers that know a target's recorded harness name it for their composer
   # reads; the near-gray ceiling and the hinted idle row apply only to kiro.
+  # shellcheck disable=SC2034 # read by the sourced composer lib at call time
   local FM_COMPOSER_HARNESS=kiro
   esc=$(printf '\033')
   caps=$'styled=1\ncursor=1\nrows=6'
