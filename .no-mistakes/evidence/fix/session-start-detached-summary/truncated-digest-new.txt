@@ -1,0 +1,7 @@
+[new-truncated] digest exit=0 elapsed_ms=5069 lines=19
+[new-truncated] ledger present at digest return: no
+[new-truncated] refresh still running: yes
+[new-truncated] ledger after wait: {"schema":"fm-secondmate-home-summary.v1","home":"/tmp/fm-lab.VdJA3v","generated":"2026-10-08T02:36:28Z"}
+[new-truncated] refresh log: (none)
+[new-truncated] 11:●  STARTUP TRUNCATED - SESSION START HIT ITS 5s RUNTIME BOUND
+[new-truncated] 12:●  It stopped during the "lock" stage, so everything above is COMPLETE

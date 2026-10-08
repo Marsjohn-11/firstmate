@@ -1,0 +1,5 @@
+[base] digest exit=0 elapsed_ms=28740 lines=127
+[base] ledger present at digest return: yes
+[base] refresh still running: no
+[base] ledger after wait: {"schema":"fm-secondmate-home-summary.v1","home":"/tmp/fm-lab.TGq7gi","generated":"2026-10-08T02:34:43Z"}
+[base] refresh log: (none)

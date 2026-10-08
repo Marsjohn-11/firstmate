@@ -1,0 +1,4 @@
+full start: exit=0 ledger=present
+ledger removed; running --reemit
+reemit: exit=0 lines=130 header=SESSION START (CONTEXT RE-EMIT) - /tmp/fm-lab.LtABVG
+ledger after reemit + 8s: absent
