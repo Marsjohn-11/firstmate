@@ -231,6 +231,17 @@ fm_composer_normalize_trim_var() {  # <varname>
   printf -v "$__fmnt_name" '%s' "$__fmnt_text"
 }
 
+# fm_composer_kiro_scope: 0 when the caller has named the pane's harness as kiro
+# through FM_COMPOSER_HARNESS, the one input that turns on the kiro-only composer
+# rules (the near-gray ghost ceiling in fm_composer_strip_ghost and the hinted
+# idle row, FM_COMPOSER_HINTED_IDLE_RE_DEFAULT). A caller that knows its target's
+# recorded harness sets it for its reads (bin/fm-send.sh, bin/fm-control.sh, the
+# watcher's and process-event re-rings); an unset or other value leaves every
+# read exactly as it was before kiro existed.
+fm_composer_kiro_scope() {
+  [ "${FM_COMPOSER_HARNESS:-}" = kiro ]
+}
+
 # fm_composer_strip_ghost: the ONE fleet-wide ANSI-aware extractor of "real typed
 # content" from a captured, styled composer row. Reads the styled line on stdin
 # (from `tmux capture-pane -e`, `herdr pane read --format ansi`, or
@@ -246,50 +257,52 @@ fm_composer_normalize_trim_var() {  # <varname>
 #     dark-foreground run. This assumes a DARK terminal theme, the firstmate
 #     fleet reality, where real typed input is bright and only de-emphasised UI
 #     is dark; the SGR-2 signal above stays theme-independent. A 256-colour
-#     foreground (38;5;n) is luminance-tested only when the index is GREY in the
-#     standard xterm-256 palette, described below.
+#     foreground (38;5;n) is NOT luminance-tested - it is palette-dependent and
+#     no fleet harness except kiro (below) uses it for ghost text, so it is kept
+#     (real text wins: under-stripping merely defers, which the max-defer alarm
+#     surfaces, while over-stripping would inject over real input).
 # Raising FM_COMPOSER_GHOST_LUMA_MAX is not free: muse draws its `⟩` prompt glyph
 # in truecolor 38;2;90;160;255, luminance ~149.9 (verified, muse 0.1.0-R708.1),
 # the tightest margin over the 128 default in the fleet. Above ~150 that glyph is
 # stripped as ghost text, which is why the bare-glyph fallback below must also
 # recognise every agent glyph from the UNSTRIPPED plain row.
 #
-# A NEAR-ACHROMATIC truecolor run gets a higher ceiling instead, because that is
-# what separates ghost text from real input without needing to know the harness:
+# KIRO ONLY: when the caller names the pane's harness as kiro
+# (FM_COMPOSER_HARNESS=kiro, see fm_composer_kiro_scope), a NEAR-ACHROMATIC run
+# gets a higher ceiling, because kiro draws its idle placeholder in a grey above
+# the 128 default. Every other harness, and a read with no harness named, keeps
+# exactly the rules above: the wider ceiling read Claude's grey slash-command
+# input (38;2;112;112;112, which the herdr payload proof reads with
+# FM_COMPOSER_GHOST_LUMA_MAX=0) as a placeholder, so it is not a fleet default.
 #   FM_COMPOSER_GHOST_GRAY_LUMA_MAX (default 180) applies when
 #   FM_COMPOSER_GHOST_GRAY_SPREAD_MAX (default 12) covers the run's channel
 #   spread (max channel minus min channel); every other run keeps the 128 default.
 # The gray ceiling only ever RAISES the applicable ceiling. A near-gray run takes
 # the higher of the two, so an operator who raises FM_COMPOSER_GHOST_LUMA_MAX
 # above 180 still gets that wider strip on gray text as the knob documents.
-# The four measured cases this separates:
 #   kiro ghost      38;2;158;158;158  luminance 158.0  spread   0  -> stripped
-#   rovo ghost      38;2;162;163;165  luminance 162.9  spread   3  -> stripped
-#   rovo real text  38;2;206;207;210  luminance 207.0  spread   4  -> kept
+#   grey real text  38;2;206;207;210  luminance 207.0  spread   4  -> kept
 #   muse real glyph 38;2;90;160;255   luminance 149.9  spread 165  -> kept
-# Margins around 180 are 17 below (rovo's ghost at 162.9) and 27 above (rovo's
-# real text at 207.0). muse is strongly chromatic, so no luminance ceiling can
-# reach it - a structural property rather than a tuned margin, and the reason a
-# gray-only ceiling is safe where raising the shared default was not.
-# The SAME grey ceiling covers a 256-colour foreground, because a harness draws
-# the same grey in whichever encoding the terminal advertises: kiro emits
+# The same scope also luminance-tests a 256-colour foreground, because kiro
+# draws the same grey in whichever encoding the terminal advertises:
 # 38;2;158;158;158 on a truecolor pane and 38;5;247 - the identical grey, xterm
-# level 158 - on a pane with no COLORTERM, so testing only truecolour left kiro's
-# placeholder unstripped and every steer to that worker deferring forever. Only
-# the 232-255 greyscale ramp (level 8 + (n-232)*10) is tested, because it is the
-# one index range whose RGB is fixed by definition rather than by a terminal
-# theme. The 6x6x6 cube's r==g==b diagonal is arithmetically grey too and stays
-# untested: no harness has been measured drawing ghost text there, and widening
-# the predicate is how the palette-dependence problem the 38;5 carve-out exists
-# for gets in. A chromatic index is kept untested rather than converted, and
-# indices 0-15 stay untested because every terminal theme remaps them. The base
-# 30-37 / 90-97 foregrounds still just end a dark run.
+# level 158 - on a pane with no COLORTERM. Only the 232-255 greyscale ramp
+# (level 8 + (n-232)*10) is tested, because it is the one index range whose RGB
+# is fixed by definition rather than by a terminal theme. The 6x6x6 cube's
+# r==g==b diagonal is arithmetically grey too and stays untested: kiro has not
+# been measured drawing ghost text there, and widening the predicate is how the
+# palette-dependence problem the 38;5 carve-out exists for gets in. A chromatic
+# index is kept untested rather than converted, and indices 0-15 stay untested
+# because every terminal theme remaps them. The base 30-37 / 90-97 foregrounds
+# still just end a dark run.
 # The dim/faint and dark-foreground states are tracked together as "de-emphasis";
 # codes are processed left to right within a sequence, so "ESC[0;2m" reads as dim.
 # LC_ALL=C makes awk walk bytes, so multibyte glyphs (e.g. ❯) and de-emphasised
 # runs alike pass through or drop intact without locale-dependent classes.
 fm_composer_strip_ghost() {
-  LC_ALL=C awk -v lumamax="${FM_COMPOSER_GHOST_LUMA_MAX:-128}" \
+  local grayscope=0
+  fm_composer_kiro_scope && grayscope=1
+  LC_ALL=C awk -v lumamax="${FM_COMPOSER_GHOST_LUMA_MAX:-128}" -v grayscope="$grayscope" \
     -v graylumamax="${FM_COMPOSER_GHOST_GRAY_LUMA_MAX:-180}" \
     -v grayspreadmax="${FM_COMPOSER_GHOST_GRAY_SPREAD_MAX:-12}" '
     function sgr_code(v, b) {
@@ -309,19 +322,21 @@ fm_composer_strip_ghost() {
       return p + 1
     }
     # ceiling_for: the luminance ceiling that applies to one truecolor run.
-    # A NEAR-ACHROMATIC run (max channel minus min channel within
-    # grayspreadmax) takes the HIGHER of graylumamax and lumamax, so the gray
-    # ceiling only ever raises the applicable ceiling and never reduces an
-    # operator-set one. Anything more saturated keeps lumamax.
+    # Outside the kiro scope (grayscope 0) that is always lumamax. Inside it, a
+    # NEAR-ACHROMATIC run (max channel minus min channel within grayspreadmax)
+    # takes the HIGHER of graylumamax and lumamax, so the gray ceiling only ever
+    # raises the applicable ceiling and never reduces an operator-set one.
+    # Anything more saturated keeps lumamax.
     function ceiling_for(r, g, b,   hi, lo) {
+      if (!grayscope) return lumamax
       hi = r; if (g > hi) hi = g; if (b > hi) hi = b
       lo = r; if (g < lo) lo = g; if (b < lo) lo = b
       if ((hi - lo) > grayspreadmax) return lumamax
       return (graylumamax > lumamax) ? graylumamax : lumamax
     }
     # palette_gray_level: the channel level of a 256-colour index in the 232-255
-    # greyscale ramp, and -1 for EVERY other index. A ramp entry has
-    # r == g == b, so its level IS its luminance.
+    # greyscale ramp, and -1 for EVERY other index and for every index outside
+    # the kiro scope. A ramp entry has r == g == b, so its level IS its luminance.
     #
     # The ramp alone is deliberate, not an oversight. It is the only index range
     # whose RGB is fixed by definition rather than by a theme, so it needs no
@@ -331,6 +346,7 @@ fm_composer_strip_ghost() {
     # the 38;5 carve-out warns about gets in. The test asserting an index outside
     # 232-255 is untouched exists to hold that line.
     function palette_gray_level(n) {
+      if (!grayscope) return -1
       if (n >= 232 && n <= 255) return 8 + (n - 232) * 10
       return -1
     }
@@ -338,9 +354,9 @@ fm_composer_strip_ghost() {
       return (lv >= 0 && lv < ceiling_for(lv, lv, lv)) ? 1 : 0
     }
     # fg38_is_dark: 1 when the SGR 38 foreground starting at param p is a
-    # TRUECOLOR (38;2 / 38:2) or a PALETTE GREY (38;5 / 38:5) whose luminance is
-    # below the ceiling that applies to it; 0 otherwise (a chromatic palette
-    # index, a bright colour, or a malformed run).
+    # TRUECOLOR (38;2 / 38:2), or in the kiro scope a PALETTE GREY (38;5 / 38:5),
+    # whose luminance is below the ceiling that applies to it; 0 otherwise (any
+    # other palette index, a bright colour, or a malformed run).
     function fg38_is_dark(a, p, k,   spec, nf, f, r, g, b) {
       spec = a[p]
       if (index(spec, ":") > 0) {           # colon form: whole colour in a[p]
@@ -556,8 +572,9 @@ FM_COMPOSER_SHELL_PROMPT_GLYPHS=$(printf '%s\n' '>' '$' '%' '#')
 # unverified harness; matching is case-insensitive.
 FM_COMPOSER_IDLE_RE_DEFAULT='^Type a message\.\.\.$|^Ask anything(\.\.\.|…)|^Plan, search, build anything$|^Add a follow-up$|^Ask Devin to build features, fix bugs, or work on your code$'
 
-# Idle placeholders that carry a submit hint typed input never renders, so the
-# whole anchored row proves an empty composer whatever its colour. kiro-cli
+# KIRO ONLY (fm_composer_kiro_scope): idle placeholders that carry a submit hint
+# typed input never renders, so the whole anchored row proves an empty composer
+# whatever its colour. Every other harness ignores this set. kiro-cli
 # 2.21.x draws `ask a question or describe a task ↵` in near-gray, which the
 # ghost strip removes; 2.28.0 draws the same row in the default foreground,
 # which no stripper can remove. Typed text, even the placeholder words, renders
@@ -780,7 +797,7 @@ fm_composer_classify_content() {  # <bordered> <content> [idle_re] [idle_case] [
   fi
   fm_composer_normalize_trim_var content
   [ -n "$content" ] || { printf 'empty'; return 0; }
-  if [ -n "$idle_re" ] \
+  if [ -n "$idle_re" ] && fm_composer_kiro_scope \
      && fm_composer_idle_matches "$content" "$FM_COMPOSER_HINTED_IDLE_RE_DEFAULT" sensitive; then
     printf 'empty'; return 0
   fi
@@ -1649,15 +1666,17 @@ _fm_composer_select_cursorless() {
   fi
   if [ "$FM_COMPOSER_SELECTED_KIND" = bare ]; then
     next=$((FM_COMPOSER_SELECTED_LAST + 1))
-    # A hinted idle placeholder is the whole composer, so the row below it
-    # (kiro's `/copy to clipboard` footer) is never wrapped input.
-    trimmed=$(_fm_composer_screen_row "$FM_COMPOSER_SELECTED_FIRST" "$plain")
-    fm_composer_normalize_trim_var trimmed
-    if fm_composer_leading_agent_glyph_var glyph "$trimmed"; then
-      trimmed=${trimmed#*"$glyph"}
+    # In the kiro scope a hinted idle placeholder is the whole composer, so the
+    # row below it (kiro's `/copy to clipboard` footer) is never wrapped input.
+    if fm_composer_kiro_scope; then
+      trimmed=$(_fm_composer_screen_row "$FM_COMPOSER_SELECTED_FIRST" "$plain")
       fm_composer_normalize_trim_var trimmed
-      fm_composer_idle_matches "$trimmed" "$FM_COMPOSER_HINTED_IDLE_RE_DEFAULT" sensitive \
-        && next=-1
+      if fm_composer_leading_agent_glyph_var glyph "$trimmed"; then
+        trimmed=${trimmed#*"$glyph"}
+        fm_composer_normalize_trim_var trimmed
+        fm_composer_idle_matches "$trimmed" "$FM_COMPOSER_HINTED_IDLE_RE_DEFAULT" sensitive \
+          && next=-1
+      fi
     fi
     while [ "$next" -ge 0 ]; do
       raw=$(_fm_composer_screen_row "$next" "$plain")

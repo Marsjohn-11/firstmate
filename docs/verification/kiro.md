@@ -80,7 +80,7 @@ Seeding that setting into the per-task `KIRO_HOME` suppresses the modal, and a p
 ## Rendered surface (V2 TUI)
 
 - Composer glyph: `›` (U+203A), the same glyph codex draws.
-- Idle placeholder: `ask a question or describe a task` (followed by a `↵` hint), drawn in truecolor near-gray `38;2;158;158;158` at luminance 158. That clears the shared 128 ghost ceiling, so the near-achromatic ceiling in `fm_composer_strip_ghost` is what strips it back to the bare glyph on a styled capture. kiro-cli 2.28.0 draws the same row in the default foreground, which no stripper removes; the `↵` hint, which typed input never renders (verified live on 2.28.0), is what `FM_COMPOSER_HINTED_IDLE_RE_DEFAULT` matches, so that row and an unstyled capture read `empty` while the placeholder words typed as input read `pending`. A cursorless read stops the composer at that hinted row, so the `/copy to clipboard` footer below it is never taken for wrapped input.
+- Idle placeholder: `ask a question or describe a task` (followed by a `↵` hint), drawn in truecolor near-gray `38;2;158;158;158` at luminance 158. That clears the shared 128 ghost ceiling, so the kiro-scoped near-achromatic ceiling in `fm_composer_strip_ghost` is what strips it back to the bare glyph on a styled capture. kiro-cli 2.28.0 draws the same row in the default foreground, which no stripper removes; the `↵` hint, which typed input never renders (verified live on 2.28.0), is what `FM_COMPOSER_HINTED_IDLE_RE_DEFAULT` matches, so that row and an unstyled capture read `empty` while the placeholder words typed as input read `pending`. A cursorless read stops the composer at that hinted row, so the `/copy to clipboard` footer below it is never taken for wrapped input.
 - Busy footer: `› Kiro is working · Type to steer · Ctrl+S to queue`. The delivery guard matches the harness-named `Kiro is working` literal, not the bare `esc to cancel` token kiro also renders in its tool region and shares with agy. It is never a recorded worker state, and its one reachable consumer is the harness-less union in `FM_DELIVERY_BUSY_REGEX_DEFAULT` that the tmux submit core reads to acknowledge a submit.
 `FM_DELIVERY_KIRO_BUSY_REGEX_DEFAULT` is registered per the fleet convention that every verified harness declares its own signature, and has no caller today: away-mode injection reads the primary harness and the pending-reply observation reads a secondmate's harness, neither of which kiro can ever be.
 
@@ -113,16 +113,17 @@ Re-running the guard on the Linux desk where the real tool lives is what would p
 ## Steering a kiro worker: fixed
 
 A real idle kiro composer used to classify as `pending`, and `fm_task_inbox_ring` defers on an exact `pending`, so every steer was skipped and the watcher re-rang forever because the verdict never changed.
-`fm_backend_composer_state` returning `pending` on a live idle pane was reproduced directly, and the cause is a colour threshold rather than anything kiro-specific.
+`fm_backend_composer_state` returning `pending` on a live idle pane was reproduced directly, and the cause is a colour threshold.
 
 kiro draws its idle placeholder in truecolor `38;2;158;158;158`, luminance 158.0, above the 128 `FM_COMPOSER_GHOST_LUMA_MAX` default, so `fm_composer_strip_ghost` left it in place and it read as real typed content.
-rovo had the same defect from the same cause at luminance 162.9, recorded in `rovo.md`, so this was never a kiro-only problem.
 
 The fix applies a higher ceiling only to NEAR-ACHROMATIC truecolor runs, `FM_COMPOSER_GHOST_GRAY_LUMA_MAX` (default 180) within `FM_COMPOSER_GHOST_GRAY_SPREAD_MAX` (default 12) of channel spread, and keeps 128 for anything more saturated.
-That separates all four measured cases without threading a harness argument through the shared composer entry points: kiro's ghost at spread 0 and rovo's at spread 3 strip, rovo's real typed text is also near-gray but separated by luminance at 207.0 and is kept, and muse's real prompt glyph at spread 165 is strongly chromatic and unreachable by any luminance ceiling.
-`bin/fm-composer-lib.sh`'s ghost-strip comment owns the measured values and both margins.
+It applies only on a kiro pane: a caller that knows the target's recorded harness names it through `FM_COMPOSER_HARNESS`, and `fm_composer_kiro_scope` in `bin/fm-composer-lib.sh` turns on this ceiling, the palette-grey test below, and the hinted idle row only for `kiro`.
+Every other harness, and a read with no harness named, keeps the shared rules unchanged, because the wider ceiling also strips Claude's typed slash command, which Claude draws in grey `38;2;112;112;112`, so a herdr exit proof judged a typed `/exit` unsent.
+Inside the kiro scope, kiro's ghost at spread 0 strips, near-gray real text at luminance 207.0 is kept, and muse's chromatic prompt glyph at spread 165 is unreachable by any luminance ceiling.
+`bin/fm-composer-lib.sh`'s ghost-strip comment owns the measured values.
 
-The same ceiling covers the 256-colour encoding of the same grey, because the encoding follows the pane's terminal rather than the harness.
+On a kiro pane the same ceiling covers the 256-colour encoding of the same grey, because the encoding follows the pane's terminal rather than the harness.
 A kiro crewmate launched into a pane with no `COLORTERM` draws the placeholder as `38;5;247`, xterm grey level 158 - the identical colour - and while only truecolour was luminance-tested that pane's composer read `pending`, so every steer to that worker was skipped and the doorbell never rang.
 A palette index is tested only when it falls in the 232-255 greyscale ramp, whose RGB is fixed by definition rather than by a theme.
 Every other index is kept untested: a chromatic index carries no fixed grey to measure, indices 0-15 are remapped by every terminal theme, and the 6x6x6 cube's `r == g == b` diagonal is arithmetically grey but has not been measured carrying any harness's ghost text, so testing it would reintroduce the palette-dependence problem the carve-out exists for.
@@ -133,7 +134,7 @@ A limit stated plainly can be tested against reality; the same limit left unstat
 `tests/fm-composer-lib.test.sh` pins the palette greys alongside the truecolor cases, and `tests/fm-kiro-harness.test.sh` classifies kiro's idle row in both encodings, each reading `empty`.
 
 Verified two ways.
-`tests/fm-composer-lib.test.sh` pins the four cases and fails on pre-fix code, with rovo's real text and muse's glyph written as explicit non-regression assertions.
+`tests/fm-composer-lib.test.sh` pins the kiro-scoped cases and fails on pre-fix code, with near-gray real text and muse's glyph written as explicit non-regression assertions, and proves that without the kiro scope the same grey runs and the hinted idle row are read exactly as before.
 Classifying a capture of a live kiro idle pane with tmux's actual descriptor (`styled=1 cursor=1 identity=1 rows=0`) and the cursor on the composer row returns `empty` after the fix, where it returned `pending` before.
 
 Two earlier claims in this record were wrong and are corrected here.

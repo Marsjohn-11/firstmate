@@ -213,6 +213,9 @@ test_kiro_record_is_the_only_state_source() {
 
 test_kiro_composer_glyph_and_placeholder() {
   local esc caps caps_plain row screen plain state stripped
+  # The callers that know a target's recorded harness name it for their composer
+  # reads; the near-gray ceiling and the hinted idle row apply only to kiro.
+  local FM_COMPOSER_HARNESS=kiro
   esc=$(printf '\033')
   caps=$'styled=1\ncursor=1\nrows=6'
   caps_plain=$'styled=0\nrows=6'
@@ -241,6 +244,11 @@ test_kiro_composer_glyph_and_placeholder() {
     || fail "kiro's near-gray placeholder must strip to the bare glyph, got '$stripped'"
   state=$(fm_composer_classify_screen "$caps" "$screen" 1)
   [ "$state" = empty ] || fail "kiro's styled idle row must read empty, got '$state'"
+  # SCOPE: the same row read without naming kiro keeps the shared rules, so the
+  # empty verdict above comes from the kiro scope and nothing else.
+  state=$(FM_COMPOSER_HARNESS='' fm_composer_classify_screen "$caps" "$screen" 1)
+  [ "$state" = pending ] \
+    || fail "kiro's idle row read with no harness named must keep the shared verdict pending, got '$state'"
 
   # The SAME idle row on a pane whose terminal advertises no truecolor: kiro
   # draws the placeholder as 256-colour 38;5;247, xterm grey level 158, the
