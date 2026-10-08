@@ -564,7 +564,8 @@ pass "best-effort refresh bounds validation and publication"
 
 # A worker killed at its deadline never runs its own cleanup, so the parent
 # must remove that attempt's temporary files and record the miss for the
-# watcher's backoff. A validation stall that ignores TERM forces the KILL path.
+# watcher's backoff. A validation stall that ignores TERM forces the KILL path;
+# the deadline leaves the producer room to reach that stall on a loaded host.
 STUBBORNBIN="$TMP_ROOT/stubbornbin"
 STUBBORN_MARKER="$TMP_ROOT/stubborn-stalled"
 mkdir -p "$STUBBORNBIN"
@@ -588,7 +589,7 @@ for attempt in 1 2; do
   rm -f "$STUBBORN_MARKER"
   PATH="$STUBBORNBIN:$FAKEBIN:$PATH" FM_TEST_REAL_JQ="$REAL_JQ" \
     FM_TEST_STUBBORN_MARKER="$STUBBORN_MARKER" \
-    FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$HOME_DIR" FM_HOME_SUMMARY_TIMEOUT=1 \
+    FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$HOME_DIR" FM_HOME_SUMMARY_TIMEOUT=3 \
     "$WRITER" --best-effort \
     || fail "a killed worker changed the best-effort caller result"
   [ -e "$STUBBORN_MARKER" ] || fail "the stubborn validation stall was never reached"
