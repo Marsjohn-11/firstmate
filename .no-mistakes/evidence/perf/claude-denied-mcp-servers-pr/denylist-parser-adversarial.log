@@ -1,0 +1,16 @@
+## valid with comments/blank/CRLF/indent
+rc=0 out=,"deniedMcpServers":[{"serverName":"plugin:p:srv"},{"serverName":"other.server-1"},{"serverName":"last_no_newline"}]
+{"a":1,"deniedMcpServers":[{"serverName":"plugin:p:srv"},{"serverName":"other.server-1"},{"serverName":"last_no_newline"}]}
+## single-quote shell breakout
+rc=1 out=error: config/claude-denied-mcp-servers has a malformed entry 'x'; touch /tmp/pwn; ''; expected one MCP server name per line using only letters, digits, _ . : and - (blank lines and # comment lines are allowed)
+## json breakout
+rc=1 out=error: config/claude-denied-mcp-servers has a malformed entry 'x"},{"serverName":"y'; expected one MCP server name per line using only letters, digits, _ . : and - (blank lines and # comment lines are allowed)
+## space inside name
+rc=1 out=error: config/claude-denied-mcp-servers has a malformed entry 'a b'; expected one MCP server name per line using only letters, digits, _ . : and - (blank lines and # comment lines are allowed)
+## only comments
+rc=0 out=
+## absent
+rc=0 out=(empty)
+## dangling symlink
+error: config/claude-denied-mcp-servers must be a readable regular file
+rc=1
