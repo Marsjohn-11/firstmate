@@ -1,0 +1,14 @@
+ok - a fresh beacon, or a stale one outside away mode, records nothing, recovers nothing, and wakes no one
+ok - a stale beacon is recorded on both vessels and the parent channel, then the watcher arm restarts it
+ok - a failed restart backs off and takes the con of the mate's own reviews without taking a held one, and the flagship honours the claims
+ok - a silent away flagship's con is taken after the threshold and handed back, with claims kept until released
+ok - a beating watcher over a primary that leaves wakes unacknowledged hands the mate the con, and progress hands it back
+ok - with no review queue configured the lookout records the failure and claims nothing
+ok - a reused pid in the lock does not stop the lookout, and a slow flagship defers the restart instead of overrunning the pass
+ok - a review has one holder, and only that holder releases it
+ok - stand registers the lookout as this home's watcher check, stand-down retires it, and stand refuses without a flagship
+ok - on a daemon home with a live away daemon below the stall threshold the lookout arms no watcher, takes no con, and leaves the daemon alone
+ok - a live away daemon whose beacon stays stale past daemon_stall_secs is left alone while the mate takes the con, and a fresh beacon hands it back
+ok - on a daemon home with a dead away daemon the lookout arms no watcher, reports it cannot revive it, and takes the con
+ok - an idle flagship's con opens and resolves one parent-channel phase under the same key
+exit=0

@@ -1,0 +1,51 @@
+$ FM_HOME=<flagship lab> fm-afk-return.sh begin   (captain returns)
+fm-afk-launch: away-posture record archived at /var/folders/tv/b4_jb7290610qhwsd01ngyhr0000gq/T//fm-lab.kFMTmL/flagship/state/afk-contracts/1791418635.afk-contract
+fm-afk-launch: away mode stopped; no daemon terminal was running, .afk cleared, and the posture record archived
+=== Return brief (away 2026-10-08T00:17:15Z -> 2026-10-08T00:31:41Z, 14m) ===
+Supervisor health:
+  - GAP: watcher downtime was detected during the away window (recovery marker present)
+  - GAP: the watcher beat was 804s old at return (grace 300s)
+  - lookout mini-capacity at 2026-10-08T00:17Z: the flagship's watcher beacon is 4002s old during away mode (threshold 900s)
+  - lookout mini-capacity at 2026-10-08T00:17Z: restarted the flagship's watcher: watcher: started pid=24071 (beacon fresh)
+  - lookout mini-capacity at 2026-10-08T00:17Z: the flagship's watcher beacon is fresh again (8s old)
+  - lookout mini-capacity at 2026-10-08T00:17Z: left the flagship's supervision to its live away daemon: watcher: away daemon pid=38068 is alive and owns supervision; left it alone (requested by mini-capacity)
+  - lookout mini-capacity at 2026-10-08T00:17Z: daemon alive but supervision stalled: the beacon has been stale for 8s (threshold 6s)
+  - lookout mini-capacity at 2026-10-08T00:17Z: ROUTE https://code.amazon.com/reviews/CR-206 to devdesk-linux was not delivered: AutoSDE comment.
+  - lookout mini-capacity at 2026-10-08T00:17Z: took the con of 1 review(s) this mate builds: CR-205; 0 already held elsewhere; 1 ROUTE line(s) to other desks not delivered; CR-206 to devdesk-linux (the flagship's away daemon is alive but supervision has stalled for 8s)
+  - lookout mini-capacity at 2026-10-08T00:18Z: the flagship's watcher beacon is fresh again (1s old)
+  - lookout mini-capacity at 2026-10-08T00:18Z: handed the con back (the flagship's watcher is beating and its queue is moving); still claimed by mini-capacity until released: CR-205
+  - lookout: CR-205 is still claimed by mini-capacity (since 2026-10-08T00:17Z); leave it to them until they release it
+Your instructions:
+  your words at entry:
+    redrive the reviews overnight
+  the away session took no action under them.
+Waiting on you:
+  (nothing)
+Tried and failed, or could not be fixed:
+  (nothing)
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  0 outcome(s) handled by the away session (0 routine, 0 escalated above)
+  (no routine outcomes recorded in the store for this window)
+Cost: 0 supervision outcome(s) recorded (0 routine, 0 captain); 0 task(s) live at return.
+catch-up health: GAP: watcher downtime was detected during the away window (recovery marker present)
+catch-up health: GAP: the watcher beat was 804s old at return (grace 300s)
+catch-up health: lookout mini-capacity at 2026-10-08T00:17Z: the flagship's watcher beacon is 4002s old during away mode (threshold 900s)
+catch-up health: lookout mini-capacity at 2026-10-08T00:17Z: restarted the flagship's watcher: watcher: started pid=24071 (beacon fresh)
+catch-up health: lookout mini-capacity at 2026-10-08T00:17Z: the flagship's watcher beacon is fresh again (8s old)
+catch-up health: lookout mini-capacity at 2026-10-08T00:17Z: left the flagship's supervision to its live away daemon: watcher: away daemon pid=38068 is alive and owns supervision; left it alone (requested by mini-capacity)
+catch-up health: lookout mini-capacity at 2026-10-08T00:17Z: daemon alive but supervision stalled: the beacon has been stale for 8s (threshold 6s)
+catch-up health: lookout mini-capacity at 2026-10-08T00:17Z: ROUTE https://code.amazon.com/reviews/CR-206 to devdesk-linux was not delivered: AutoSDE comment.
+catch-up health: lookout mini-capacity at 2026-10-08T00:17Z: took the con of 1 review(s) this mate builds: CR-205; 0 already held elsewhere; 1 ROUTE line(s) to other desks not delivered; CR-206 to devdesk-linux (the flagship's away daemon is alive but supervision has stalled for 8s)
+catch-up health: lookout mini-capacity at 2026-10-08T00:18Z: the flagship's watcher beacon is fresh again (1s old)
+catch-up health: lookout mini-capacity at 2026-10-08T00:18Z: handed the con back (the flagship's watcher is beating and its queue is moving); still claimed by mini-capacity until released: CR-205
+catch-up health: lookout: CR-205 is still claimed by mini-capacity (since 2026-10-08T00:17Z); leave it to them until they release it
+catch-up wake: 1791418687 2 signal cr-driver.status signal: /var/folders/tv/b4_jb7290610qhwsd01ngyhr0000gq/T//fm-lab.kFMTmL/flagship/state/cr-driver.status
+catch-up wake: wake annotation: unread wake-EVENT since last drain, not current state: cr-driver.status: progress [at=1791418636]: ROUTE https://code.amazon.com/reviews/CR-205 to mini-capacity: dry run red (iOS).
+catch-up wake: wake annotation: latest wake-EVENT observed at drain, not current state: cr-driver.status: progress [at=1791418636]: ROUTE https://code.amazon.com/reviews/CR-206 to devdesk-linux: AutoSDE comment.
+catch-up wake: STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+catch-up wake: cr-driver progress [at=1791418636]: ROUTE https://code.amazon.com/reviews/CR-206 to devdesk-linux: AutoSDE comment.
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 24071.1791418686.KZ13PK
+fm-afk-return: catch-up clear; ordinary captain work may proceed
+exit=0

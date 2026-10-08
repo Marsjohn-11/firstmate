@@ -1,0 +1,16 @@
+$ FM_HOME=<mate lab> fm-lookout.sh stand
+lookout stood on the flagship localhost (/var/folders/tv/b4_jb7290610qhwsd01ngyhr0000gq/T//fm-lab.kFMTmL/flagship); this home's watcher keeps it on every check sweep
+exit=0
+--- mate state after stand
+lookout
+lookout.check-trust
+lookout.check.sh
+#!/usr/bin/env bash
+# The lookout on the flagship, stood by bin/fm-lookout.sh stand.
+exec env FM_HOME='/var/folders/tv/b4_jb7290610qhwsd01ngyhr0000gq/T//fm-lab.kFMTmL/mate' '/Users/marsjohn/.no-mistakes/worktrees/45849cd9dd00/01M4BZ8Q0NQRJA3X876V6MDA0G/bin/fm-lookout.sh' watch
+--- running the registered check as the watcher would
+check exit=0
+$ fm-lookout.sh stand-down
+lookout stood down; claims this home holds stay until released
+exit=0
+(no check registered)

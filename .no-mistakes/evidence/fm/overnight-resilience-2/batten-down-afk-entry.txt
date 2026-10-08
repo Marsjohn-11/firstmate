@@ -1,0 +1,49 @@
+$ fm-batten-down.sh   (real machine readings, no config: relative 10% / 20 GB disk floor)
+batten-down check: FAILED - this machine may not survive the away window
+  ok    disk: 108.3 GB free on /System/Volumes/Data (minimum 92.6 GB)
+  FAIL  load: 1-minute load 185.69 (maximum 128); let running builds finish or stop lanes before leaving
+  ok    swap: 7.9 GB in use (maximum 40 GB)
+  ok    watcher: not needed (no work under way)
+reclaimable build caches: none found
+Fix the failed checks and run /afk again, or enter anyway with bin/fm-afk-launch.sh enter --skip-batten-down.
+exit=1
+
+$ printf "min_free_gb=100000\nmax_load=100000\n" > config/batten-down; fm-batten-down.sh   (absolute floor replaces the default)
+batten-down check: FAILED - this machine may not survive the away window
+  FAIL  disk: 108.3 GB free on /System/Volumes/Data (minimum 100000 GB); free space from the caches listed below
+  ok    load: 1-minute load 188.36 (maximum 100000)
+  ok    swap: 7.9 GB in use (maximum 40 GB)
+  ok    watcher: not needed (no work under way)
+reclaimable build caches: none found
+Fix the failed checks and run /afk again, or enter anyway with bin/fm-afk-launch.sh enter --skip-batten-down.
+exit=1
+
+$ fm-afk-launch.sh enter --words "redrive the reviews"   (disk check failing)
+batten-down check: FAILED - this machine may not survive the away window
+  FAIL  disk: 108.3 GB free on /System/Volumes/Data (minimum 100000 GB); free space from the caches listed below
+  ok    load: 1-minute load 188.36 (maximum 100000)
+  ok    swap: 7.9 GB in use (maximum 40 GB)
+  ok    watcher: not needed (no work under way)
+reclaimable build caches: none found
+Fix the failed checks and run /afk again, or enter anyway with bin/fm-afk-launch.sh enter --skip-batten-down.
+fm-afk-launch: away mode was not entered; no record was written
+exit=4
+(no away record written)
+
+$ printf "max_load=100000\n" > config/batten-down; fm-afk-launch.sh enter --words "redrive the reviews"   (all checks pass)
+batten-down check: shipshape for the night
+  ok    disk: 108.3 GB free on /System/Volumes/Data (minimum 92.6 GB)
+  ok    load: 1-minute load 188.36 (maximum 100000)
+  ok    swap: 7.9 GB in use (maximum 40 GB)
+  ok    watcher: not needed (no work under way)
+reclaimable build caches: none found
+Away posture recorded at 2026-10-08T00:15:51Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 4 concurrent workers.
+Away posture (recorded):
+  entered: 2026-10-08T00:15:51Z
+  expected return: not given
+  spend cap: 4 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    redrive the reviews
+exit=0
+.afk-contract

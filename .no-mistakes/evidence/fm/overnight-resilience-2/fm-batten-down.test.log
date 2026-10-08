@@ -1,0 +1,15 @@
+ok - a healthy machine passes the batten-down check and enters away mode
+ok - away entry refuses on low disk and writes no record
+ok - away entry refuses on high load and writes no record
+ok - away entry refuses on large swap and writes no record
+ok - away entry refuses on missing midway and writes no record
+ok - the Midway check is off unless config turns it on
+ok - a Midway session that ends inside the window or already ended fails the check
+ok - a stale watcher beacon fails while work is under way and a fresh one passes
+ok - the default disk floor is 10% of the volume and never under 20 GB
+ok - config/batten-down sets the thresholds and an invalid value fails its check
+ok - --skip-batten-down enters away mode on a failing machine and records the words unchanged
+ok - the cache report lists idle caches with how to reclaim them and deletes nothing
+ok - while already away, new words land and failed checks only warn
+ok - FM_BATTEN_DOWN=off skips the check for one run
+exit=0

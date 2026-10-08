@@ -1,0 +1,100 @@
+=== S-A: stale beacon on a non-daemon flagship -> lookout restarts the REAL watcher (bin/fm-watch-arm.sh)
+watch exit=0 (stdout above wakes the mate only for the con)
+-rw-r--r--@ 1 marsjohn  staff  0 Oct  7 17:17 /var/folders/tv/b4_jb7290610qhwsd01ngyhr0000gq/T//fm-lab.kFMTmL/flagship/state/.last-watcher-beat
+--- mate events.log
+stale	the flagship's watcher beacon is 4002s old during away mode (threshold 900s)
+recovered	restarted the flagship's watcher: watcher: started pid=24071 (beacon fresh)
+fresh	the flagship's watcher beacon is fresh again (8s old)
+--- mate parent-channel
+note [key=lookout-stale-flagship-1791418636] [at=1791418639]: lookout: the flagship's watcher beacon is 4002s old during away mode; restarting it
+note [at=1791418650]: lookout: restarted the flagship's watcher
+
+=== S-B: daemon home, live daemon, stale beacon below daemon_stall_secs -> left alone, no con, one daemon-alive event
+exit=0
+lookout: took the con from flagship (the flagship's away daemon is alive but supervision has stalled for 8s). Drive these reviews to green under your lookout duty: CR-205. Release each with bin/fm-lookout.sh release <review> when it is done or handed back.
+exit=0
+--- mate events.log
+stale	the flagship's watcher beacon is 4002s old during away mode (threshold 900s)
+recovered	restarted the flagship's watcher: watcher: started pid=24071 (beacon fresh)
+fresh	the flagship's watcher beacon is fresh again (8s old)
+stale	the flagship's watcher beacon is 4002s old during away mode (threshold 900s)
+daemon-alive	left the flagship's supervision to its live away daemon: watcher: away daemon pid=38068 is alive and owns supervision; left it alone (requested by mini-capacity)
+daemon-stalled	daemon alive but supervision stalled: the beacon has been stale for 8s (threshold 6s)
+route-undelivered	ROUTE https://code.amazon.com/reviews/CR-206 to devdesk-linux was not delivered: AutoSDE comment.
+took-the-con	took the con of 1 review(s) this mate builds: CR-205; 0 already held elsewhere; 1 ROUTE line(s) to other desks not delivered; CR-206 to devdesk-linux (the flagship's away daemon is alive but supervision has stalled for 8s)
+--- mate parent-channel
+note [key=lookout-stale-flagship-1791418636] [at=1791418639]: lookout: the flagship's watcher beacon is 4002s old during away mode; restarting it
+note [at=1791418650]: lookout: restarted the flagship's watcher
+note [key=lookout-stale-flagship-1791418656] [at=1791418659]: lookout: the flagship's watcher beacon is 4002s old during away mode; restarting it
+working [key=lookout-con-flagship-1791418656] [at=1791418667]: lookout: took the con of 1 review(s) this mate builds: CR-205; 0 already held elsewhere; 1 ROUTE line(s) to other desks not delivered; CR-206 to devdesk-linux (the flagship's away daemon is alive but supervision has stalled for 8s)
+CR-205 is held by mini-capacity since 2026-10-08T00:17Z
+claimed exit=0 (1 = free)
+
+=== S-C: same live daemon, beacon still stale past daemon_stall_secs (6s) -> mate takes the con, daemon untouched
+exit=0
+daemon pid=38068 still alive
+--- mate events.log
+stale	the flagship's watcher beacon is 4002s old during away mode (threshold 900s)
+recovered	restarted the flagship's watcher: watcher: started pid=24071 (beacon fresh)
+fresh	the flagship's watcher beacon is fresh again (8s old)
+stale	the flagship's watcher beacon is 4002s old during away mode (threshold 900s)
+daemon-alive	left the flagship's supervision to its live away daemon: watcher: away daemon pid=38068 is alive and owns supervision; left it alone (requested by mini-capacity)
+daemon-stalled	daemon alive but supervision stalled: the beacon has been stale for 8s (threshold 6s)
+route-undelivered	ROUTE https://code.amazon.com/reviews/CR-206 to devdesk-linux was not delivered: AutoSDE comment.
+took-the-con	took the con of 1 review(s) this mate builds: CR-205; 0 already held elsewhere; 1 ROUTE line(s) to other desks not delivered; CR-206 to devdesk-linux (the flagship's away daemon is alive but supervision has stalled for 8s)
+--- mate parent-channel
+note [key=lookout-stale-flagship-1791418636] [at=1791418639]: lookout: the flagship's watcher beacon is 4002s old during away mode; restarting it
+note [at=1791418650]: lookout: restarted the flagship's watcher
+note [key=lookout-stale-flagship-1791418656] [at=1791418659]: lookout: the flagship's watcher beacon is 4002s old during away mode; restarting it
+working [key=lookout-con-flagship-1791418656] [at=1791418667]: lookout: took the con of 1 review(s) this mate builds: CR-205; 0 already held elsewhere; 1 ROUTE line(s) to other desks not delivered; CR-206 to devdesk-linux (the flagship's away daemon is alive but supervision has stalled for 8s)
+CR-205 is held by mini-capacity since 2026-10-08T00:17Z
+claimed exit=0
+--- flagship state/.review-claims.log
+1791418667	CR-205	claim	mini-capacity	took the con: route: dry run red (iOS).
+
+=== S-D: beacon fresh again -> con handed back, keyed phase resolves
+lookout: handed the con back to flagship (the flagship's watcher is beating and its queue is moving). Take no new reviews from the con; finish or hand back each one you still hold (CR-205) and release it with bin/fm-lookout.sh release <review>.
+exit=0
+--- mate events.log
+stale	the flagship's watcher beacon is 4002s old during away mode (threshold 900s)
+recovered	restarted the flagship's watcher: watcher: started pid=24071 (beacon fresh)
+fresh	the flagship's watcher beacon is fresh again (8s old)
+stale	the flagship's watcher beacon is 4002s old during away mode (threshold 900s)
+daemon-alive	left the flagship's supervision to its live away daemon: watcher: away daemon pid=38068 is alive and owns supervision; left it alone (requested by mini-capacity)
+daemon-stalled	daemon alive but supervision stalled: the beacon has been stale for 8s (threshold 6s)
+route-undelivered	ROUTE https://code.amazon.com/reviews/CR-206 to devdesk-linux was not delivered: AutoSDE comment.
+took-the-con	took the con of 1 review(s) this mate builds: CR-205; 0 already held elsewhere; 1 ROUTE line(s) to other desks not delivered; CR-206 to devdesk-linux (the flagship's away daemon is alive but supervision has stalled for 8s)
+fresh	the flagship's watcher beacon is fresh again (1s old)
+handed-back-the-con	handed the con back (the flagship's watcher is beating and its queue is moving); still claimed by mini-capacity until released: CR-205
+--- mate parent-channel
+note [key=lookout-stale-flagship-1791418636] [at=1791418639]: lookout: the flagship's watcher beacon is 4002s old during away mode; restarting it
+note [at=1791418650]: lookout: restarted the flagship's watcher
+note [key=lookout-stale-flagship-1791418656] [at=1791418659]: lookout: the flagship's watcher beacon is 4002s old during away mode; restarting it
+working [key=lookout-con-flagship-1791418656] [at=1791418667]: lookout: took the con of 1 review(s) this mate builds: CR-205; 0 already held elsewhere; 1 ROUTE line(s) to other desks not delivered; CR-206 to devdesk-linux (the flagship's away daemon is alive but supervision has stalled for 8s)
+resolved [key=lookout-con-flagship-1791418656] [at=1791418689]: lookout: handed the con back (the flagship's watcher is beating and its queue is moving); still claimed by mini-capacity until released: CR-205
+--- flagship return brief (fm-lookout.sh brief)
+lookout mini-capacity at 2026-10-08T00:17Z: the flagship's watcher beacon is 4002s old during away mode (threshold 900s)
+lookout mini-capacity at 2026-10-08T00:17Z: restarted the flagship's watcher: watcher: started pid=24071 (beacon fresh)
+lookout mini-capacity at 2026-10-08T00:17Z: the flagship's watcher beacon is fresh again (8s old)
+lookout mini-capacity at 2026-10-08T00:17Z: the flagship's watcher beacon is 4002s old during away mode (threshold 900s)
+lookout mini-capacity at 2026-10-08T00:17Z: left the flagship's supervision to its live away daemon: watcher: away daemon pid=38068 is alive and owns supervision; left it alone (requested by mini-capacity)
+lookout mini-capacity at 2026-10-08T00:17Z: daemon alive but supervision stalled: the beacon has been stale for 8s (threshold 6s)
+lookout mini-capacity at 2026-10-08T00:17Z: ROUTE https://code.amazon.com/reviews/CR-206 to devdesk-linux was not delivered: AutoSDE comment.
+lookout mini-capacity at 2026-10-08T00:17Z: took the con of 1 review(s) this mate builds: CR-205; 0 already held elsewhere; 1 ROUTE line(s) to other desks not delivered; CR-206 to devdesk-linux (the flagship's away daemon is alive but supervision has stalled for 8s)
+lookout mini-capacity at 2026-10-08T00:18Z: the flagship's watcher beacon is fresh again (1s old)
+lookout mini-capacity at 2026-10-08T00:18Z: handed the con back (the flagship's watcher is beating and its queue is moving); still claimed by mini-capacity until released: CR-205
+lookout: CR-205 is still claimed by mini-capacity (since 2026-10-08T00:17Z); leave it to them until they release it
+
+=== S-E: flagship unreachable over REAL ssh (localhost:22 refused) for stale_secs -> silent, mate takes the con
+/tmp/fm-s2.sh: line 62: 38068 Terminated: 15          $SHIM/fm-supervise-daemon.sh > /dev/null 2>&1
+exit=0
+lookout: took the con from flagship (the flagship has been silent for 8s). Drive these reviews to green under your lookout duty: CR-205. Release each with bin/fm-lookout.sh release <review> when it is done or handed back.
+exit=0
+--- mate parent-channel
+note [key=lookout-stale-flagship-1791418636] [at=1791418639]: lookout: the flagship's watcher beacon is 4002s old during away mode; restarting it
+note [at=1791418650]: lookout: restarted the flagship's watcher
+note [key=lookout-stale-flagship-1791418656] [at=1791418659]: lookout: the flagship's watcher beacon is 4002s old during away mode; restarting it
+working [key=lookout-con-flagship-1791418656] [at=1791418667]: lookout: took the con of 1 review(s) this mate builds: CR-205; 0 already held elsewhere; 1 ROUTE line(s) to other desks not delivered; CR-206 to devdesk-linux (the flagship's away daemon is alive but supervision has stalled for 8s)
+resolved [key=lookout-con-flagship-1791418656] [at=1791418689]: lookout: handed the con back (the flagship's watcher is beating and its queue is moving); still claimed by mini-capacity until released: CR-205
+note [key=lookout-silent-flagship-1791418691] [at=1791418693]: lookout: the flagship localhost did not answer over SSH; it last read away=yes
+working [key=lookout-con-flagship-1791418691] [at=1791418701]: lookout: took the con of 1 review(s) this mate builds: CR-205; 0 already held elsewhere; 1 ROUTE line(s) to other desks not delivered; CR-206 to devdesk-linux (the flagship has been silent for 8s)
