@@ -1,0 +1,6 @@
+fixture: lab=fm-lab-fm-herdr-session-3058910-6962 workspace=w2 pane=w2:p1 journal=live-task.herdr-presentation meta=live-task.meta
+== S1: only journal's task has live .meta
+  herdr calls made by cleanup: 2
+    > herdr workspace list --session fm-lab-fm-herdr-session-3058910-6962
+    > herdr session list --json --session fm-lab-fm-herdr-session-3058910-6962
+not ok - S1 cleanup queried herdr although every journal task has .meta

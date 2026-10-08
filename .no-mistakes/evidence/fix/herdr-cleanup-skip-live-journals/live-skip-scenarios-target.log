@@ -1,0 +1,17 @@
+fixture: lab=fm-lab-fm-herdr-session-3054086-27808 workspace=w2 pane=w2:p1 journal=live-task.herdr-presentation meta=live-task.meta
+== S1: only journal's task has live .meta
+  herdr calls made by cleanup: 0
+ok - S1 live .meta: zero herdr calls, pane and journal preserved
+== S2: dangling-symlink .meta still counts as present
+  herdr calls made by cleanup: 0
+ok - S2 dangling symlink .meta: zero herdr calls, pane preserved
+== S3: a second journal lacks .meta -> discovery runs, live task preserved
+  herdr calls made by cleanup: 2
+    > herdr workspace list --session fm-lab-fm-herdr-session-3054086-27808
+    > herdr session list --json --session fm-lab-fm-herdr-session-3054086-27808
+ok - S3 one meta-less journal: discovery runs, live task pane and journal preserved
+== S4: symlinked journal without meta is ignored for the gate
+  herdr calls made by cleanup: 0
+ok - S4 symlinked journal does not trigger discovery
+== S5: task .meta removed -> stale restored shell is retired
+ok - S5 meta-less journal: cleanup closes exact stale pane and retires journal
