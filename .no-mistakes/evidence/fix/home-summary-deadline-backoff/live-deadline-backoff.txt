@@ -1,0 +1,30 @@
+== S1: baseline real publication (no backoff record)
+rc=0
+ledger generated=2026-10-08T07:57:05Z schema=fm-secondmate-home-summary.v1
+backoff record present: no
+
+== S2: plant a concurrent attempt's temp files (pid tag 999999) before forcing deadline misses
+miss 1: rc=0 elapsed=2s stall_reached=yes backoff=1
+  temp files left: .home-summary-error.999999.FOREIGN .home-summary.json.999999.FOREIGN 
+miss 2: rc=0 elapsed=2s stall_reached=yes backoff=2
+  temp files left: .home-summary-error.999999.FOREIGN .home-summary.json.999999.FOREIGN 
+miss 3: rc=0 elapsed=2s stall_reached=yes backoff=3
+  temp files left: .home-summary-error.999999.FOREIGN .home-summary.json.999999.FOREIGN 
+log tail:
+[2026-10-08T07:57:08Z] refresh exceeded its 2-second deadline
+[2026-10-08T07:57:10Z] refresh exceeded its 2-second deadline
+
+== S3: non-deadline failure (producer exits 1) must not count as a miss
+rc=0 backoff before=3 after=3
+[2026-10-08T07:57:13Z] summary producer failed with exit 1: producer boom 
+
+== S4: real watcher honors backoff (record=3, interval=2 => hold 8s)
+after 5s: watcher alive=yes ledger mtime=2000-01-01 00:00:00 backoff=3
+  refresh children running: 0
+-- age the record past its delay
+after expiry: ledger mtime=2026-10-08 07:57:19 generated=2026-10-08T07:57:19Z backoff=removed
+
+== S5: concurrent attempt's files after everything
+.home-summary-error.999999.FOREIGN
+.home-summary.json.999999.FOREIGN
+lab removed: yes

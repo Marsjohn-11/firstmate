@@ -1,0 +1,14 @@
+== Scenario A: deadline miss reaps temp files and counts misses
+attempt 1: rc=0 elapsed=2s backoff=1 leftovers=[.home-summary.json.4242424.FOREIGN ]
+attempt 2: rc=0 elapsed=2s backoff=2 leftovers=[.home-summary.json.4242424.FOREIGN ]
+[2026-10-08T08:04:51Z] refresh exceeded its 2-second deadline
+[2026-10-08T08:04:53Z] refresh exceeded its 2-second deadline
+== Scenario B: success clears the record
+rc=0 ledger=present backoff_exists=no
+== Scenario C: live watcher honors backoff, then resumes
+t+5s (inside 8s backoff): watcher_alive=yes ledger_refreshed=no beat=present
+t+13s (backoff expired): ledger_refreshed=yes backoff_exists=no
+== Scenario D (adversarial): corrupt backoff record does not wedge refresh
+corrupt record: ledger_refreshed=yes backoff_exists=no
+watch.err tail:
+lab removed: yes
