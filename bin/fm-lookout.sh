@@ -534,7 +534,7 @@ self_reviews() {  # <route-cutoff-epoch>
 # a queue to drive, empty when there was none to take.
 CON=no
 take_the_con() {  # <reason>
-  local cutoff list review url why held dest claimed=0 skipped=0 undelivered=0 names='' routes='' line
+  local cutoff list review url why held dest claimed=0 skipped=0 undelivered=0 took_names='' routes='' line
   if [ "$(cfg take_the_con on)" = off ]; then
     event con-off "take_the_con is off in config/lookout; did not take the con ($1)"
     CON=empty
@@ -557,7 +557,7 @@ take_the_con() {  # <reason>
     fi
     [ -n "$held" ] || claim_append "$review" claim "$(self_name)" "took the con: $why" || continue
     claimed=$((claimed + 1))
-    names="$names $review"
+    took_names="$took_names $review"
   done <<EOF
 $list
 EOF
@@ -571,12 +571,12 @@ EOF
 $(route_lines "$cutoff" | awk -F '\t' '!seen[$1 FS $2]++')
 EOF
   fi
-  line="took the con of $claimed review(s) this mate builds:${names:- none}; $skipped already held elsewhere; $undelivered ROUTE line(s) to other desks not delivered${routes} ($1)"
+  line="took the con of $claimed review(s) this mate builds:${took_names:- none}; $skipped already held elsewhere; $undelivered ROUTE line(s) to other desks not delivered${routes} ($1)"
   event took-the-con "$line"
   report "working [key=lookout-con-$NAME-$since]: lookout: $line"
   CON=yes
   printf 'lookout: took the con from %s (%s). Drive these reviews to green under your lookout duty:%s. Release each with bin/fm-lookout.sh release <review> when it is done or handed back.\n' \
-    "$NAME" "$1" "${names:- none}"
+    "$NAME" "$1" "${took_names:- none}"
 }
 
 hand_back_the_con() {  # <standing-con> <reason>
