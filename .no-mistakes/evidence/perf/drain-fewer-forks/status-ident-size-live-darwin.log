@@ -1,0 +1,7 @@
++ /bin/bash drive.sh (Darwin)
+paired:   ident=strong:16777232:1454573899:1791605831.086571930 size=9
+single:   ident=strong:16777232:1454573899:1791605831.086571930 size=9
+real:     dev:ino=16777232:1454573899 size=9 birth=1791605831.086571930
+append:   ident=strong:16777232:1454573899:1791605831.086571930 size=27 (same identity, larger size)
+replace:  ident=strong:16777232:1454576232:1791605838.410093664 size=9 changed=yes
+missing:  rc=1
