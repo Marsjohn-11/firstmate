@@ -1,0 +1,69 @@
+FM_TEST_BEGIN 2026-10-11T03:06:30Z tests/fm-supervision-host.test.sh family=afk expected_gate_skip=none
+ok - report surface: only the branch actor's current turn may report, and only on the tasks its wake names
+ok - report surface: visible late outcomes queue a relay, while silent outcomes remain stored without a wake or note
+ok - dispatch entry: the host reads branch eligibility, the offer rule, and the wake prompt from the Pi branch's own owner
+ok - drain: BRANCH OUTCOMES runs on a Claude home by default and on another primary with the file, never with off, and never on Pi
+ok - drain: captain outcomes come first, and routine overflow collapses into a count one drain clears
+ok - drain: repeated captain outcomes collapse per task, and the byte cap presents only the run its acknowledgement covers
+ok - drain: a long away window costs one short drain, captain outcomes collapsed per task and routine overflow counted, and nothing from it is shown again
+ok - drain: the BRANCH OUTCOMES budgets count bytes, cutting multibyte summaries by whole characters in any locale
+ok - drain: branch outcomes stay unread when a projection of the store fails
+ok - drain: branch outcomes stay unread and the drain fails when jq is missing
+ok - drain: branch outcomes stay unread when the drain cannot print them
+ok - drain: a legacy backlog is presented with each outcome's age and a check-first instruction, never adopted
+ok - drain: a keyed decision survives acknowledgement through a newer outcome for its task
+ok - drain: an outcome carried across a switch off Pi comes back with its age, never adopted
+ok - drain: an outcome nothing has shown is presented until acknowledged, and a repeated acknowledgement changes nothing
+ok - drain: an outcome the host drain presented but main never acknowledged stays unprocessed across a switch to Pi
+ok - drain: an outcome the host drain presented but main never acknowledged survives an outcome index repair
+ok - host: an attended wake the branch may take is handled on the engine, and its routine outcome never wakes main
+not ok - captain: the captain outcome did not wake main: 1791688329	start	gen=host-2155364-1791688326	primary=claude
+FM_TEST_END 2026-10-11T03:12:50Z tests/fm-supervision-host.test.sh exit=1 duration_ms=379883 gate_skip=false
+FM_TEST_BEGIN 2026-10-11T03:12:50Z tests/fm-supervision-host-stop-hook.test.sh family=afk expected_gate_skip=none
+not ok - closed successor: the Stop hook did not finish: 1791688377	start	gen=host-2203012-1791688375	primary=claude
+FM_TEST_END 2026-10-11T03:13:29Z tests/fm-supervision-host-stop-hook.test.sh exit=1 duration_ms=39138 gate_skip=false
+FM_TEST_BEGIN 2026-10-11T03:13:29Z tests/fm-supervision-host-mirror.test.sh family=afk expected_gate_skip=none
+ok - host: a primary with no verified dialog mirror keeps every attended close on main, and its away posture still runs
+ok - host: each wake carries the captain's dialog since the last wake, without operational input
+ok - host: the dialog mirror, its feed, and the wake file are owner-only
+ok - host: dialog a turn never completed with its report (a park boundary, a stopped turn, no report) reaches the next turn
+ok - host: an attended wake whose mirror is missing, cannot be read (at the feed or at the prompt), or holds a malformed entry reaches main before any engine turn, and the cursor stays put
+FM_TEST_END 2026-10-11T03:20:32Z tests/fm-supervision-host-mirror.test.sh exit=0 duration_ms=423037 gate_skip=false
+FM_TEST_BEGIN 2026-10-11T03:20:32Z tests/fm-supervision-host-away.test.sh family=afk expected_gate_skip=none
+ok - host: an away wake is handled on the engine through the branch contract and never reaches main
+ok - host: an engine turn that records no outcome hands its durable wake to main
+ok - host: a captain return during an engine turn hands that turn's outcomes to main
+ok - host: silent outcomes are excluded from both captain-return handoff paths
+ok - host: an early visible outcome survives more than 1,000 same-turn receipts
+ok - host: an outcome lookup failure forces a visible main handoff
+ok - host: an outcome recorded after the return reaches main even when its host dies at the turn's end
+ok - host: a killed predecessor's engine is reaped and the next host removes its turn files
+ok - host: a turn that reports but leaves its granted rows queued hands the wake to main
+ok - host: a captain return during a failed engine turn still hands that turn's outcomes to main
+ok - host: an engine turn whose result is incomplete hands its wake to main
+FM_TEST_END 2026-10-11T03:23:07Z tests/fm-supervision-host-away.test.sh exit=0 duration_ms=154706 gate_skip=false
+FM_TEST_BEGIN 2026-10-11T03:23:07Z tests/fm-supervision-host-latch.test.sh family=afk expected_gate_skip=none
+ok - host: two engine errors latch the session, main keeps every away wake in the cooldown, a failed probe doubles it up to its cap, and a report recovers it silently
+ok - host: an attended close in a latched session reaches main as the arm printed it and leaves the latch as it was, and a home that opted out with off never reads it
+ok - host: attended, two engine errors latch the session, main keeps every close unchanged in the cooldown, a failed probe doubles it up to its cap, and a routine probe's recovery stays in the ledger, off main
+FM_TEST_END 2026-10-11T03:28:24Z tests/fm-supervision-host-latch.test.sh exit=0 duration_ms=317273 gate_skip=false
+FM_TEST_BEGIN 2026-10-11T03:28:24Z tests/fm-supervision-host-park.test.sh family=afk expected_gate_skip=none
+ok - host: parked child-exit sampling uses ordinary half-second sleeps
+ok - host: the park ends itself with a boundary wake and a stopped watcher
+ok - host: waiting closes cannot carry the park past its boundary
+ok - host: a close whose margin runs out while the successor starts reaches main at the boundary without a turn
+ok - host: the park's test clock is inert without the test marker
+ok - host: a park at or beyond the Stop-hook registration falls back to the default boundary
+ok - host: an owner's later park limit lets a turn outlive the boundary, and no other limit does
+ok - host: the first cycle's status streams once, --restart replaces a stale watcher, and an owner predecessor makes a handling successor
+FM_TEST_END 2026-10-11T03:32:50Z tests/fm-supervision-host-park.test.sh exit=0 duration_ms=265130 gate_skip=false
+FM_TEST_SUMMARY total=6 failed=2 skipped_gate=0 duration_ms=1580136
+FM_TEST_SUMMARY_FAMILY family=afk count=6 duration_ms=1579167 failed=2
+FM_TEST_SLOWEST rank=1 script=tests/fm-supervision-host-mirror.test.sh duration_ms=423037
+FM_TEST_SLOWEST rank=2 script=tests/fm-supervision-host.test.sh duration_ms=379883
+FM_TEST_SLOWEST rank=3 script=tests/fm-supervision-host-latch.test.sh duration_ms=317273
+FM_TEST_SLOWEST rank=4 script=tests/fm-supervision-host-park.test.sh duration_ms=265130
+FM_TEST_SLOWEST rank=5 script=tests/fm-supervision-host-away.test.sh duration_ms=154706
+FM_TEST_SLOWEST rank=6 script=tests/fm-supervision-host-stop-hook.test.sh duration_ms=39138
+fm-test-run: wrote timing artifact: /home/marsjohn/.no-mistakes/evidence/01M4MEGY4R4VS12V7BG1MJW5BF/split-suites-timing.json
+exit=1

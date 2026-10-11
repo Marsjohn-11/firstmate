@@ -1,0 +1,5 @@
+old test functions 75 new 75 missing set() added set()
+old invoked 75 new invoked 75 missing invocations set()
+\bpass " old 75 new 75 lost 0
+\bassert_\w+ old 351 new 351 lost 0
+\bfail " old 405 new 405 lost 0

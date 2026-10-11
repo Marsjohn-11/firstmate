@@ -1,0 +1,23 @@
+== --changed --base 4735ddc (this change)
+tests/fm-supervision-host-away.test.sh
+tests/fm-supervision-host-latch.test.sh
+tests/fm-supervision-host-mirror.test.sh
+tests/fm-supervision-host-park.test.sh
+tests/fm-supervision-host-stop-hook.test.sh
+tests/fm-supervision-host.test.sh
+== helper-only change selects:
+tests/fm-supervision-host-away.test.sh
+tests/fm-supervision-host-latch.test.sh
+tests/fm-supervision-host-mirror.test.sh
+tests/fm-supervision-host-park.test.sh
+tests/fm-supervision-host-stop-hook.test.sh
+tests/fm-supervision-host.test.sh
+== bin/fm-supervision-host.sh change selects:
+tests/fm-supervision-host-away.test.sh
+tests/fm-supervision-host-latch.test.sh
+tests/fm-supervision-host-mirror.test.sh
+tests/fm-supervision-host-park.test.sh
+tests/fm-supervision-host-stop-hook.test.sh
+tests/fm-supervision-host.test.sh
+tests/fm-supervision-host-attended-live-e2e.test.sh
+tests/fm-supervision-host-live-e2e.test.sh

@@ -1,0 +1,9 @@
+serial lane scripts: 216; union of 9 shards: 216; duplicates: 0
+partition exact
+FM_TEST_COVERAGE ok total=256 parallel=24 parallel_max_ms=665545 parallel_imbalance_ms=2 parallel_unhinted=0 serial=216 serial_shards=9 serial_unhinted=8 serial_max_ms=1129498 serial_budget_ms=1200000 herdr=16
+check-coverage rc=0
+fm-supervision-host-stop-hook family: 1
+fm-supervision-host-mirror family: 1
+fm-supervision-host-away family: 1
+fm-supervision-host-latch family: 1
+fm-supervision-host-park family: 1
