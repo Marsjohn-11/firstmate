@@ -1,0 +1,31 @@
+{
+  "families": [
+    {
+      "count": 1,
+      "duration_ms": 37379,
+      "failed": 1,
+      "name": "afk"
+    }
+  ],
+  "finished_at": "2026-10-11T04:41:06Z",
+  "run_id": "fm-test-run-1791693628707-2420350",
+  "scripts": [
+    {
+      "duration_ms": 37379,
+      "exit": 1,
+      "expected_gate_skip": "none",
+      "family": "afk",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-supervision-host-stop-hook.test.sh"
+    }
+  ],
+  "selection": "scripts;jobs=1",
+  "started_at": "2026-10-11T04:40:28Z",
+  "summary": {
+    "duration_ms": 37655,
+    "failed": 1,
+    "skipped_gate": 0,
+    "total": 1
+  }
+}

@@ -1,0 +1,18 @@
+$ fm-test-run.sh --list --family afk
+tests/fm-afk-contract.test.sh
+tests/fm-afk-inject-e2e.test.sh
+tests/fm-afk-return.test.sh
+tests/fm-host-mirror.test.sh
+tests/fm-supervision-host-away.test.sh
+tests/fm-supervision-host-latch.test.sh
+tests/fm-supervision-host-mirror.test.sh
+tests/fm-supervision-host-park.test.sh
+tests/fm-supervision-host-stop-hook.test.sh
+tests/fm-supervision-host.test.sh
+$ fm-test-run.sh --list --changed --base 4735ddc
+tests/fm-supervision-host-away.test.sh
+tests/fm-supervision-host-latch.test.sh
+tests/fm-supervision-host-mirror.test.sh
+tests/fm-supervision-host-park.test.sh
+tests/fm-supervision-host-stop-hook.test.sh
+tests/fm-supervision-host.test.sh

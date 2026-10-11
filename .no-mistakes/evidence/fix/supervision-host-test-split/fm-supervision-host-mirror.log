@@ -1,0 +1,11 @@
+FM_TEST_BEGIN 2026-10-11T04:36:45Z tests/fm-supervision-host-mirror.test.sh family=afk expected_gate_skip=none
+ok - host: a primary with no verified dialog mirror keeps every attended close on main, and its away posture still runs
+ok - host: each wake carries the captain's dialog since the last wake, without operational input
+ok - host: the dialog mirror, its feed, and the wake file are owner-only
+not ok - the watcher's downtime resurface did not reach main: watcher: started pid=2430670 (beacon fresh)
+FM_TEST_END 2026-10-11T04:40:54Z tests/fm-supervision-host-mirror.test.sh exit=1 duration_ms=249486 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=249654
+FM_TEST_SUMMARY_FAMILY family=afk count=1 duration_ms=249486 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-supervision-host-mirror.test.sh duration_ms=249486
+fm-test-run: wrote timing artifact: /home/marsjohn/.no-mistakes/evidence/01M4MK3B0YVB3EHWHRBRQVGRJY/fm-supervision-host-mirror.json
+exit=1
