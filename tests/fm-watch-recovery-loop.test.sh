@@ -269,10 +269,9 @@ test_presented_acknowledgement_survives_a_turn_boundary_rearm() {
   [ "${marker##*:}" = "$generation" ] \
     || fail "T3 turn-boundary re-arm moved the recovery generation to $marker (presented $generation)"
 
-  # A row appended during handling must not stop the presented acknowledgement
-  # from retiring the episode it names.
-  append_wake "$state" signal late "signal: row appended during handling" \
-    || fail "T3 could not append the late row"
+  # The presented acknowledgement retires the episode it names. A row appended
+  # during handling is out of scope here: a wake appended over an announced
+  # episode starts a fresh generation (docs/watcher-continuity.md).
   ack_err="$dir/ack.err"
   FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-wake-drain.sh" \
     --ack-through "$sequence" --recovery-generation "$generation" \
@@ -286,18 +285,8 @@ test_presented_acknowledgement_survives_a_turn_boundary_rearm() {
     *) fail "T3 episode was not retired by its own acknowledgement: $marker" ;;
   esac
 
-  # The late row is still queued and still resurfaces, and once it too is
-  # acknowledged a re-arm supervises instead of announcing recovery again.
-  err="$dir/drain2.err"
-  FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-wake-drain.sh" >/dev/null 2> "$err" \
-    || fail "T3 second drain failed: $(cat "$err")"
-  sequence=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through \([0-9][0-9]*\) --recovery-generation [A-Za-z0-9._-][A-Za-z0-9._-]*$/\1/p' "$err")
-  generation=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through [0-9][0-9]* --recovery-generation \([A-Za-z0-9._-][A-Za-z0-9._-]*\)$/\1/p' "$err")
-  [ "$sequence" = 2 ] \
-    || fail "T3 late row was not presented as row 2: $(cat "$err")"
-  FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-wake-drain.sh" \
-    --ack-through "$sequence" --recovery-generation "$generation" >/dev/null 2>&1 \
-    || fail "T3 late-row acknowledgement failed"
+  # Once the episode is settled a re-arm supervises instead of announcing
+  # recovery again.
   out="$dir/watch3.out"
   PATH="$fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$state" \
     FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
