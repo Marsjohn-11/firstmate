@@ -1,0 +1,15 @@
+### A: a wake appended over an announced episode starts a fresh generation (main's rule kept)
+append exit=0
+marker after append: pending:downtime:538940.1791871543.PQhnBJ
+old-generation ack exit=0
+  wake drain: acknowledged wakes through 0 (0 row(s) consumed), but a newer recovery episode is pending; re-run bin/fm-wake-drain.sh and use the new WAKE_ACK_REQUIRED command
+marker after old ack: pending:downtime:538940.1791871543.PQhnBJ
+
+### B: a stale acknowledgement (consumes nothing, presented row above cutoff) leaves the episode open
+  WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 5 --recovery-generation seed.1.aaa
+stale ack (through 3 < row 5) exit=0
+  wake drain: nothing was acknowledged through 3 (none of your presented wake rows is at or below it); the current wake is row 5: run bin/fm-wake-drain.sh --ack-through 5 --recovery-generation seed.1.aaa after handling it
+marker after stale ack: pending:handling:seed.1.aaa   queue rows: 1
+correct ack exit=0
+marker after correct ack: acked:handling:seed.1.aaa   queue rows: 0
+

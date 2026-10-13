@@ -1,0 +1,8 @@
+### C: ack that consumed its presented row retires the episode even with a later row queued; that row still resurfaces
+  drain hands: bin/fm-wake-drain.sh --ack-through 1 --recovery-generation seed.1.aaa
+  queue before ack: 1:seed 2:later    marker: pending:downtime:seed.1.aaa
+  ack exit=0 
+  marker after ack: acked:downtime:seed.1.aaa   queue: 2:later 
+  next drain presents:
+    1791871602	2	check	later	check: later row arrives after presentation
+    WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 598454.1791871603.IJ8WaM

@@ -1,0 +1,11 @@
+T2_WATCH_OUTPUT=signal: /tmp/fm-watch-recovery-loop.137NQi/recovery-gap-successor/state/crew.status 
+T2_QUEUE_ROW=1791871914	2	signal	crew.status	signal: /tmp/fm-watch-recovery-loop.137NQi/recovery-gap-successor/state/crew.status
+ok - a resurfacing handling successor stays alive and supervises instead of going blind
+T1_MESSAGES=1
+T1_LOCK_PID=799060
+T1_MARKER=announced:downtime:seed.1.aaa
+ok - unacknowledged recovery is announced at most once per generation and the successor stays alive
+T3_GENERATION=handling.1.aaa
+T3_MARKER=acked:downtime:handling.1.aaa
+ok - a presented acknowledgement survives a turn-boundary re-arm and settles its episode
+exit=0

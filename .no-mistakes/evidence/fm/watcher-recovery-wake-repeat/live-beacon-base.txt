@@ -1,0 +1,13 @@
+t=5s beacon_age=5s turnover_age=none verdict=healthy
+t=11s beacon_age=11s turnover_age=none verdict=healthy
+t=16s beacon_age=16s turnover_age=none verdict=UNHEALTHY
+t=21s beacon_age=21s turnover_age=none verdict=UNHEALTHY
+t=27s beacon_age=27s turnover_age=none verdict=UNHEALTHY
+t=32s beacon_age=4s turnover_age=none verdict=healthy
+t=38s beacon_age=10s turnover_age=none verdict=healthy
+t=43s beacon_age=15s turnover_age=none verdict=UNHEALTHY
+t=48s beacon_age=20s turnover_age=none verdict=UNHEALTHY
+t=54s beacon_age=26s turnover_age=none verdict=UNHEALTHY
+RUNNING: worst beacon age 28s (grace 15s), unhealthy samples=24
+== SIGSTOP the watcher (wedged loop)
+WEDGED 20s: beacon_age=46s verdict=UNHEALTHY

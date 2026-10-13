@@ -1,0 +1,38 @@
+# branch c55ca3c: real fm-watch.sh + fm-wake-drain.sh in a disposable lab home
+== round 1
+    (start1 exited with a wake: check: rearm-resurface )
+  marker after watcher start: announced:downtime:seed.1.aaa
+  drain hands: bin/fm-wake-drain.sh --ack-through 1 --recovery-generation seed.1.aaa
+  turn boundary re-arm (non-successor start):
+    (rearm1 exited with a wake: check: rearm-resurface )
+  marker after re-arm: announced:downtime:seed.1.aaa
+  ack exit=0: 
+  marker after ack: acked:downtime:seed.1.aaa
+== round 2
+    (start2 still supervising after 4s, stopped)
+  marker after watcher start: pending:downtime:431043.1791871437.HttCMR
+  drain hands: bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 431043.1791871437.HttCMR
+  turn boundary re-arm (non-successor start):
+    (rearm2 still supervising after 4s, stopped)
+  marker after re-arm: pending:downtime:431043.1791871437.HttCMR
+  ack exit=0: 
+  marker after ack: acked:downtime:431043.1791871437.HttCMR
+== round 3
+    (start3 still supervising after 4s, stopped)
+  marker after watcher start: pending:downtime:444565.1791871451.HvkVQa
+  drain hands: bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 444565.1791871451.HvkVQa
+  turn boundary re-arm (non-successor start):
+    (rearm3 still supervising after 4s, stopped)
+  marker after re-arm: pending:downtime:444565.1791871451.HvkVQa
+  ack exit=0: 
+  marker after ack: acked:downtime:444565.1791871451.HvkVQa
+== round 4
+    (start4 still supervising after 4s, stopped)
+  marker after watcher start: pending:downtime:458773.1791871464.vMpZpR
+  drain hands: bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 458773.1791871464.vMpZpR
+  turn boundary re-arm (non-successor start):
+    (rearm4 still supervising after 4s, stopped)
+  marker after re-arm: pending:downtime:458773.1791871464.vMpZpR
+  ack exit=0: 
+  marker after ack: acked:downtime:458773.1791871464.vMpZpR
+TOTAL recovery announcements across 4 rounds: 1

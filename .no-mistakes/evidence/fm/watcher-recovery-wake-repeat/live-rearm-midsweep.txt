@@ -1,0 +1,8 @@
+== branch
+first watcher pid=732859; second start mid-sweep (beacon age 1s):
+  watcher: already running pid 732859
+  second start exit=0
+== base
+first watcher pid=748878; second start mid-sweep (beacon age 21s):
+  watcher: lock held by live pid 748878 but heartbeat is stale for 21s (>15s); inspect or stop that watcher before re-arming.
+  second start exit=1

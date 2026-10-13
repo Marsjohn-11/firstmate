@@ -1,0 +1,38 @@
+# base 6407052 (before): same driver
+== round 1
+    (start1 exited with a wake: check: rearm-resurface )
+  marker after watcher start: announced:downtime:seed.1.aaa
+  drain hands: bin/fm-wake-drain.sh --ack-through 1 --recovery-generation seed.1.aaa
+  turn boundary re-arm (non-successor start):
+    (rearm1 exited with a wake: check: rearm-resurface )
+  marker after re-arm: announced:downtime:480914.1791871481.FAQAKs
+  ack exit=0: wake drain: acknowledged wakes through 1 (1 row(s) consumed), but a newer recovery episode is pending; re-run bin/fm-wake-drain.sh and use the new WAKE_ACK_REQUIRED command 
+  marker after ack: announced:downtime:480914.1791871481.FAQAKs
+== round 2
+    (start2 still supervising after 4s, stopped)
+  marker after watcher start: announced:downtime:480914.1791871481.FAQAKs
+  drain hands: bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 480914.1791871481.FAQAKs
+  turn boundary re-arm (non-successor start):
+    (rearm2 still supervising after 4s, stopped)
+  marker after re-arm: pending:downtime:480914.1791871481.FAQAKs
+  ack exit=0: 
+  marker after ack: acked:downtime:480914.1791871481.FAQAKs
+== round 3
+    (start3 still supervising after 4s, stopped)
+  marker after watcher start: pending:downtime:497863.1791871504.FLABHx
+  drain hands: bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 497863.1791871504.FLABHx
+  turn boundary re-arm (non-successor start):
+    (rearm3 still supervising after 4s, stopped)
+  marker after re-arm: pending:downtime:497863.1791871504.FLABHx
+  ack exit=0: 
+  marker after ack: acked:downtime:497863.1791871504.FLABHx
+== round 4
+    (start4 still supervising after 4s, stopped)
+  marker after watcher start: pending:downtime:511391.1791871519.S8KzfP
+  drain hands: bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 511391.1791871519.S8KzfP
+  turn boundary re-arm (non-successor start):
+    (rearm4 still supervising after 4s, stopped)
+  marker after re-arm: pending:downtime:511391.1791871519.S8KzfP
+  ack exit=0: 
+  marker after ack: acked:downtime:511391.1791871519.S8KzfP
+TOTAL recovery announcements across 4 rounds: 2
