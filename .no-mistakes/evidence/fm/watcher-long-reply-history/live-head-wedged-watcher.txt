@@ -1,0 +1,2 @@
+t=20s beacon_age=15s first_watcher_alive_after_rearm=yes rearm_output: watcher: lock held by live pid 1480078 but heartbeat is stale for 15s (>10s); inspect or stop that watcher before re-arming.
+t=40s beacon_age=35s first_watcher_alive_after_rearm=no rearm_output: watcher: replaced stalled pid 1480078 (beacon 35s past hard bound 30s)

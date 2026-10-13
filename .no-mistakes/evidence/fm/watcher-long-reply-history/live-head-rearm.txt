@@ -1,0 +1,2 @@
+t=20s beacon_age=2s first_watcher_alive_after_rearm=yes rearm_output: watcher: already running pid 1409326
+t=45s beacon_age=2s first_watcher_alive_after_rearm=yes rearm_output: watcher: already running pid 1409326

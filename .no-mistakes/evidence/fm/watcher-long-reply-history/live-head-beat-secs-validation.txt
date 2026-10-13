@@ -1,0 +1,17 @@
+== FM_WATCHER_BEAT_SECS=99999999999999999999
+root=/home/marsjohn/.no-mistakes/worktrees/912b065c2da1/01M4SNN1TA0TZ7SBT1YCCB84Y5 secs=45 first_beat_at=2s distinct_beat_seconds=5 max_beacon_age=10s
+--- watcher stderr/stdout (tail) ---
+integer-expression-errors=0
+== FM_WATCHER_BEAT_SECS=00
+root=/home/marsjohn/.no-mistakes/worktrees/912b065c2da1/01M4SNN1TA0TZ7SBT1YCCB84Y5 secs=45 first_beat_at=1s distinct_beat_seconds=5 max_beacon_age=11s
+--- watcher stderr/stdout (tail) ---
+integer-expression-errors=0
+== FM_WATCHER_BEAT_SECS=-5
+root=/home/marsjohn/.no-mistakes/worktrees/912b065c2da1/01M4SNN1TA0TZ7SBT1YCCB84Y5 secs=45 first_beat_at=3s distinct_beat_seconds=5 max_beacon_age=10s
+--- watcher stderr/stdout (tail) ---
+integer-expression-errors=0
+== FM_WATCHER_BEAT_SECS=abc
+root=/home/marsjohn/.no-mistakes/worktrees/912b065c2da1/01M4SNN1TA0TZ7SBT1YCCB84Y5 secs=45 first_beat_at=2s distinct_beat_seconds=5 max_beacon_age=11s
+--- watcher stderr/stdout (tail) ---
+integer-expression-errors=0
+SETTLED_UNCHANGED

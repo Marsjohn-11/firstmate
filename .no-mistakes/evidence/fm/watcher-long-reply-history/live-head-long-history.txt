@@ -1,0 +1,3 @@
+root=/home/marsjohn/.no-mistakes/worktrees/912b065c2da1/01M4SNN1TA0TZ7SBT1YCCB84Y5 secs=90 first_beat_at=2s distinct_beat_seconds=41 max_beacon_age=3s
+--- watcher stderr/stdout (tail) ---
+integer-expression-errors=0

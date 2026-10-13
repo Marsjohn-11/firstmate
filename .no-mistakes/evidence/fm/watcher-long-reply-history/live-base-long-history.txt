@@ -1,0 +1,3 @@
+root=/tmp/fmscen/base secs=90 first_beat_at=1s distinct_beat_seconds=1 max_beacon_age=88s
+--- watcher stderr/stdout (tail) ---
+integer-expression-errors=0
