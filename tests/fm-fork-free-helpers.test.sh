@@ -399,7 +399,8 @@ for d in "$2"/*.d; do
   fm_autoarm_ledger_outcome_to got "$d"
   [ "$got" = "$want" ] || printf 'outcome %s: helper %q, sed %q\n' "${d##*/}" "$got" "$want"
   if fm_autoarm_ledger_read "$d"; then
-    want=$(sed -n '2p' "$f" 2>/dev/null || true)
+    # Bash 4.4+ warns on the NUL bytes the substitution drops.
+    { want=$(sed -n '2p' "$f" 2>/dev/null || true); } 2>/dev/null
     [ "$FM_AUTOARM_IDENTITY" = "$want" ] \
       || printf 'identity %s: helper %q, sed %q\n' "${d##*/}" "$FM_AUTOARM_IDENTITY" "$want"
   fi
