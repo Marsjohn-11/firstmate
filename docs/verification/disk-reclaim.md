@@ -16,12 +16,12 @@ That is a short working margin, not an overnight guarantee.
 
 The following simulator runtimes had zero devices immediately before deletion and were absent from `xcrun simctl runtime list` afterward:
 
-| Runtime | UUID | Reported size |
-|---|---|---:|
-| iOS 18.0 | `7972864F-6EF3-46F2-85A6-24DF769164F8` | 7.8 GiB |
-| iOS 18.1 | `431D15A9-7E38-4DBE-A84D-9873C9F6479A` | 8.0 GiB |
-| iOS 18.3.1 | `6A3900FA-93C4-4E2A-9E6C-BECCB4ED3AE2` | 8.1 GiB |
-| watchOS 11.2 | `1D5F26D6-DA39-4A79-A9C4-E4AB1510B8E8` | 4.2 GiB |
+| Runtime | Reported size |
+|---|---:|
+| iOS 18.0 | 7.8 GiB |
+| iOS 18.1 | 8.0 GiB |
+| iOS 18.3.1 | 8.1 GiB |
+| watchOS 11.2 | 4.2 GiB |
 
 The first tool-manager pass removed six superseded tool versions after each tool's `info.json` identified a newer current version and the process table showed zero users:
 
@@ -81,7 +81,6 @@ No resolving external symlink was removed.
 
 A real iOS simulator build of an app library target reached Swift compilation, linked the target's static library, and reported `Build completed successfully`.
 The command later exited nonzero only because Build Event Protocol upload to a legacy remote build-cache endpoint returned HTTP 404.
-Both blocked lane owners were notified that the missing-external repair was complete and could retry.
 
 ## Regrowth measurements
 
