@@ -1,0 +1,2 @@
+ok - the cycle-turnover marker is touched exactly once per cycle and stays distinct from the liveness beacon (3 turnovers, 33 beats, 3 cycles)
+exit=0

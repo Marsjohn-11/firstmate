@@ -1,0 +1,3 @@
+ok - disposable watcher refuses inherited state outside its marked lab
+not ok - beacon went quiet for 28s while the 22s sweep was still running (grace 12s)
+exit=1

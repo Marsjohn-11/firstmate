@@ -1,0 +1,4 @@
+ok - disposable watcher refuses inherited state outside its marked lab
+SWEEP_SPAN=23s WORST_BEACON_AGE=3s GRACE=12s CHECK_RUNS=23 HEALTHY_THROUGHOUT=yes
+ok - a watcher stays beacon-fresh and healthy throughout a sweep longer than the stale grace
+exit=0
