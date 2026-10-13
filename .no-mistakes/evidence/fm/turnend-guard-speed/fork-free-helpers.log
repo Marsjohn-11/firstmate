@@ -1,0 +1,13 @@
+ok - fm_dirname_to and fm_basename_to match dirname and basename on every edge case
+ok - fm_epoch_seconds_to reads the clock like date +%s and forks date at most as often
+ok - signal seen paths and absolute lock paths are byte-identical to the dirname/basename/tr forms
+ok - recovery marker reads accept exactly the one-line records wc -l accepted
+ok - window_to_task resolves every recorded window exactly as the grep/tail/cut pipeline did
+ok - classify stat helpers resolve the kernel name once per process
+ok - fm_read_file_to assigns and returns exactly what a cat command substitution does
+ok - the in-process harness name match agrees with grep -E on every case
+ok - the Cursor path fast negative agrees with full canonicalization, symlinks and case included
+ok - one combined ps read per ancestry hop reports the same parent and command name as separate reads
+ok - the ancestry walk reads each hop once and reads arguments only when the command name cannot decide
+ok - the ledger outcome and identity reads match the sed expressions they replace
+bash tests/fm-fork-free-helpers.test.sh  2.17s user 5.49s system 40% cpu 18.710 total

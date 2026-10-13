@@ -1,0 +1,13 @@
+Live Claude Stop hook (.claude/settings.json Stop[0] command, run via sh -c with CLAUDE_PROJECT_DIR/FM_HOME = disposable plain clone)
+base=6407052f  head=7c3a321c, same fixture state, 3-5 runs each, loaded machine
+A idle home                 base exit0  head exit0   (idle ~0.3-0.6s both)
+B in-flight, no watcher     base exit2  head exit2   stderr byte-identical
+C .afk + fresh beat, no daemon base exit2 head exit2 stderr identical except beacon age seconds
+D fresh rewake ledger       base exit0  head exit0
+E stale rewake ledger       base exit2  head exit2   stderr byte-identical
+E2 non-ASCII rewake ledger  base exit0  head exit0   (sed fallback path)
+F legacy live autoarm lock  base exit0  head exit0
+F2 lock role=watcher        base exit2  head exit2
+G linked child worktree     head exit0 silent no-op
+Block path timing (ms, sorted): base [2860 3205 3661 4296 4666] [2848 2882 3055 3453 3729]
+                                head [2670 2746 2752 2788 3367] [2295 2332 2507 3674 4650]
