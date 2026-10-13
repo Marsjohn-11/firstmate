@@ -1,0 +1,3 @@
+old    needed-noWatcher   rc=2 t=33.030s stderr_lines=6 md5=a9eb5b2a233d98044b73ef14e46cbede
+new    needed-noWatcher   rc=2 t=21.992s stderr_lines=6 md5=a9eb5b2a233d98044b73ef14e46cbede
+old    watcher-healthy    rc=0 t=4.342s stderr_lines=0 md5=d41d8cd98f00b204e9800998ecf8427e

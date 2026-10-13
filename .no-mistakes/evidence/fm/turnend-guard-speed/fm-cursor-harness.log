@@ -1,0 +1,6 @@
+ok - fm_cursor_process_matches: cursor's real shapes identify; real node/agent lookalikes do not
+ok - fm_cursor_process_matches: name and install-tree signals each carry a verdict alone
+ok - fm_cursor_verify_executable: the legacy alias is accepted only with cursor evidence
+ok - fm_cursor_resolve_binary: prints the stable launcher, not the versioned target
+ok - tmux liveness: a cursor pane is agent; an unrelated node/agent is other, never dead
+not ok - a real cursor-agent ancestor must detect cursor, got ''

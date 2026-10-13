@@ -1,0 +1,13 @@
+base    noWatcher-block  rc=2 t=41.54s first=●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+target  noWatcher-block  rc=2 t=20.94s first=●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+base    noWatcher-block  rc=2 t=24.45s first=●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+target  noWatcher-block  rc=2 t=25.16s first=●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+base    noWatcher-block  rc=2 t=24.29s first=●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+target  noWatcher-block  rc=2 t=6.87s first=●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+base    healthy-allow    rc=0 t=5.27s first=
+target  healthy-allow    rc=0 t=3.31s first=
+base    healthy-allow    rc=0 t=21.23s first=
+target  healthy-allow    rc=0 t=12.15s first=
+base    healthy-allow    rc=0 t=10.93s first=
+target  healthy-allow    rc=0 t=8.07s first=
+21:56  up 1 day,  1:40, 5 users, load averages: 329.76 397.18 466.39
