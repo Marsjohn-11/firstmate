@@ -250,6 +250,7 @@ fi
 if [ -e "$STATE/.afk" ]; then
   AFK_GRACE=${FM_GUARD_GRACE:-$(fm_poll_derived_grace)}
   fm_path_age_to BEAT_AGE "$STATE/.last-watcher-beat"
+  # shellcheck disable=SC2153 # Assigned by fm_path_age_to.
   if [ "$BEAT_AGE" -lt "$AFK_GRACE" ] && fm_afk_daemon_owns_supervision "$STATE"; then
     allow_supervised_stop
   fi

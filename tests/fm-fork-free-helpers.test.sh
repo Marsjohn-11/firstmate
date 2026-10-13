@@ -243,7 +243,8 @@ test_read_file_helper_matches_cat() {
   cat > "$script" <<'SH'
 . "$1/bin/fm-path-lib.sh"
 for f in "$2"/* "$2/missing"; do
-  want=$(cat "$f" 2>/dev/null); want_rc=$?
+  # Bash 4.4+ warns on the NUL bytes the substitution drops.
+  { want=$(cat "$f" 2>/dev/null); want_rc=$?; } 2>/dev/null
   fm_read_file_to got "$f"; got_rc=$?
   [ "$got" = "$want" ] && [ "$got_rc" = "$want_rc" ] \
     || printf 'read %s: helper %q (%s), cat %q (%s)\n' "${f##*/}" "$got" "$got_rc" "$want" "$want_rc"
