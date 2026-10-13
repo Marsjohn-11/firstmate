@@ -1594,9 +1594,10 @@ test_tick_does_no_per_record_work_for_settled_history() {
     || fail "an open escalation on a resolved record must still close"
   [ "$(sed -E 's/ \[at=[0-9]+\]//' "$state/hibit.status" | grep -Fc "resolved [key=pending-reply-$corr]")" -eq 1 ] \
     || fail "the retried close must append exactly one resolution"
-  # Only the record with an open escalation has work left.
-  [ "$(wc -l < "$progress_log" | tr -d ' ')" = 1 ] \
-    || fail "the progress command must run once per selected record"
+  # Listing and selecting a long settled history must show progress too, not
+  # only the work on the one record with an open escalation.
+  [ "$(wc -l < "$progress_log" | tr -d ' ')" -gt "$records" ] \
+    || fail "the progress command must run across listing and selection, not only per selected record"
 
   before=$(cat "$dir"/* | cksum)
   launch_log="$home/launches.log"

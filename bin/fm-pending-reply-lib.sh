@@ -1541,7 +1541,7 @@ _fm_pending_reply_select_needing_work() {  # <record-path>...
         else if (index(line, "escalation_closed_epoch=") == 1) closed = substr(line, 25)
       }
       close(path)
-      if (rc < 0 || phase != "resolved" || (escalated != "" && closed == "")) print path
+      if (rc < 0 || phase != "resolved" || (escalated != "" && closed == "")) { print path; fflush() }
     }
   '
 }
@@ -1569,8 +1569,9 @@ _fm_pending_reply_tick_fields() {  # <record-path>
 # selected in one pass first (_fm_pending_reply_select_needing_work), so a
 # settled record costs no lock and no fork, and the per-record path below runs
 # only for the records that selection returns.
-# The optional progress command runs before each selected record, so a caller
-# can show liveness across a long scan.
+# The optional progress command runs as each record is listed, as each
+# selected record arrives from selection, and before each selected record is
+# worked, so a caller can show liveness across a long scan.
 fm_pending_reply_tick() {  # <state-dir> [progress-command]
   local state=$1 progress=${2-} dir rec corr task_id phase delivered meta backend target label busy sm_home harness remote_host
   local observation observation_task found i
@@ -1578,6 +1579,7 @@ fm_pending_reply_tick() {  # <state-dir> [progress-command]
   dir=$(fm_pending_reply_dir "$state")
   [ -d "$dir" ] || return 0
   for rec in "$dir"/*; do
+    [ -z "$progress" ] || "$progress"
     [ -f "$rec" ] || continue
     case "${rec##*/}" in
       .*) continue ;;
@@ -1590,8 +1592,10 @@ fm_pending_reply_tick() {  # <state-dir> [progress-command]
     esac
   done
   while IFS= read -r rec; do
+    [ -z "$progress" ] || "$progress"
     selected+=("$rec")
   done < <(_fm_pending_reply_select_needing_work ${records[@]+"${records[@]}"})
+  [ -z "$progress" ] || "$progress"
   for rec in ${selected[@]+"${selected[@]}"}; do
     [ -z "$progress" ] || "$progress"
     _fm_pending_reply_tick_fields "$rec"
