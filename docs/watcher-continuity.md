@@ -221,10 +221,11 @@ An unacknowledged downtime generation is announced at most once.
 The first recovery marks that generation announced, and later empty-queue arms leave it announced until durable work or interrupted handling makes recovery pending again.
 A non-successor watcher start checks the durable queue and recovery marker under their locks.
 If an announced-but-unacknowledged episode has an empty queue, the arm leaves that generation announced, making repeated empty-queue arms idempotent while a long-poll source is merely alive.
-If a durable row arrived after the announcement, the arm returns that episode to pending so buried work still resurfaces once.
+If rows are still queued, such as presented rows not yet acknowledged, the arm returns that episode to pending so that work still resurfaces once.
+A row appended after a downtime announcement does not reach this reopen, because the append itself already opened a fresh pending generation (see the append rule below).
 
 The reopen keeps the episode's own generation rather than minting a fresh one.
-A harness that re-arms only between turns reaches that reopen at every turn boundary while a busy fleet keeps a row queued, so minting there invalidated the acknowledgement the handling turn had already been given.
+A harness that re-arms only between turns reaches that reopen at every turn boundary while presented rows still wait unacknowledged in the queue, so minting there invalidated the acknowledgement the handling turn had already been given.
 That acknowledgement then reported a newer episode and asked for a re-drain whose own acknowledgement the next boundary invalidated again - one firstmate turn per round, indefinitely, with no watcher alive in between.
 
 A Codex foreground checkpoint skips the announced-episode reopen transition, so an already-announced generation stays announced while the checkpoint continues its bounded supervision.
