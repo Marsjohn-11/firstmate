@@ -38,7 +38,8 @@
 #      the decision; a retry while that decision is still open appends nothing
 #  19. A tick over a large settled history launches no per-record helper, yet
 #      still retries an open escalation close
-#  20. The watcher's beacon keeps advancing through a slow tick
+#  20. The watcher's beacon keeps advancing through a slow tick, and a beat
+#      interval too large to compare falls back to the default
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -1693,6 +1694,36 @@ SH
   pass "watcher beacon stays fresh through a slow pending-reply tick"
 }
 
+# An interval too large for the shell to compare falls back to the default
+# instead of turning every progress beat into a comparison error.
+test_watcher_rejects_an_oversized_beat_interval() {
+  local home state out pid started
+  home=$(setup_parent oversized-beat)
+  state="$home/state"
+  fm_test_track_watcher_state "$state"
+  out="$home/watch.out"
+  env FM_HOME="$home" FM_STATE_OVERRIDE="$state" \
+    FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
+    FM_SECONDMATE_LIVENESS_SECS=99999999 FM_WATCHER_BEAT_SECS=99999999999999999999 \
+    "$ROOT/bin/fm-watch.sh" > "$out" 2>&1 &
+  pid=$!
+  started=$(date +%s)
+  while [ ! -e "$state/.last-watcher-beat" ]; do
+    kill -0 "$pid" 2>/dev/null || fail "watcher exited before its first beat: $(cat "$out")"
+    [ $(($(date +%s) - started)) -lt 60 ] || fail "watcher never beat"
+    sleep 0.1
+  done
+  # Several one-second cycles, each passing the progress beats.
+  sleep 3
+  kill -0 "$pid" 2>/dev/null || fail "watcher exited with an oversized beat interval: $(cat "$out")"
+  kill "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  if grep -q 'integer expression expected' "$out"; then
+    fail "an oversized beat interval made the beat comparison error: $(cat "$out")"
+  fi
+  pass "watcher falls back from a beat interval too large to compare"
+}
+
 test_correlations_reuse_only_for_matching_open_task() {
   local dir fb log home state got corr1 corr2 corr3 rec
   dir="$TMP_ROOT/corr-reuse"; mkdir -p "$dir"
@@ -2320,6 +2351,7 @@ test_tick_skips_terminal_and_reuses_target_observation
 test_tick_leaves_settled_records_alone
 test_tick_does_no_per_record_work_for_settled_history
 test_watcher_beacon_stays_fresh_through_a_slow_tick
+test_watcher_rejects_an_oversized_beat_interval
 test_correlations_reuse_only_for_matching_open_task
 test_tick_end_to_end_missed_then_escalate
 test_failed_send_discards_undelivered_expectation
