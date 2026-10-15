@@ -1,0 +1,12 @@
+### ready-report gate via fm-crew-state.sh (live task ext-t1, backup_remote=backup recorded)
+HEAD cea4ad2; backup/ext-t1 on backup = cea4ad2
+$ status: done: review https://review.example.com/r/12 uploaded for review
+  fm-crew-state.sh ext-t1 -> state: done · source: status-log · review https://review.example.com/r/12 uploaded for review
+$ status: done: PR https://github.com/acme/demo/pull/12
+  fm-crew-state.sh ext-t1 -> state: blocked · source: status-log · this project ships through an external review tool, so the ready report is `review <url> uploaded for review`, never a PR
+$ worker commits again without refreshing backup; status: done: review ... uploaded for review
+  fm-crew-state.sh ext-t1 -> state: blocked · source: status-log · named head 6afa978ced7fdeba79db666c3013848e99ecce81 is not on the backup remote backup under backup/; push the durable copy and fetch it before reporting done
+$ backup config removed from meta (no backup recorded), same report
+  fm-crew-state.sh ext-t1 -> state: done · source: status-log · review https://review.example.com/r/12 uploaded for review
+$ no backup recorded, non-canonical URL: done: review http://review.example.com/r/12 uploaded for review
+  fm-crew-state.sh ext-t1 -> state: blocked · source: status-log · this project ships through an external review tool, so the ready report is `review <url> uploaded for review`, never a PR

@@ -1,0 +1,22 @@
+ok - a Cursor --trailer commit object has no AI co-author and keeps the captain identity
+ok - the Command Code trailer a worker writes into its own message is stripped
+ok - a human Co-authored-by trailer survives next to a stripped Cursor trailer
+ok - a human co-author at a vendor domain survives; only the exact bot address is stripped
+ok - a hook manager resolving the pane hooks dir fails instead of displacing the strip
+ok - a relaunch reinstall replaces the read-only strip dir and still strips
+ok - install chains the previous commit-msg hook after stripping
+ok - a relative project core.hooksPath resolves against the worktree and still runs
+ok - an inherited GIT_CONFIG hooksPath does not become the chained previous hooks
+ok - a project hook that appears after install still runs for the rest of the task
+ok - a pane GIT_CONFIG hooksPath still chains the repository git is actually in
+ok - an empty project core.hooksPath runs no repository hook and still strips the trailer
+ok - an unresolvable project core.hooksPath still refuses the commit
+ok - a valueless project core.hooksPath still refuses the commit
+ok - the repository's pre-push runs and can refuse under every hooksPath override channel
+ok - a git -c hooksPath override still strips the trailer and chains the project's hooks
+ok - the repository's own hook keeps inherited GIT_CONFIG entries such as a scoped credential helper
+ok - env-file writes the canonical hooks path so wrappers still chain the repository hook
+ok - commit-msg file mode strips the trailer and keeps the subject
+ok - install --no-strip leaves commit messages untouched while still chaining
+ok - install --push-guard writes a read-only pre-push that runs the guard before chaining
+# all fm-git-strip-ai-trailers tests passed

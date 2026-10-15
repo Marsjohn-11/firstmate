@@ -1,0 +1,32 @@
+### fm-review-check.sh (lab home; config/external-review-url = ^https://review\.example\.com/r/[0-9]+$)
+$ fm-review-check.sh ext-t1 https://github.com/acme/demo/pull/12
+error: https://github.com/acme/demo/pull/12 is not a canonical https review URL (no whitespace, query, fragment, or forge pull request URL), or does not match config/external-review-url
+[exit 2]
+$ fm-review-check.sh ext-t1 https://review.example.com/r/12?draft=1
+error: https://review.example.com/r/12?draft=1 is not a canonical https review URL (no whitespace, query, fragment, or forge pull request URL), or does not match config/external-review-url
+[exit 2]
+$ fm-review-check.sh ext-t1 https://other.example.org/r/12
+error: https://other.example.org/r/12 is not a canonical https review URL (no whitespace, query, fragment, or forge pull request URL), or does not match config/external-review-url
+[exit 2]
+$ fm-review-check.sh ext-t1 http://review.example.com/r/12
+error: http://review.example.com/r/12 is not a canonical https review URL (no whitespace, query, fragment, or forge pull request URL), or does not match config/external-review-url
+[exit 2]
+--- worker commits after the backup copy (HEAD not on backup namespace)
+new HEAD cea4ad2
+$ fm-review-check.sh ext-t1 https://review.example.com/r/12
+error: named head cea4ad260ef471c0ced7ce211c9086a53ca67bea is not on the backup remote backup under backup/; push the durable copy and fetch it before reporting done
+[exit 1]
+--- worker refreshes the backup copy
+[push exit 0]
+$ fm-review-check.sh ext-t1 https://review.example.com/r/12
+recorded: review=https://review.example.com/r/12 (no merge watch: a human approves and merges the review; escalate it to the captain)
+[exit 0]
+--- meta after
+forge=external
+review=https://review.example.com/r/12
+review_head=cea4ad260ef471c0ced7ce211c9086a53ca67bea
+head: cea4ad260ef471c0ced7ce211c9086a53ca67bea
+--- non-external task refused
+$ fm-review-check.sh plain-t1 https://review.example.com/r/13
+error: plain-t1 does not record forge=external, so it has no external review to record; a pull request is recorded with bin/fm-pr-check.sh
+[exit 1]

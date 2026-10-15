@@ -1,0 +1,48 @@
+### fm-promote.sh on a forge=external project (scout record fixture in lab)
+$ fm-promote.sh sc-t1 --mode direct-PR --yolo off
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  3 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+error: promotion is refused for forge=external: a scout launches without the push guard and the task record that keep task branches off the shared origin; spawn a fresh ship task with bin/fm-brief.sh --forge external instead
+[exit 1]
+
+### fm-teardown.sh ext-t1 (review recorded, work not landed on main)
+state before: ext-t1.busy-gen ext-t1.busy-state ext-t1.git-hooks ext-t1.inbox ext-t1.meta ext-t1.push-guard ext-t1.status ext-t1.turn-ended 
+$ fm-teardown.sh ext-t1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.6yHREm
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+REFUSED: worktree /local/home/marsjohn/.treehouse/demo-408719/1/demo has work not on any remote and not landed.
+unpushed commits:
+6afa978 later2
+Push the branch, land its PR, or get the captain's explicit OK to discard, then --force.
+[exit 1]
+state after refusal: ext-t1.busy-gen ext-t1.busy-state ext-t1.git-hooks ext-t1.inbox ext-t1.meta ext-t1.push-guard ext-t1.status ext-t1.turn-ended 
+$ fm-teardown.sh ext-t1 --force   (lab-only disposable work)
+teardown: force-killing leaked worktree process(es) for ext-t1: 1772083
+A new version of treehouse is available: v2.0.1 → v3.1.4
+Run "treehouse update" to update
+
+worktree /local/home/marsjohn/.treehouse/demo-408719/1/demo is not managed by treehouse
+error: treehouse return failed for worktree /local/home/marsjohn/.treehouse/demo-408719/1/demo; teardown aborted
+[exit 1]
+state after forced teardown: ext-t1.busy-gen ext-t1.busy-state ext-t1.git-hooks ext-t1.inbox ext-t1.meta ext-t1.push-guard ext-t1.status ext-t1.turn-ended 
+
+### retry: fm-teardown.sh ext-t1 --force (treehouse slot already reported available)
+A new version of treehouse is available: v2.0.1 → v3.1.4
+Run "treehouse update" to update
+
+worktree /local/home/marsjohn/.treehouse/demo-408719/1/demo is not managed by treehouse
+error: treehouse return failed for worktree /local/home/marsjohn/.treehouse/demo-408719/1/demo; teardown aborted
+[exit 1]
+state after: ext-t1.busy-gen ext-t1.busy-state ext-t1.git-hooks ext-t1.inbox ext-t1.meta ext-t1.push-guard ext-t1.status ext-t1.turn-ended 
+
+### diagnosis of the forced-teardown abort (environmental, pre-existing)
+$ treehouse return /local/home/marsjohn/.treehouse/demo-408719/1/demo
+worktree ... is not managed by treehouse
+$ treehouse return /home/marsjohn/.treehouse/demo-408719/1/demo
+Worktree returned to pool.
+/home/marsjohn is a symlink to /local/home/marsjohn; treehouse v2.0.1 only accepts the /home spelling. The fm-teardown.sh change in this diff only adds state/<id>.push-guard to its rm list.

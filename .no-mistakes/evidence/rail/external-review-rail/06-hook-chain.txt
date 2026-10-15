@@ -1,0 +1,10 @@
+### chaining to the repository's own pre-push hook
+$ git push backup HEAD:refs/heads/backup/ext-t1-chain
+repo-own-pre-push ran: remote=backup
+To file:///tmp/fm-lab.6yHREm/backup.git
+ * [new branch]      HEAD -> backup/ext-t1-chain
+[exit 0]
+$ (repo hook now refuses) git push backup HEAD:refs/heads/backup/ext-t1-chain2
+repo-own-pre-push says no
+error: failed to push some refs to 'file:///tmp/fm-lab.6yHREm/backup.git'
+[exit 1]

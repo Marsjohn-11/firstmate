@@ -1,0 +1,22 @@
+### fm-brief.sh composition refusals (lab home /tmp/fm-lab.6yHREm)
+$ fm-brief.sh refuse-t1 demo --mode no-mistakes --forge external
+error: fm-brief.sh --forge: forge=external ships direct-PR only for now; the pipeline's push, pr, and ci steps would push to the shared origin
+[exit 1]
+$ fm-brief.sh refuse-t1 demo --mode local-only --forge external
+error: fm-brief.sh --forge: forge=external cannot ship mode=local-only - that mode publishes nothing, so a forge has no meaning there, and its landing would fast-forward local main with content the review server has never seen; ship no-mistakes or direct-PR, which publish through the forge
+[exit 1]
+$ fm-brief.sh refuse-t1 demo --mode direct-PR --forge external --base-branch dev
+error: fm-brief.sh --base-branch: a base branch is not supported on forge=external
+[exit 1]
+data dir after refusals: ext-t1 projects.md projects.md.orig 
+
+### accepted scaffold
+$ fm-brief.sh ext-t1 demo --mode direct-PR --forge external (already ran)
+90
+### adapter guards at brief time
+$ adapter carrying its own Delivery contract line
+error: /tmp/fm-lab.6yHREm/config/external-review.md must not carry a 'Delivery contract: mode=' line; the delivery contract is rendered by bin/fm-dod-lib.sh
+[exit 1]
+$ adapter missing
+error: forge=external needs /tmp/fm-lab.6yHREm/config/external-review.md, the worker instructions for this home's review tool (docs/configuration.md "External review tool"); without it a worker has no way to publish except a push
+[exit 1]

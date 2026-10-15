@@ -1,0 +1,22 @@
+### fm-project-mode registry binding (real CLI, lab home /tmp/fm-lab.6yHREm)
+$ registry: demo [direct-PR forge=external]
+  default -> direct-PR off
+[exit 0]
+  --forge -> external
+[exit 0]
+$ registry: demo [local-only forge=external]
+  default -> refused: demo is registered local-only with forge=external in /tmp/fm-lab.6yHREm/data/projects.md; local-only publishes nothing, so a forge has no meaning there, and its landing would fast-forward local main with content the review server has never seen; register no-mistakes or direct-PR to publish through the forge, or drop the forge token to keep the project local
+[exit 3]
+  --forge -> refused: demo is registered local-only with forge=external in /tmp/fm-lab.6yHREm/data/projects.md; local-only publishes nothing, so a forge has no meaning there, and its landing would fast-forward local main with content the review server has never seen; register no-mistakes or direct-PR to publish through the forge, or drop the forge token to keep the project local
+[exit 3]
+$ registry: demo [no-mistakes forge=external]
+  default -> no-mistakes off
+[exit 0]
+  --forge -> external
+[exit 0]
+$ registry: demo [direct-PR +yolo forge=external]
+  default -> refused: +yolo is registered for demo but yolo is inactive for forge=external, so this reports yolo=off: firstmate can neither observe nor perform the review tool's approval or merge, so every review escalates
+direct-PR off
+[exit 0]
+  --forge -> external
+[exit 0]

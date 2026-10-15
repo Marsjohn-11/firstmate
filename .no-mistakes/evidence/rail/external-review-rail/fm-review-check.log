@@ -1,0 +1,4 @@
+ok - fm-review-check: records one review= and review_head=, arms no watch, and a re-record replaces both
+ok - fm-review-check: refuses a forge PR, non-https, a pattern mismatch, an unsafe id, missing input, a non-external task, and an unbacked copy
+ok - fm-review-check: a secondmate home publishes the child's review-ready line to the parent channel
+# all fm-review-check tests passed

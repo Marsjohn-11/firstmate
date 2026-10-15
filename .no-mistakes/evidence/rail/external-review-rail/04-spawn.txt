@@ -1,0 +1,36 @@
+### live fm-spawn.sh refusals (real tmux fm-lab socket, real treehouse)
+$ fm-spawn.sh yolo-t1 demo --mode direct-PR --yolo on
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.6yHREm
+error: --yolo on is refused for yolo-t1: demo is registered forge=external, where firstmate can neither observe nor perform the review tool's approval or merge; spawn with --yolo off
+[exit 1] meta: ls: cannot access '/tmp/fm-lab.6yHREm/state/yolo-t1.meta': No such file or directory
+$ backup remote aliasing origin: fm-spawn.sh alias-t1 ...
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.6yHREm
+error: alias-t1 cannot launch: the backup remote backup points at the project's shared origin; a durable copy must go to storage only the captain controls
+[exit 1] meta: ls: cannot access '/tmp/fm-lab.6yHREm/state/alias-t1.meta': No such file or directory
+$ backup prefix=fm/copies/ inside task prefix: fm-spawn.sh prefix-t1 ...
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.6yHREm
+error: backup prefix 'fm/copies/' equals or starts with the task branch prefix 'fm/'; a durable copy must never read as a delivery branch
+[exit 1] meta: ls: cannot access '/tmp/fm-lab.6yHREm/state/prefix-t1.meta': No such file or directory
+
+### live accepted spawn: fm-spawn.sh ext-t1 demo --mode direct-PR --yolo off (harness claude)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.6yHREm
+spawned ext-t1 harness=claude kind=ship mode=direct-PR yolo=off window=primary:fm-ext-t1 worktree=/local/home/marsjohn/.treehouse/demo-408719/1/demo
+[exit 0]
+--- state/ext-t1.meta
+window=primary:fm-ext-t1
+endpoint_task_id=ext-t1
+worktree=/local/home/marsjohn/.treehouse/demo-408719/1/demo
+project=/tmp/fm-lab.6yHREm/projects/demo
+harness=claude
+kind=ship
+mode=direct-PR
+yolo=off
+branch=fm/ext-t1
+tasktmp=/tmp/fm-ext-t1
+forge=external
+backup_remote=backup
+backup_prefix=backup/
+model=default
+effort=default
+busy_gen=g1792092589.1773333.3821
+spawn_gen=s1792092590.1770834.8071
