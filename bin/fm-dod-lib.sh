@@ -49,8 +49,8 @@
 # task's done. Teardown's landed-work test remains the complete discard gate.
 # The block opens with the fixed machine-readable "Delivery contract: mode=<mode>"
 # line that bin/fm-spawn.sh checks a ship brief against; a forge=gerrit block
-# appends " forge=gerrit shape=squash" to that line and a forge=forgejo block
-# appends " forge=forgejo". The "Ship branch: <branch>"
+# appends " forge=gerrit shape=squash" to that line, and a forge=forgejo or
+# forge=external block appends " forge=forgejo" or " forge=external". The "Ship branch: <branch>"
 # line under it is machine-readable the same way: bin/fm-spawn.sh refuses a ship
 # whose spawn-selected branch disagrees with it.
 # forge is none|gerrit|forgejo|external and defaults to none;
