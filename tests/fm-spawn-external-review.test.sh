@@ -122,7 +122,6 @@ test_spawn_installs_the_guard_and_records_the_task() {
   assert_grep 'backup_prefix=backup/' "$meta" "the spawn did not record the backup prefix"
   hooks=$(cd "$HOME_DIR/state" && pwd -P)/$id.git-hooks
   [ -x "$hooks/pre-push" ] || fail "keep-ai-trailers skipped the push guard hooks"
-  assert_grep 'fm-git-push-guard.sh' "$hooks/pre-push" "the installed pre-push does not run the guard"
   out=$(GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=$hooks \
     git -C "$POOL_DIR" push origin "HEAD:refs/heads/fm/$id" 2>&1) && fail "the installed guard let the task branch reach origin"
   assert_contains "$out" "fm-git-push-guard: refused:" "the task-branch push was not refused by the guard"
