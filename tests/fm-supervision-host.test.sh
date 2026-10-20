@@ -1503,6 +1503,42 @@ test_successor_close_during_main_turn_is_delivered_at_the_next_turn_end() {
   pass "host+hook: a successor close that lands during main's turn is delivered at the next turn end"
 }
 
+# The live loop (2026-10-20): the successor a main-only pass-through leaves
+# for main closed during main's turn with nobody reading its arm, so the next
+# park found that arm gone and started a fresh cycle, which announced the
+# queued close as a main-only "check: rearm-resurface"; that turn's own left
+# successor closed the same way, lap after lap. Each next park must deliver
+# the left successor's own close instead, so no lap resurfaces a recovery.
+test_successor_close_during_main_turn_reaches_main_as_itself_lap_after_lap() {
+  local home lap successor drained
+  home=$(make_primary_home hook-successor-laps)
+  start_hook_session "$home"
+  turn_end "$home"
+  wait_until 150 watcher_live "$home" || fail "successor laps: the Stop hook never started a watcher cycle: $(cat "$home/hook.err" 2>/dev/null)"
+  append_status "$home" 'which export format?' needs-decision
+  wait_until 250 hook_exited "$home" || fail "successor laps: the first close never reached the Stop hook: $(cat "$home/state/.supervision-host.log")"
+  assert_rewoke_main "$home" "successor laps (first)"
+  for lap in 1 2; do
+    successor=$(cat "$home/state/.watch.lock/pid")
+    main_drain "$home" >/dev/null
+    append_status "$home" "which region for lap $lap?" needs-decision
+    wait_until 250 bash -c '! kill -0 "$1" 2>/dev/null' _ "$successor" || fail "fixture: lap $lap's successor did not close on the later decision"
+    # shellcheck disable=SC2086 # the printed acknowledgement arguments
+    [ -z "$MAIN_ACK" ] || FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" "$@" >/dev/null 2>&1' "$ROOT/bin/fm-wake-drain.sh" $MAIN_ACK \
+      || fail "successor laps: lap $lap's acknowledgement failed: $MAIN_ACK"
+    turn_end "$home"
+    wait_until 250 hook_exited "$home" || fail "successor laps: lap $lap's turn end never closed: $(cat "$home/state/.supervision-host.log")"
+    assert_rewoke_main "$home" "successor laps (lap $lap)"
+    assert_no_re 'rearm-resurface' "$home/hook.err" "successor laps: lap $lap resurfaced a recovery instead of the successor's close"
+    assert_re '^signal: .*demo.status' "$home/hook.err" "successor laps: lap $lap must carry the successor's own close"
+    drained=$(main_drain "$home")
+    assert_contains "$drained" "which region for lap $lap?" "successor laps: lap $lap's close must reach main's drain"
+  done
+  assert_no_re 'rearm-resurface' "$home/state/.supervision-host.log" "successor laps: a lap resurfaced a recovery"
+  watcher_live "$home" || fail "successor laps: the last turn end left no watcher"
+  pass "host+hook: a successor close during main's turn reaches main as itself, lap after lap, without a recovery resurface"
+}
+
 # The live loop (2026-10-07): the successor a main-only pass-through leaves
 # for main shared the Stop hook's process group, so Claude's teardown of that
 # group after the exit-2 rewake stopped it mid-turn. The stop published
@@ -3006,6 +3042,7 @@ test_claude_stop_hook_delivers_a_close_that_turns_main_only_at_its_turn
 test_successor_left_at_the_turn_survives_the_hook_process_group_teardown
 test_claude_stop_hook_notifies_when_at_turn_downtime_write_fails
 test_successor_close_during_main_turn_is_delivered_at_the_next_turn_end
+test_successor_close_during_main_turn_reaches_main_as_itself_lap_after_lap
 test_pass_through_successor_survives_the_hook_process_group_teardown
 test_next_park_takes_over_the_cycle_a_pass_through_left_for_main
 test_a_park_stopped_mid_take_over_leaves_the_take_over_to_the_next_park

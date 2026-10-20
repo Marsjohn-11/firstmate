@@ -137,7 +137,9 @@
 # releases the branch actor's leases; it releases them again after every
 # engine turn. It also reads the record of a successor a pass-through left for
 # main: while that arm still runs under its recorded identity, the first cycle
-# without --restart requests a take-over rather than an ordinary attach.
+# without --restart requests a take-over rather than an ordinary attach, and
+# when that arm already closed with its wake rows still queued, the first
+# cycle is that arm's unread close.
 # Activation removes the
 # record only once that identity is no longer alive, so a later host retries a
 # take-over that left it running.
@@ -241,6 +243,7 @@ ENGINE_PID_FILE="$STATE/.supervision-host.engine-pid"
 HEALTH_FILE="$STATE/.supervision-host-health"
 MIRROR_FEED="$STATE/.supervision-host-mirror"
 LEFT_RECORD="$STATE/.supervision-host-left"
+LEFT_CLOSE="$STATE/.supervision-host-left-close"
 
 HOST_PID=$$
 HOST_STARTED_SECONDS=$SECONDS
@@ -267,6 +270,10 @@ ENGINE_RUNNING=0
 # The successor arm a predecessor's pass-through left for main, which the
 # first cycle takes over.
 LEFT_ARM=
+# The close that arm printed after its host exited, which nobody read; the
+# first cycle hands it on in place of starting a cycle of its own.
+LEFT_TEXT=
+LEFT_CLOSED_ARM=
 # The running turn's result and diagnostics files, removed by the cleanup when
 # the host is stopped mid-turn.
 TURN_RESULT=
@@ -387,8 +394,16 @@ activate() {
       LEFT_ARM=$pid
     else
       rm -f "$LEFT_RECORD"
+      # It closed during main's turn: a fresh cycle would announce that close
+      # as a main-only recovery, so hand it on while its rows still wait.
+      if [ -s "$FM_WAKE_QUEUE" ]; then
+        LEFT_TEXT=$(grep -Ev '^watcher: (started|attached) ' "$LEFT_CLOSE" 2>/dev/null || true)
+        printf '%s\n' "$LEFT_TEXT" | grep -Eq '^(signal:|stale:|check:|heartbeat($|:))' || LEFT_TEXT=
+        [ -z "$LEFT_TEXT" ] || LEFT_CLOSED_ARM=$pid
+      fi
     fi
   fi
+  rm -f "$LEFT_CLOSE"
   printf 'host\t%s\t%s\n' "$HOST_PID" "$(identity_of "$HOST_PID")" > "$HOST_RECORD" || return 1
   release_branch_leases
 }
@@ -682,8 +697,9 @@ start_successor() {  # <predecessor-arm-pid>
 # so the cleanup stops it and main's next turn end arms a fresh cycle; that
 # returns 1. The shell signals background jobs when it exits, and this arm's
 # handler would then stop the watcher, so disown it first. The capture file
-# stays tracked so the EXIT trap unlinks it; the arm already holds that
-# descriptor and keeps waiting on the watcher.
+# moves to LEFT_CLOSE, where the arm's open descriptor keeps writing, so the
+# next host can read a close the arm prints after this host exits; a capture
+# that cannot move stays tracked so the EXIT trap unlinks it.
 detach_successor() {
   local identity tmp=
   [ -n "${SUCCESSOR_PID:-}" ] || return 0
@@ -700,6 +716,9 @@ detach_successor() {
   disown "$SUCCESSOR_PID" 2>/dev/null || true
   forget_process "$SUCCESSOR_PID"
   SUCCESSOR_PID=
+  if [ -n "${SUCCESSOR_OUT:-}" ] && mv -f "$SUCCESSOR_OUT" "$LEFT_CLOSE" 2>/dev/null; then
+    SUCCESSOR_OUT=
+  fi
 }
 
 # Start the same successor a handled wake starts and leave it running. It
@@ -1059,7 +1078,13 @@ activate || { echo "supervision-host stood down: the host record could not be wr
 log_line "start	gen=$GEN	primary=$PRIMARY"
 
 # The first cycle.
-if [ "$FIRST_ARM_RESTART" -eq 1 ]; then
+if [ "$FIRST_ARM_RESTART" -eq 0 ] && [ -n "$LEFT_TEXT" ]; then
+  log_line "take-over	closed arm=$LEFT_CLOSED_ARM"
+  ARM_TEXT=$LEFT_TEXT
+  CLOSED_ARM_PID=$LEFT_CLOSED_ARM
+  READY_PENDING=0
+elif [ "$FIRST_ARM_RESTART" -eq 1 ]; then
+  LEFT_TEXT=
   start_arm "$OWNER_PREDECESSOR" --restart
 elif [ -n "$LEFT_ARM" ]; then
   log_line "take-over	arm=$LEFT_ARM"
@@ -1067,12 +1092,16 @@ elif [ -n "$LEFT_ARM" ]; then
 else
   start_arm "$OWNER_PREDECESSOR"
 fi || { echo "watcher: FAILED - the supervision host could not start a watcher cycle"; exit 1; }
-ARM_PID=$STARTED_ARM_PID
-ARM_OUT=$STARTED_ARM_OUT
+ARM_PID=${STARTED_ARM_PID:-}
+ARM_OUT=${STARTED_ARM_OUT:-}
 
 while :; do
   boundary_reached && boundary_exit
-  await_close || boundary_exit
+  if [ -n "$LEFT_TEXT" ]; then
+    LEFT_TEXT=
+  else
+    await_close || boundary_exit
+  fi
   REASON=$(printf '%s\n' "$ARM_TEXT" | grep -E '^(signal:|stale:|check:|heartbeat($|:))' || true)
 
   # The away daemon owns triage while its flag exists; the owner stands down.
