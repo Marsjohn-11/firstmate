@@ -1,0 +1,16 @@
+## test_procevent_reannounced_result_surfaces_under_its_own_headline_lap_after_lap (base bin/fm-watch.sh @7da4c362)
+not ok - lap 1: the re-announced process-event row surfaced as a bare recovery: check: rearm-resurface
+exit=1
+## test_procevent_unacknowledged_result_redrains_until_handled (base bin/fm-watch.sh @7da4c362)
+not ok - the fixture captured no process-event result
+exit=1
+## test_procevent_headlines_classify_queue_keys (base bin/fm-watch.sh @7da4c362)
+ok - process-event queue keys surface under their own headlines
+exit=0
+## test_procevent_launch_failed_episodes_are_each_delivered (base bin/fm-watch.sh @7da4c362)
+wait_for_exit: owned pid 37773 exceeded 30 polls; sending TERM
+ok - every launch-failure episode is delivered under the failed-to-start headline
+exit=0
+## test_procevent_unacknowledged_result_redrains_until_handled retry, FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=60 (base bin/fm-watch.sh @7da4c362)
+not ok - the successor did not re-surface the unacknowledged result under its own headline: check: rearm-resurface
+exit=1

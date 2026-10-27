@@ -1,0 +1,13 @@
+ok - a captured process-event result wakes a healthy watcher proactively, with no manual drain
+ok - an unacknowledged process-event result re-drains until handling is acknowledged
+ok - a re-announced process-event row surfaces under its own headline, lap after lap
+ok - complete process-event queue keys map to distinct seen markers
+ok - process-event queue keys surface under their own headlines
+ok - every launch-failure episode is delivered under the failed-to-start headline
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 79931.1793105571.UdLM4X
+ok - queue revalidation, proactive output, and marker commit serialize with drain
+/var/folders/tv/b4_jb7290610qhwsd01ngyhr0000gq/T/fm-test.nXa1AE/new/bin/fm-push-transition-lib.sh: line 100: echo: write error: Broken pipe
+tests/wake-helpers.sh: line 329: 11373 Killed: 9               PATH="$dir/fakebin:$PATH" FM_HOME="$dir" FM_PROCEVENT_CLAIM_ROOT="$dir/claims" FM_CREW_STATE_BIN="$dir/fakebin/fm-crew-state.sh" FM_POLL=0.2 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out"
+tests/wake-helpers.sh: line 329: 26291 Killed: 9               PATH="$dir/fakebin:$PATH" FM_HOME="$dir" FM_PROCEVENT_CLAIM_ROOT="$dir/claims" FM_CREW_STATE_BIN="$dir/fakebin/fm-crew-state.sh" FM_POLL=0.2 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out"
+ok - surfacing failures replay until post-handling acknowledgement
+ok - marker failure exits through the shared wake owner, releases its lock, and replays later

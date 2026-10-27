@@ -1,0 +1,66 @@
+
+$ fm-procevent.sh register lavish demo-src -- <prints a waiting session>
+registered: demo-src (lavish)
+
+$ fm-procevent.sh reconcile   # runner captures the result and publishes a wake
+reconciled: published=0 started=1 stopped=0 uncertain=0 failed=0
+retired: demo-src
+queue:
+1	check	procevent:demo-src:1
+
+$ fm-watch.sh   # first surface
+check: process-event result captured: procevent:demo-src:1
+
+$ fm-wake-drain.sh + --ack-through   # main drains, result NOT marked handled
+check	procevent:demo-src:1	check: procevent lavish demo-src 1
+[ack-through 2]
+
+$ lap 1: re-announce the unhandled captured result on a fresh queue row (what reconcile does)
+reconciled: published=1 started=0 stopped=0 uncertain=0 failed=0
+queue:
+3	check	procevent:demo-src:1
+marker: 2 
+
+$ lap 1: fm-watch.sh
+check: process-event result captured: procevent:demo-src:1
+marker after: 4 
+
+$ lap 1: fm-watch.sh again WITHOUT draining   # same row still queued must stay with the drain
+(no output in 4s)
+
+$ lap 1: drain + ack
+check	procevent:demo-src:1	check: procevent lavish demo-src 1
+[ack-through 4]
+
+$ lap 2: re-announce the unhandled captured result on a fresh queue row (what reconcile does)
+reconciled: published=1 started=0 stopped=0 uncertain=0 failed=0
+queue:
+5	check	procevent:demo-src:1
+marker: 4 
+
+$ lap 2: fm-watch.sh
+check: process-event result captured: procevent:demo-src:1
+marker after: 6 
+
+$ lap 2: fm-watch.sh again WITHOUT draining   # same row still queued must stay with the drain
+(no output in 4s)
+
+$ lap 2: drain + ack
+check	procevent:demo-src:1	check: procevent lavish demo-src 1
+[ack-through 6]
+
+$ pre-change marker: overwrite the marker with an empty (legacy) file and queue one more row
+reconciled: published=1 started=0 stopped=0 uncertain=0 failed=0
+7	check	procevent:demo-src:1
+check: process-event result captured: procevent:demo-src:1
+marker after: 8 
+
+$ fm-procevent.sh handled demo-src 1; reconcile   # handled result is no longer republished
+handled: demo-src 1
+reconciled: published=0 started=0 stopped=0 uncertain=0 failed=0
+check	procevent:demo-src:1	check: procevent lavish demo-src 1
+[ack-through 8]
+reconciled: published=0 started=0 stopped=0 uncertain=0 failed=0
+queue rows after handled+reconcile:        0
+
+(lab removed)
