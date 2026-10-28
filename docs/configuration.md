@@ -2343,6 +2343,21 @@ Arm the check once per home with `bin/fm-tool-update-check.sh arm`.
 - So a budget larger than that timeout allows is cut down to what fits instead of being refused, and the cut is reported in the report line.
 - A budget that is not a whole number from 1 to 120 is still refused outright.
 
+## Watched pipelines (config/watched-pipelines)
+
+`config/watched-pipelines` is an optional local, gitignored list of Amazon pipelines whose standing health this home watches, independent of any task.
+It holds one pipeline name per line; blank lines and lines starting with `#` are ignored.
+[`bin/fm-pipeline-watch.sh`](../bin/fm-pipeline-watch.sh) owns the poll, its wake lines, and its environment overrides.
+
+- `bin/fm-pipeline-watch.sh arm` writes and binds one `state/pw-<pipeline>.check.sh` per listed pipeline, and disarms watches for pipelines no longer listed.
+- Re-run `arm` after editing the list; an invalid name refuses the whole arm.
+- `bin/fm-pipeline-watch.sh disarm [<pipeline>]` removes one watch, or every watch with no argument.
+
+Each poll wakes on a new failure (keyed by its step URL), once on recovery, and at most hourly on a failed read.
+A failed read is never reported as healthy or recovered.
+The read is builder-mcp's `GetPipelineDetails`, called over stdio by [`bin/fm-builder-mcp-call.sh`](../bin/fm-builder-mcp-call.sh), so it needs `builder-mcp` installed and a current Midway session.
+An expired session surfaces as a stale line naming the error.
+
 ## Local Claude usage warner (config/usage-warner)
 
 `config/usage-warner` is an optional local, gitignored set of Claude usage-window thresholds.
