@@ -1,0 +1,95 @@
+{
+  "analyzers": [
+    {
+      "partner_id": "AutoSDE - CR reviewer",
+      "status": "Pass",
+      "status_message": "Analysis complete: No critical issues detected.",
+      "status_details": "\n\n## Lab Assignments\n\n- **comment_skepticism_rule5**: treatment\n- **custom_rule_codesearch**: treatment\n- **default_review_cache_timeout**: treatment\n- **default_review_codesearch_context**: treatment\n- **haiku_fallback_disabled**: treatment\n- **opus_4_8_production**: treatment",
+      "retryable": true,
+      "pass_required_for": []
+    },
+    {
+      "partner_id": "Change Guardian",
+      "status": "Pass",
+      "status_message": "Analysis was skipped because no infra-as-code artifacts were recognized.",
+      "status_details": "**Tell us more about your experience using Change Guardian!**\n\n| [Survey](https://survey.fieldsense.whs.amazon.dev/survey/dfe6ee51-c771-47ef-9d01-4bcd19ccbcb3) | [Feature Request](https://issues.amazon.com/issues/create?template=9026c714-7c79-4fa5-806d-1ab8fe64024d) | [Bug Report](https://t.corp.amazon.com/create/templates/07a72ea8-36d5-40da-aefe-b0359253787a) | [Slack Channel](https://amzn-aws.slack.com/archives/C04FANM860K) | [Known Issues](https://w.amazon.com/bin/view/ChangeGuardian/KnownIssuesAndNuances/) | [Documentation](https://docs.hub.amazon.dev/change-guardian/) |",
+      "retryable": true,
+      "pass_required_for": [
+        "Auto-Publish",
+        "Merge"
+      ]
+    },
+    {
+      "partner_id": "Coverlay",
+      "status": "Pass",
+      "status_message": "All packages passed coverage check",
+      "status_details": "### AmazonCaptainCrew/mainline\nNo coverage data found - [Click here to view your build artifacts](https://devcentral.amazon.com/ac/brazil/package-master/package/view/AmazonCaptainCrew;1.0.76.0;AL2_x86_64)\n\n[Onboard with a coverage reporting framework](https://w.amazon.com/bin/view/Coverlay/FAQ/#HSupportbylanguageandtool) if your package runs unit tests.\n\n[Follow the troubleshooting steps here](https://w.amazon.com/bin/view/Coverlay/Troubleshooting/NoCoverageData/) if you have any other issues.\n\n\nTo see line coverage details on your CR diff: \n- For unit tests: Ensure your build is creating a coverage report [in a format supported by Coverlay](https://docs.hub.amazon.dev/coverlay/user-guide/concept-intro/#select-tool). Unit test coverage will be available after the Dry Run Build and Coverlay analyzer finish running.\n- For integration tests: Your pipeline needs to be onboarded to [ITL](https://w.amazon.com/bin/view/Test_Automation_Platform/ITL/GettingStarted/) and [CloudCover](https://docs.hub.amazon.dev/cloudcover/user-guide/gs-java-instrument/). Integration test coverage will be available after the ITL analyzer finished running. The CloudCover report will also be accessible from the CloudCover approval step in your pipeline.\n\n![coverage gutters color legend](https://code.amazon.com/packages/CoverlayWorker/blobs/mainline/--/src/com/amazon/coverlayworker/reporting/assets/coverageGuttersColorLegend.png?raw=1)\n\n#### [Coverlay User Guide](https://builderhub.corp.amazon.com/docs/coverlay/user-guide/index.html) | [Interpreting Coverlay Results](https://builderhub.corp.amazon.com/docs/coverlay/user-guide/howto-interpret.html) | [What is Safeguard check?](https://builderhub.corp.amazon.com/docs/coverlay/user-guide/concept-safeguard.html) | [Coverlay FAQ](https://w.amazon.com/bin/view/Coverlay/FAQ) | [How to view your organization's Unit Test Coverage Dashboard](https://w.amazon.com/bin/view/Systems_Intelligence/Dashboards/Unit_Test_Coverage)",
+      "retryable": true,
+      "pass_required_for": [
+        "Auto-Publish",
+        "Merge"
+      ]
+    },
+    {
+      "partner_id": "Dry Run Build",
+      "status": "Pass",
+      "status_message": "https://build.amazon.com/8038056415 | 1 build passed",
+      "status_details": "## 1 Dry Run Build has been submitted for this CR\n|Status|Build|Why?|\n|-|-|-|\n|✅ Pass|[CRUX/default](https://build.amazon.com/8038056415)|[tonioamz@'s workspace](https://code.amazon.com/snapshots/tonioamz/2026-09-24T17-26-36-0000350f80cc-4b9c-48b1-a56b-a9c015f9b394)|\n\n---\n### [Documentation](https://builderhub.corp.amazon.com/docs/crux/user-guide/analyzer-dry-run-build.html)\n- [build configuration](https://builderhub.corp.amazon.com/docs/crux/user-guide/analyzer-dry-run-build.html#how-to-configure-multiple-dry-run-builds)\n- [troubleshooting](https://builderhub.corp.amazon.com/docs/crux/user-guide/analyzer-dry-run-build.html#troubleshooting)",
+      "retryable": true,
+      "pass_required_for": [
+        "Auto-Publish",
+        "Merge"
+      ]
+    },
+    {
+      "partner_id": "Integration Tests",
+      "status": "Skipped",
+      "status_message": "No packages from the CR are built into any pipeline. Verify that the CR targets the same branch that your pipeline builds from (e.g. if your pipeline uses a non-mainline branch, ensure the CR is against that branch). [Cut us a ticket](https://t.corp.amazon.com/create/templates/8b3b73bc-f613-4891-a38a-c92e781c84a9) to investigate if you believe your package does build into one or more pipelines.",
+      "status_details": null,
+      "retryable": true,
+      "pass_required_for": [
+        "Merge"
+      ]
+    },
+    {
+      "partner_id": "Region Flex CRUX Analyzer",
+      "status": "Pass",
+      "status_message": "Region Flex Analysis Passed",
+      "status_details": "This Region Flex CRUX Analyzer contains a suite of sub-analyzers to help you build resilient, multi-region services by identifying potential flexibility issues early. Wiki: https://w.amazon.com/bin/view/Region_Flexibility/Guardrails/CRUX_Analyzers/\n\n---\n\nLRA Analyzer: No LRA references found\n\n---\n\nCloudWatch Agent Analyzer: No EC2 roles found - analysis not applicable",
+      "retryable": false,
+      "pass_required_for": [
+        "Auto-Publish"
+      ]
+    },
+    {
+      "partner_id": "Security Code Scanner",
+      "status": "Pass",
+      "status_message": "Complete: 0 issues identified",
+      "status_details": null,
+      "retryable": false,
+      "pass_required_for": [
+        "Auto-Publish",
+        "Merge"
+      ]
+    },
+    {
+      "partner_id": "Shepherd CodeGuard",
+      "status": "Blocked",
+      "status_message": "Shepherd review required. [Run Shepherd CodeGuard Analysis](https://agentspaces.amazon.dev/app/?mode=CUSTOM&blueprint=AgentSpacesEmptyBlueprintProd&aimPackageName=AEE-SE-Kiro-Agents&customAgentName=shepherd-codeguard-agent&spaceName=Shepherd%20CodeGuard%20-%20CR-307699074&initialPrompt=CR-307699074)",
+      "status_details": "This CR is **blocked** until the Shepherd CodeGuard agent completes for **CR-307699074** (revision 1).\n\nClick the link to launch the agent. It will set this check to PASS (no issues) or FAIL (issues found).",
+      "retryable": true,
+      "pass_required_for": []
+    },
+    {
+      "partner_id": "Software Assurance",
+      "status": "Pass",
+      "status_message": "No SAS Risks Identified",
+      "status_details": null,
+      "retryable": true,
+      "pass_required_for": [
+        "Auto-Publish",
+        "Merge"
+      ]
+    }
+  ]
+}

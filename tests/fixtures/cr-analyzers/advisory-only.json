@@ -1,0 +1,106 @@
+{
+  "analyzers": [
+    {
+      "partner_id": "AutoSDE - CR reviewer",
+      "status": "Pass",
+      "status_message": "Analysis complete: No critical issues detected.",
+      "retryable": true,
+      "pass_required_for": []
+    },
+    {
+      "partner_id": "Change Guardian",
+      "status": "Pass",
+      "status_message": "Analysis was skipped because no infra-as-code artifacts were recognized.",
+      "retryable": true,
+      "pass_required_for": [
+        "Auto-Publish",
+        "Merge"
+      ]
+    },
+    {
+      "partner_id": "Coverlay",
+      "status": "Pass",
+      "status_message": "All packages passed coverage check",
+      "retryable": true,
+      "pass_required_for": [
+        "Auto-Publish",
+        "Merge"
+      ]
+    },
+    {
+      "partner_id": "Dry Run Build",
+      "status": "Pass",
+      "status_message": "https://build.amazon.com/7968618616 | 1 build passed",
+      "retryable": true,
+      "pass_required_for": [
+        "Auto-Publish",
+        "Merge"
+      ]
+    },
+    {
+      "partner_id": "GK-CRUX-Analyzer",
+      "status": "Pass",
+      "status_message": "No enforced HIGH severity violations were found. See the comments section for details.",
+      "retryable": true,
+      "pass_required_for": [
+        "Auto-Publish",
+        "Merge"
+      ]
+    },
+    {
+      "partner_id": "InclusiveTechScanner",
+      "status": "Pass",
+      "status_message": "Complete: 0 issues identified",
+      "retryable": false,
+      "pass_required_for": [
+        "Auto-Publish",
+        "Merge"
+      ]
+    },
+    {
+      "partner_id": "Integration Tests",
+      "status": "Pass",
+      "status_message": "The test workflow was skipped for the current code review version. Click on [this link](https://itl.aws.dev/authorize/test-plan/1%2F398273131043%2FIntegration+Tests%2FCR-295347675%3A1%2F1786131216000) to view the test workflow.",
+      "retryable": true,
+      "pass_required_for": [
+        "Merge"
+      ]
+    },
+    {
+      "partner_id": "Region Flex CRUX Analyzer",
+      "status": "Pass",
+      "status_message": "Region Flex Analysis Passed",
+      "retryable": false,
+      "pass_required_for": [
+        "Auto-Publish"
+      ]
+    },
+    {
+      "partner_id": "Security Code Scanner",
+      "status": "Pass",
+      "status_message": "Complete: 0 issues identified",
+      "retryable": false,
+      "pass_required_for": [
+        "Auto-Publish",
+        "Merge"
+      ]
+    },
+    {
+      "partner_id": "Shepherd CodeGuard",
+      "status": "Blocked",
+      "status_message": "Shepherd review required. [Run Shepherd CodeGuard Analysis](https://agentspaces.amazon.dev/app/?mode=CUSTOM&blueprint=AgentSpacesEmptyBlueprintProd&aimPackageName=AEE-SE-Kiro-Agents&customAgentName=shepherd-codeguard-agent&spaceName=Shepherd%20CodeGuard%20-%20CR-295347675&initialPrompt=CR-295347675)",
+      "retryable": true,
+      "pass_required_for": []
+    },
+    {
+      "partner_id": "Software Assurance",
+      "status": "Pass",
+      "status_message": "No SAS Risks Identified",
+      "retryable": true,
+      "pass_required_for": [
+        "Auto-Publish",
+        "Merge"
+      ]
+    }
+  ]
+}

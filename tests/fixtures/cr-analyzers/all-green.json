@@ -1,0 +1,8 @@
+{
+  "analyzers": [
+    {"partner_id": "Dry Run Build", "status": "Pass", "status_message": "1 build passed", "retryable": true, "pass_required_for": ["Auto-Publish", "Merge"]},
+    {"partner_id": "Security Code Scanner", "status": "Pass", "status_message": "Complete: 0 issues identified", "retryable": false, "pass_required_for": ["Auto-Publish", "Merge"]},
+    {"partner_id": "GK-CRUX-Analyzer", "status": "Pass", "status_message": "No enforced HIGH severity violations were found.", "retryable": true, "pass_required_for": ["Auto-Publish", "Merge"]},
+    {"partner_id": "Change Guardian", "status": "Pass", "status_message": "Analysis complete: no risky infrastructure changes found.", "retryable": true, "pass_required_for": ["Auto-Publish", "Merge"]}
+  ]
+}

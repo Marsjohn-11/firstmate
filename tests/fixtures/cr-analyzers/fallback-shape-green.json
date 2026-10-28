@@ -1,0 +1,9 @@
+{
+  "content": {
+    "revisionSummary": {"status": "PUBLISHED"},
+    "analyzers": [
+      {"partner_id": "Dry Run Build", "status": "Pass", "status_message": "1 build passed", "retryable": true, "pass_required_for": ["Auto-Publish", "Merge"]},
+      {"partner_id": "Software Assurance", "status": "Pass", "status_message": "No SAS Risks Identified", "retryable": true, "pass_required_for": ["Auto-Publish", "Merge"]}
+    ]
+  }
+}

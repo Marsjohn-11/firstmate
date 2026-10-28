@@ -840,6 +840,15 @@ Build and test with the package's Brazil build (\`brazil-build\`); follow the pa
 Create the code review as a DRAFT and drive it to a green dry-run build:
 - If the package ships a CR audit workflow (look under \`.agents/workflows/\`), run it - it composes AutoSDE and the Critic analyzers - and address the blockers it reports.
 - Otherwise create the review with the \`cr\` CLI and drive its dry-run builds and analyzers to green.
+Bracket every \`cr -r\` with the revise guard, because \`cr -r\` replaces a draft latest revision in place and hides the comments on it:
+\`\`\`sh
+$FM_ROOT/bin/fm-cr-revise-guard.sh CR-<n> --baseline $DATA/$ID/cr-revise-baseline.json
+cr -r CR-<n> --no-auto-publish
+$FM_ROOT/bin/fm-cr-revise-guard.sh CR-<n> --after $DATA/$ID/cr-revise-baseline.json --uploaded <revision number in the URL cr printed>
+\`\`\`
+Run \`cr -r\` only when the first command exits 0.
+Exit 1 means the draft carries reviewer comments, so do not upload; append \`needs-decision\` naming them.
+Any other non-zero exit is a blocker to report, not to retry around.
 NEVER publish the CR. Publishing a code review is a human action; firstmate relays the ready review to the captain, who publishes it.
 Write the CR title and description in plain English for a reviewer who lacks your context, and never put "captain" or any direct address in the CR.
 When the review is a DRAFT with a green dry-run build, append \`done: CR <url> dry-run green\` to the status file - with the full \`https://code.amazon.com/reviews/CR-<n>\` URL exactly as \`cr\` printed it - and stop.

@@ -1,0 +1,7 @@
+{
+  "analyzers": [
+    {"partner_id": "Dry Run Build", "status": "Fail", "status_message": "1 build failed: compilation error in FooService", "retryable": true, "pass_required_for": ["Auto-Publish", "Merge"]},
+    {"partner_id": "Security Code Scanner", "status": "Pass", "status_message": "Complete: 0 issues identified", "retryable": false, "pass_required_for": ["Auto-Publish", "Merge"]},
+    {"partner_id": "AutoSDE - CR reviewer", "status": "Fault", "status_message": "OutOfMemory while analyzing", "retryable": true, "pass_required_for": []}
+  ]
+}

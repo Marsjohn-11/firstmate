@@ -98,6 +98,7 @@ So "all six analyzers pass" can mean four measured and two abstained.
 Read each `status_message` rather than counting `Pass` values, and say how many actually measured when it matters -
 for a docs-only change two abstentions are irrelevant, but claiming six green is the same overclaim this skill exists
 to stop.
+`bin/fm-cr-analyzers.sh` applies this rule to the merge-gating analyzers and exits 3 when a gating `Pass` abstained.
 
 `next_actions` offering `PUBLISH_CR` to the captain means CRUX is offering him the button now the gates pass.
 It is not evidence anything published itself.

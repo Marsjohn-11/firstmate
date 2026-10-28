@@ -1,0 +1,46 @@
+{
+  "analyzers": [
+    {
+      "partner_id": "Dry Run Build",
+      "status": "Pass",
+      "status_message": "https://build.amazon.com/8086463658 | 1 build passed",
+      "pass_required_for": [
+        "Auto-Publish",
+        "Merge"
+      ]
+    },
+    {
+      "partner_id": "Coverlay",
+      "status": "Pass",
+      "status_message": "All packages passed coverage check",
+      "pass_required_for": [
+        "Auto-Publish",
+        "Merge"
+      ]
+    },
+    {
+      "partner_id": "Security Code Scanner",
+      "status": "Pass",
+      "status_message": "Private package, no permissions to scan. Click the Analyzer page to see how to grant access. (should take only a couple of mins)",
+      "pass_required_for": [
+        "Auto-Publish",
+        "Merge"
+      ]
+    },
+    {
+      "partner_id": "Change Guardian",
+      "status": "Pass",
+      "status_message": "Analysis was skipped because no infra-as-code artifacts were recognized.",
+      "pass_required_for": [
+        "Auto-Publish",
+        "Merge"
+      ]
+    },
+    {
+      "partner_id": "AutoSDE - CR reviewer",
+      "status": "Pass",
+      "status_message": "Analysis complete: 3 comment(s) posted.",
+      "pass_required_for": []
+    }
+  ]
+}
