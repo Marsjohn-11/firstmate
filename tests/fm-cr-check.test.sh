@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Behavior tests for bin/fm-cr-check.sh.
 #
-# The CR rail always escalates: firstmate never auto-publishes or auto-merges a
-# code review, so recording a CR-ready task is a light metadata write with NO
-# self-executing merge poll. These tests pin that fm-cr-check records exactly
-# one validated canonical cr= line, arms no check.sh, replaces a prior cr=, and
-# refuses a non-canonical URL or bad task id without touching metadata.
+# Recording a CR-ready task writes exactly one validated canonical cr= line and
+# arms a registered watcher shim for bin/fm-cr-poll.sh (its own suite,
+# tests/fm-cr-poll.test.sh, pins what the poll reports). A re-record replaces
+# the prior cr= and drops poll sidecars that describe another review; a
+# non-canonical URL or bad task id is refused without touching metadata.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -14,6 +14,17 @@ set -u
 CR_CHECK="$ROOT/bin/fm-cr-check.sh"
 VALID='https://code.amazon.com/reviews/CR-284538794'
 VALID2='https://code.amazon.com/reviews/CR-999000111'
+GUARD_ROOT=$(fm_test_tmproot fm-cr-check-guard)
+mkdir -p "$GUARD_ROOT/bin"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$GUARD_ROOT/bin/fm-guard.sh"
+chmod +x "$GUARD_ROOT/bin/fm-guard.sh"
+
+# cr_check <home> <args...>: run fm-cr-check with a no-op supervision guard.
+cr_check() {
+  local home=$1
+  shift
+  FM_ROOT_OVERRIDE="$GUARD_ROOT" FM_HOME="$home" "$CR_CHECK" "$@"
+}
 
 setup_home() {
   local home=$1 id=$2
@@ -25,21 +36,30 @@ setup_home() {
     "yolo=off"
 }
 
-test_records_and_arms_no_poll() {
+test_records_and_arms_registered_poll() {
   local home id out status meta
   home=$(fm_test_tmproot fm-cr-record)
   id=cr-record-1
   setup_home "$home" "$id"
   meta="$home/state/$id.meta"
-  out=$(FM_HOME="$home" "$CR_CHECK" "$id" "$VALID" 2>&1); status=$?
+  out=$(cr_check "$home" "$id" "$VALID" 2>&1); status=$?
   expect_code 0 "$status" "recording a valid CR must exit 0"
   assert_contains "$out" "recorded: cr=$VALID" "fm-cr-check must confirm the recorded CR"
   assert_grep "cr=$VALID" "$meta" "meta must carry the recorded cr= line"
   assert_equals 1 "$(grep -c '^cr=' "$meta")" "exactly one cr= line"
-  # The CR rail arms no self-executing merge poll.
-  assert_absent "$home/state/$id.check.sh" "fm-cr-check must not arm a merge poll"
+  assert_contains "$out" "armed: state/$id.check.sh polls $VALID" "fm-cr-check must confirm the armed poll"
+  assert_present "$home/state/$id.check.sh" "fm-cr-check must arm the review poll"
+  assert_present "$home/state/$id.check-trust" "the poll must be bound to its bytes for the watcher"
   assert_absent "$home/state/$id.pr-poll" "fm-cr-check must not write a PR-poll sidecar"
-  pass "fm-cr-check: records one cr= line and arms no poll"
+  bash -n "$home/state/$id.check.sh" || fail "the armed shim must be valid bash"
+  (
+    # shellcheck source=bin/fm-pr-lib.sh
+    . "$ROOT/bin/fm-pr-lib.sh"
+    # shellcheck source=bin/fm-check-lib.sh
+    . "$ROOT/bin/fm-check-lib.sh"
+    fm_custom_check_registered "$home/state" "$id"
+  ) || fail "the armed shim must pass the watcher's trust check"
+  pass "fm-cr-check: records one cr= line and arms a registered poll"
 }
 
 test_replaces_prior_cr() {
@@ -48,8 +68,8 @@ test_replaces_prior_cr() {
   id=cr-replace-1
   setup_home "$home" "$id"
   meta="$home/state/$id.meta"
-  FM_HOME="$home" "$CR_CHECK" "$id" "$VALID" >/dev/null 2>&1 || fail "first record failed"
-  FM_HOME="$home" "$CR_CHECK" "$id" "$VALID2" >/dev/null 2>&1 || fail "second record failed"
+  cr_check "$home" "$id" "$VALID" >/dev/null 2>&1 || fail "first record failed"
+  cr_check "$home" "$id" "$VALID2" >/dev/null 2>&1 || fail "second record failed"
   assert_equals 1 "$(grep -c '^cr=' "$meta")" "a re-record must not stack cr= lines"
   assert_grep "cr=$VALID2" "$meta" "meta must carry the newest cr="
   assert_no_grep "cr=$VALID" "$meta" "the prior cr= must be replaced"
@@ -58,18 +78,48 @@ test_replaces_prior_cr() {
   pass "fm-cr-check: a re-record replaces the prior cr= line"
 }
 
+test_rerecord_drops_other_review_sidecars() {
+  local home id state
+  home=$(fm_test_tmproot fm-cr-sidecars)
+  id=cr-sidecars-1
+  setup_home "$home" "$id"
+  state="$home/state"
+  cr_check "$home" "$id" "$VALID" >/dev/null 2>&1 || fail "first record failed"
+  printf 'cr=%s\nstate=in-review\n' "$VALID" > "$state/$id.cr-seen"
+  printf 'cr=%s\nstate=ok\n' "$VALID" > "$state/$id.cr-dest-seen"
+  cr_check "$home" "$id" "$VALID" >/dev/null 2>&1 || fail "re-record of the same review failed"
+  assert_grep 'state=in-review' "$state/$id.cr-seen" "re-recording the same review keeps its poll state"
+  cr_check "$home" "$id" "$VALID2" >/dev/null 2>&1 || fail "record of another review failed"
+  assert_absent "$state/$id.cr-seen" "another review's poll state must not carry over"
+  assert_absent "$state/$id.cr-dest-seen" "another review's destination state must not carry over"
+  assert_grep "$VALID2" "$state/$id.check.sh" "the shim must poll the newly recorded review"
+  pass "fm-cr-check: a re-record keeps its own poll state and drops another review's"
+}
+
+test_refuses_task_with_pr_poll() {
+  local home id status
+  home=$(fm_test_tmproot fm-cr-prpoll)
+  id=cr-prpoll-1
+  setup_home "$home" "$id"
+  printf 'x\n' > "$home/state/$id.pr-poll"
+  cr_check "$home" "$id" "$VALID" >/dev/null 2>&1; status=$?
+  expect_code 1 "$status" "a task with a PR poll must not also arm a review poll"
+  assert_absent "$home/state/$id.check.sh" "the PR poll's check must not be overwritten"
+  pass "fm-cr-check: refuses to arm over a task's PR poll"
+}
+
 test_rejects_bad_input() {
   local home id meta out status
   home=$(fm_test_tmproot fm-cr-reject)
   id=cr-reject-1
   setup_home "$home" "$id"
   meta="$home/state/$id.meta"
-  out=$(FM_HOME="$home" "$CR_CHECK" "$id" 'https://github.com/o/r/pull/1' 2>&1); status=$?
+  out=$(cr_check "$home" "$id" 'https://github.com/o/r/pull/1' 2>&1); status=$?
   expect_code 2 "$status" "a forge PR URL must be refused"
   assert_no_grep "cr=" "$meta" "a refused URL must not touch metadata"
-  out=$(FM_HOME="$home" "$CR_CHECK" '../escape' "$VALID" 2>&1); status=$?
+  out=$(cr_check "$home" '../escape' "$VALID" 2>&1); status=$?
   expect_code 2 "$status" "a path-unsafe task id must be refused"
-  out=$(FM_HOME="$home" "$CR_CHECK" "$id" 2>&1); status=$?
+  out=$(cr_check "$home" "$id" 2>&1); status=$?
   expect_code 2 "$status" "a missing URL argument must be refused"
   pass "fm-cr-check: refuses non-canonical URLs and unsafe ids without writing"
 }
@@ -79,12 +129,14 @@ test_missing_meta() {
   home=$(fm_test_tmproot fm-cr-nometa)
   id=cr-nometa-1
   mkdir -p "$home/state"
-  FM_HOME="$home" "$CR_CHECK" "$id" "$VALID" >/dev/null 2>&1; status=$?
+  cr_check "$home" "$id" "$VALID" >/dev/null 2>&1; status=$?
   expect_code 1 "$status" "an absent task metadata file must fail"
   pass "fm-cr-check: refuses when task metadata is absent"
 }
 
-test_records_and_arms_no_poll
+test_records_and_arms_registered_poll
 test_replaces_prior_cr
+test_rerecord_drops_other_review_sidecars
+test_refuses_task_with_pr_poll
 test_rejects_bad_input
 test_missing_meta

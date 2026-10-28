@@ -67,6 +67,9 @@
 # by itself causes a false refusal of landed work.
 # A gh lookup error falls back to the content check; if that is also inconclusive,
 # teardown refuses rather than risk discarding unlanded work.
+# A task whose meta records cr= (bin/fm-cr-check.sh) has also landed when CRUX
+# reports that review SHIPPED or MERGED and its uploaded tip contains the current
+# local work; a review CRUX cannot read never counts, and the refusal names it.
 # A merge-tree option or execution error reports the content-landed proof as
 # unavailable. The merge-tree --write-tree proof requires Git 2.38 or newer.
 # Uncommitted changes are never landed. Before return, the dirty check explicitly
@@ -398,7 +401,9 @@ for _teardown_source in \
   fm-nm-run-lib.sh \
   fm-wake-lib.sh \
   fm-path-lib.sh \
-  fm-lease-lib.sh
+  fm-lease-lib.sh \
+  fm-delivery-target-lib.sh \
+  fm-cr-lib.sh
 do
   teardown_require_source "$SCRIPT_DIR/$_teardown_source"
 done
@@ -427,6 +432,9 @@ unset _teardown_source
 . "$SCRIPT_DIR/fm-secondmate-parent-lib.sh"
 # shellcheck source=bin/fm-nm-run-lib.sh
 . "$SCRIPT_DIR/fm-nm-run-lib.sh"
+# shellcheck source=bin/fm-cr-lib.sh
+. "$SCRIPT_DIR/fm-cr-lib.sh"
+
 # Archive paths live only in teardown; presentation/wake readers stay unaware.
 teardown_archive_directory() {  # <directory>
   if [ -L "$1" ] || { [ -e "$1" ] && [ ! -d "$1" ]; }; then
@@ -1287,6 +1295,7 @@ if [ "${FM_TEARDOWN_GUARD_DONE:-0}" != 1 ]; then
 fi
 HOME_PATH=$(grep '^home=' "$META" | cut -d= -f2- || true)
 PR_URL=$(grep '^pr=' "$META" | tail -1 | cut -d= -f2- || true)
+CR_URL=$(grep '^cr=' "$META" | tail -1 | cut -d= -f2- || true)
 # tasktmp is recorded by fm-spawn for tasks that set up a per-task temp root
 # (/tmp/fm-<id>/); absent for tasks spawned before that change, so tolerate empty.
 TASK_TMP=$(grep '^tasktmp=' "$META" | cut -d= -f2- || true)
@@ -1632,7 +1641,8 @@ remove_pr_poll_artifacts() {
   fm_pr_poll_merge_notified_remove "$state_dir" "$id" || return 1
   rm -f "$state_dir/$id.check.sh" "$state_dir/$id.pr-poll" \
     "$state_dir/$id.pr-poll-registration" "$state_dir/$id.pr-poll-retirement" \
-    "$state_dir/$id.merge-authority" "$state_dir/$id.check-trust" || return 1
+    "$state_dir/$id.merge-authority" "$state_dir/$id.check-trust" \
+    "$state_dir/$id.cr-seen" "$state_dir/$id.cr-dest-seen" || return 1
 }
 
 pr_number_from_target() {
@@ -1785,14 +1795,50 @@ content_in_default() {
   [ "$merged_tree" = "$default_tree" ]
 }
 
+# Did the recorded CRUX review land with the worktree's current work in it?
+# CRUX lands a review as a different commit than the uploaded tip, so the review
+# status proves the landing and the uploaded tip proves the contents: HEAD must
+# be that tip, an ancestor of it, or patch-equivalent to it. This covers a
+# landing that mainline has since edited, which the content proof cannot see.
+# Returns 0 landed, 1 not landed or not contained, 2 when CRUX cannot be read,
+# which sets CR_LANDING_UNREADABLE so the refusal names it.
+CR_LANDING_UNREADABLE=
+cr_is_landed() {
+  local reading status tips tip current
+  [ -n "$CR_URL" ] || return 1
+  fm_cr_url_parse "$CR_URL" || return 1
+  if ! reading=$(fm_cr_landing_read "$FM_CR_ID"); then
+    CR_LANDING_UNREADABLE=$CR_URL
+    return 2
+  fi
+  status=$(printf '%s\n' "$reading" | head -1)
+  tips=$(printf '%s\n' "$reading" | sed '1d')
+  case "$status" in
+    SHIPPED|MERGED) ;;
+    *) return 1 ;;
+  esac
+  current=$(git -C "$WT" rev-parse --verify HEAD 2>/dev/null) || return 1
+  while IFS= read -r tip; do
+    [ -n "$tip" ] || continue
+    git -C "$WT" cat-file -e "$tip^{commit}" 2>/dev/null || continue
+    git -C "$WT" merge-base --is-ancestor "$current" "$tip" 2>/dev/null && return 0
+    unpushed_patches_are_in_pr_head "$tip" && return 0
+  done <<EOF
+$tips
+EOF
+  return 1
+}
+
 # Has the worktree's committed work actually LANDED, though its commits are not
-# reachable from any remote-tracking branch? True when a merged PR proves the
-# current local work is contained in the PR head, OR the content is already in the
-# default branch (fallback, which also covers the no-PR and gh-error paths). False
-# when neither proof establishes that the work landed.
+# reachable from any remote-tracking branch? True when a merged PR or a landed
+# CRUX review proves the current local work is contained in what landed, OR the
+# content is already in the default branch (fallback, which also covers the
+# no-PR and gh-error paths). False when neither proof establishes that the work
+# landed, and an unreadable review never counts as landed.
 work_is_landed() {
   local branch=$1
   pr_is_merged "$branch" && return 0
+  cr_is_landed && return 0
   content_in_default
 }
 
@@ -2172,7 +2218,10 @@ validate_worktree_teardown_safety() {
         echo "REFUSED: worktree $WT has work not on any remote and not landed." >&2
       fi
       printf 'unpushed commits:\n%s\n' "$unpushed" >&2
-      echo "Push the branch, land its PR, or get the captain's explicit OK to discard, then --force." >&2
+      if [ -n "$CR_LANDING_UNREADABLE" ]; then
+        echo "CRUX could not be read for $CR_LANDING_UNREADABLE (Midway expired, AEA posture, or network), so its landing is unproven. Run mwinit and retry teardown." >&2
+      fi
+      echo "Push the branch, land its PR or code review, or get the captain's explicit OK to discard, then --force." >&2
       return 1
     fi
   fi

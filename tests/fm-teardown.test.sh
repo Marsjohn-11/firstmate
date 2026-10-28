@@ -398,6 +398,45 @@ append_pr_meta_url() {
   printf '%s\n' 'pr=https://github.com/example/repo/pull/7' >> "$case_dir/state/task-x1.meta"
 }
 
+# CRUX review fixtures. append_cr_meta records the task's review, and
+# add_crux_review serves it through a fake mcurl: the latest revision has
+# <status> and a WSNAP snapshot whose uploaded tip is <tip>.
+CR_TEST_URL='https://code.amazon.com/reviews/CR-7000001'
+append_cr_meta() {
+  local case_dir=$1
+  printf 'cr=%s\n' "$CR_TEST_URL" >> "$case_dir/state/task-x1.meta"
+}
+
+add_crux_review() {
+  local case_dir=$1 status=$2 tip=$3
+  jq -cn --arg s "$status" '[{review_revision_summary:{status:$s, id:{review_revision_id:{revision:1}}}}]' \
+    > "$case_dir/crux-revisions.json"
+  jq -cn --arg s "$status" '{revision:{cr_revision:{status:$s, comments:[],
+      diff_source:{diff_source:{type:"WSNAP", id:"snap-1"}}}}}' > "$case_dir/crux-revision.json"
+  jq -cn --arg tip "$tip" '{snapshot:{content:[{content:{package_name:"Pkg",
+      branches:[{branch:{local_branch:"fm/task-x1", gitfarm_branch:"mainline", tip_commit:$tip}}]}}]}}' \
+    > "$case_dir/crux-snapshot.json"
+  cat > "$case_dir/fakebin/mcurl" <<SH
+#!/usr/bin/env bash
+url=
+for arg in "\$@"; do url=\$arg; done
+case "\$url" in
+  */revisions) cat $(printf '%q' "$case_dir/crux-revisions.json") ;;
+  */revisions/1.json) cat $(printf '%q' "$case_dir/crux-revision.json") ;;
+  */snapshots/snap-1.json) cat $(printf '%q' "$case_dir/crux-snapshot.json") ;;
+  *) exit 22 ;;
+esac
+SH
+  chmod +x "$case_dir/fakebin/mcurl"
+}
+
+# add_crux_down: every mcurl read fails, as with an expired Midway cookie.
+add_crux_down() {
+  local case_dir=$1
+  printf '#!/usr/bin/env bash\nexit 22\n' > "$case_dir/fakebin/mcurl"
+  chmod +x "$case_dir/fakebin/mcurl"
+}
+
 commit_tree_from_wt_head() {
   local case_dir=$1 parent=$2 msg=$3 tree
   tree=$(git -C "$case_dir/wt" rev-parse "$parent^{tree}") || return 1
@@ -6003,7 +6042,128 @@ test_teardown_retains_journal_bound_to_another_pane
 test_teardown_retires_v1_journal_when_projected_workspace_gone
 test_teardown_retains_v1_journal_when_projected_workspace_present
 test_teardown_retains_v1_journal_when_workspace_query_ambiguous
+
+test_crux_shipped_review_allows_when_mainline_later_edited_it() {
+  local case_dir rc
+  case_dir=$(make_case crux-shipped-edited)
+  write_meta "$case_dir" direct-PR ship
+  append_cr_meta "$case_dir"
+  wt_commit_file "$case_dir" feature.txt hello "add feature"
+  # CRUX landed the review as another commit, and mainline has since edited the
+  # same lines, so the content proof alone cannot see the landing.
+  land_on_origin_main "$case_dir" feature.txt "hello, edited after landing"
+  add_crux_review "$case_dir" SHIPPED "$(git -C "$case_dir/wt" rev-parse HEAD)"
+
+  set +e
+  FM_CR_FALLBACK_BIN="$case_dir/no-builder-mcp" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+
+  expect_code 0 "$rc" "crux-shipped-edited: a landed review holding HEAD should allow teardown"
+  ! grep -q REFUSED "$case_dir/stderr" || fail "crux-shipped-edited: teardown printed a REFUSED line"
+  pass "a shipped CRUX review whose uploaded tip holds HEAD is landed, even after mainline edits"
+}
+
+test_crux_shipped_review_refuses_work_after_its_upload() {
+  local case_dir rc tip
+  case_dir=$(make_case crux-shipped-extra)
+  write_meta "$case_dir" direct-PR ship
+  append_cr_meta "$case_dir"
+  wt_commit_file "$case_dir" feature.txt hello "add feature"
+  tip=$(git -C "$case_dir/wt" rev-parse HEAD)
+  land_on_origin_main "$case_dir" feature.txt "hello, edited after landing"
+  wt_commit_file "$case_dir" later.txt later "work after the upload"
+  add_crux_review "$case_dir" SHIPPED "$tip"
+
+  set +e
+  FM_CR_FALLBACK_BIN="$case_dir/no-builder-mcp" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+
+  [ "$rc" -ne 0 ] || fail "crux-shipped-extra: work after the uploaded tip must refuse teardown"
+  grep -q 'REFUSED: worktree .* has work not on any remote and not landed' "$case_dir/stderr" \
+    || fail "crux-shipped-extra: expected the unlanded-work refusal, got: $(cat "$case_dir/stderr")"
+  pass "a shipped CRUX review does not bless commits made after its upload"
+}
+
+test_crux_open_review_refuses() {
+  local case_dir rc
+  case_dir=$(make_case crux-open)
+  write_meta "$case_dir" direct-PR ship
+  append_cr_meta "$case_dir"
+  wt_commit_file "$case_dir" feature.txt hello "add feature"
+  add_crux_review "$case_dir" OPEN "$(git -C "$case_dir/wt" rev-parse HEAD)"
+
+  set +e
+  FM_CR_FALLBACK_BIN="$case_dir/no-builder-mcp" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+
+  [ "$rc" -ne 0 ] || fail "crux-open: a review still in review must refuse teardown"
+  grep -q 'REFUSED' "$case_dir/stderr" || fail "crux-open: expected a REFUSED line"
+  ! grep -q 'CRUX could not be read' "$case_dir/stderr" || fail "crux-open: a readable review is not unreadable"
+  pass "a CRUX review still in review is not landed"
+}
+
+test_crux_unreadable_review_refuses_and_names_it() {
+  local case_dir rc
+  case_dir=$(make_case crux-unreadable)
+  write_meta "$case_dir" direct-PR ship
+  append_cr_meta "$case_dir"
+  wt_commit_file "$case_dir" feature.txt hello "add feature"
+  land_on_origin_main "$case_dir" feature.txt "hello, edited after landing"
+  add_crux_down "$case_dir"
+
+  set +e
+  FM_CR_FALLBACK_BIN="$case_dir/no-builder-mcp" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+
+  [ "$rc" -ne 0 ] || fail "crux-unreadable: an unreadable review must refuse teardown"
+  grep -q "CRUX could not be read for $CR_TEST_URL" "$case_dir/stderr" \
+    || fail "crux-unreadable: the refusal must name the unreadable review, got: $(cat "$case_dir/stderr")"
+  pass "an unreadable CRUX review refuses teardown and says so"
+}
+
+test_crux_fallback_reads_shipped_review_when_mcurl_is_down() {
+  local case_dir rc tip stub
+  case_dir=$(make_case crux-fallback)
+  write_meta "$case_dir" direct-PR ship
+  append_cr_meta "$case_dir"
+  wt_commit_file "$case_dir" feature.txt hello "add feature"
+  tip=$(git -C "$case_dir/wt" rev-parse HEAD)
+  land_on_origin_main "$case_dir" feature.txt "hello, edited after landing"
+  add_crux_down "$case_dir"
+  jq -cn --arg tip "$tip" '{content:{revisionSummary:{status:"SHIPPED"}, snapshotDetails:{snapshot:{content:[
+      {content:{package_name:"Pkg", branches:[{branch:{gitfarm_branch:"mainline", tip_commit:$tip}}]}}]}}}}' \
+    > "$case_dir/fallback.body"
+  stub="$case_dir/fake-builder-mcp"
+  cat > "$stub" <<SH
+#!/usr/bin/env bash
+while IFS= read -r line; do
+  case "\$line" in
+    *'"id":2'*) jq -cn --rawfile t $(printf '%q' "$case_dir/fallback.body") \
+      '{result:{content:[{type:"text",text:\$t}],isError:false},jsonrpc:"2.0",id:2}' ;;
+  esac
+done
+SH
+  chmod +x "$stub"
+
+  set +e
+  FM_CR_FALLBACK_BIN="$stub" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+
+  expect_code 0 "$rc" "crux-fallback: builder-mcp's shipped reading should allow teardown"
+  pass "with mcurl down, the builder-mcp reading proves a shipped review"
+}
+
 test_squash_merged_branch_deleted_allows
+test_crux_shipped_review_allows_when_mainline_later_edited_it
+test_crux_shipped_review_refuses_work_after_its_upload
+test_crux_open_review_refuses
+test_crux_unreadable_review_refuses_and_names_it
+test_crux_fallback_reads_shipped_review_when_mcurl_is_down
 test_squash_merged_pr_allows_when_head_ancestor_of_pr_head
 test_no_pr_recorded_discovers_merged_pr_by_branch_allows
 test_squash_merged_pr_allows_replayed_unpushed_patch
