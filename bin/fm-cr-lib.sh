@@ -37,7 +37,8 @@
 # fm_cr_mcurl_probe names the mode it saw, because posture means "route around
 # it" while expiry means "run mwinit".
 #
-# Dependencies: mcurl and jq; builder-mcp for the fallback. bash 3.2 compatible.
+# Dependencies: mcurl and jq; builder-mcp through bin/fm-builder-mcp-call.sh for
+# the fallback. bash 3.2 compatible.
 
 # shellcheck source=bin/fm-delivery-target-lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fm-delivery-target-lib.sh"
@@ -206,19 +207,15 @@ fm_cr_mcurl_probe() {
   esac
 }
 
-# The builder-mcp fallback.
-#
-# builder-mcp is an MCP server on stdio, not a one-shot CLI, so a read is one
-# JSON-RPC session: initialize, then one ReadInternalWebsites call. The server
-# does not exit at end of input, so the session ends once the reply arrives or
-# FM_CR_FALLBACK_TIMEOUT (20s) passes, and the server's process group is
-# stopped. FM_CR_FALLBACK_BIN overrides the server path.
+# The builder-mcp fallback. bin/fm-builder-mcp-call.sh owns the stdio session;
+# this bounds it at FM_CR_FALLBACK_TIMEOUT (20s). FM_CR_FALLBACK_BIN overrides
+# the server path.
 fm_cr_fallback_bin() {
   if [ -n "${FM_CR_FALLBACK_BIN:-}" ]; then
     printf '%s' "$FM_CR_FALLBACK_BIN"
     return 0
   fi
-  command -v builder-mcp 2>/dev/null
+  command -v builder-mcp 2>/dev/null || printf '%s' "$HOME/.toolbox/bin/builder-mcp"
 }
 
 fm_cr_fallback_available() {
@@ -229,38 +226,14 @@ fm_cr_fallback_available() {
 
 # fm_cr_mcp_read <url>: echo the ReadInternalWebsites text for <url>, or return 3.
 fm_cr_mcp_read() {
-  local url=$1 bin secs dir pid i request text
+  local url=$1 bin secs args text
   bin=$(fm_cr_fallback_bin) || return 3
   [ -n "$bin" ] && [ -x "$bin" ] || return 3
   secs=${FM_CR_FALLBACK_TIMEOUT:-20}
   case "$secs" in ''|0*|*[!0-9]*) secs=20 ;; esac
-  dir=$(mktemp -d "${TMPDIR:-/tmp}/fm-cr-mcp.XXXXXX") || return 3
-  mkfifo "$dir/in" || { rm -rf -- "$dir"; return 3; }
-  request=$(jq -cn --arg url "$url" '{jsonrpc:"2.0", id:2, method:"tools/call",
-    params:{name:"ReadInternalWebsites", arguments:{inputs:[$url]}}}') || { rm -rf -- "$dir"; return 3; }
-  ( fm_exec_timed "$secs" 2 "$bin" --include-tools ReadInternalWebsites ) \
-    < "$dir/in" > "$dir/out" 2>/dev/null &
-  pid=$!
-  # The writer is a subshell, so a server that exits early ends it with SIGPIPE
-  # rather than the caller.
-  (
-    printf '%s\n' \
-      '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"firstmate","version":"1"}}}' \
-      '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
-      "$request"
-    i=0
-    while kill -0 "$pid" 2>/dev/null && [ "$i" -lt $(( secs * 10 )) ]; do
-      grep -q '"id":2[,}]' "$dir/out" 2>/dev/null && break
-      sleep 0.1
-      i=$(( i + 1 ))
-    done
-  ) > "$dir/in" 2>/dev/null
-  kill -TERM "$pid" 2>/dev/null || true
-  wait "$pid" 2>/dev/null || true
-  text=$(jq -rR 'fromjson? | select(type == "object" and .id == 2 and .error == null
-      and (.result.isError // false) == false) | .result.content[0].text // empty' \
-    "$dir/out" 2>/dev/null | head -1)
-  rm -rf -- "$dir"
+  args=$(jq -cn --arg url "$url" '{inputs: [$url]}') || return 3
+  text=$(FM_BUILDER_MCP_BIN="$bin" fm_run_timed "$secs" \
+    "$(dirname "${BASH_SOURCE[0]}")/fm-builder-mcp-call.sh" ReadInternalWebsites "$args" 2>/dev/null) || return 3
   [ -n "$text" ] || return 3
   printf '%s' "$text"
 }

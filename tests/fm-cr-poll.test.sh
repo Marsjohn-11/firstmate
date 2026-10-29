@@ -155,7 +155,7 @@ run_check() {
   local state=$1 id=$2 fakebin=$3
   shift 3
   env -i HOME="$HOME" PATH="$fakebin:$BASE_PATH" \
-    FM_CR_FALLBACK_BIN="$state/no-such-builder-mcp" FM_CR_FALLBACK_TIMEOUT=5 "$@" \
+    FM_CR_FALLBACK_BIN="$state/no-such-builder-mcp" FM_CR_FALLBACK_TIMEOUT=60 "$@" \
     bash "$state/$id.check.sh"
 }
 

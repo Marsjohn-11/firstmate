@@ -153,6 +153,11 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-tool-update-check.sh` | Report watched tooling with an update available, and updates installed but left inert by PATH order |
 | `fm-pipeline-watch.sh` | Watch the standing health of the Amazon pipelines in `config/watched-pipelines` through bound watcher checks |
 | `fm-builder-mcp-call.sh` | Call one builder-mcp tool over stdio and print its result |
+| `fm-cr-check.sh` | Record a task's canonical CRUX review URL as `cr=` and arm its bound review poll |
+| `fm-cr-poll.sh` | One watcher poll of a recorded review: landed, abandoned, new reviewer comments, missing destination branch, or unable to see it |
+| `fm-cr-lib.sh` | Shared CRUX read path over mcurl with the builder-mcp fallback, plus comment, snapshot, and analyzer parsing |
+| `fm-cr-analyzers.sh` | Analyzer gate before relaying a review as ready: green, red, abstained, or unreadable |
+| `fm-cr-revise-guard.sh` | Check run before and after each `cr -r`, refusing to replace a draft revision that carries reviewer comments |
 | `fm-startup-growth-check.sh` | Daily metadata-only growth check for startup memory and tracked startup/instruction surfaces |
 | `fm-usage-warner.sh`     | Opt-in macOS threshold warner that notifies once when a configured Claude usage window crosses its percentage |
 | `fm-pr-lib.sh`           | Own canonical task and PR validation, the branch-to-PR lookup shared by teardown and the PR health monitor, plus private atomic PR-poll publication, merge-notification identity, and retirement |

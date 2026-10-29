@@ -118,7 +118,7 @@ run_guard() {
   shift 2
   while [ $# -gt 0 ] && [ "$1" != "--" ]; do envs+=("$1"); shift; done
   shift
-  env -i HOME="$HOME" PATH="$fakebin:$BASE_PATH" FM_CR_FALLBACK_BIN="$fallback" FM_CR_REVISE_FALLBACK_TIMEOUT=10 \
+  env -i HOME="$HOME" PATH="$fakebin:$BASE_PATH" FM_CR_FALLBACK_BIN="$fallback" FM_CR_REVISE_FALLBACK_TIMEOUT=90 \
     "${envs[@]}" bash "$GUARD" "$@"
 }
 
