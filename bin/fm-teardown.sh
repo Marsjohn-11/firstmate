@@ -180,6 +180,11 @@
 # Orca tasks use the same safety checks, then close the recorded terminal and
 # remove the recorded worktree through `orca worktree rm`; teardown never guesses
 # an Orca target from ambient CLI state.
+# A Brazil task (project_kind=brazil, bin/fm-brazil-lib.sh) runs the same
+# landed-work check on worktree= and on every other package its workspace
+# declares, reaps processes under the whole workspace, then removes it with
+# `brazil-worktree remove` instead of a Treehouse return. A removal that fails
+# or leaves the workspace behind aborts with the task records intact.
 # A Herdr presentation journal never authorizes cleanup. Teardown still closes
 # only the exact task pane from ordinary endpoint metadata and never calls
 # `workspace close`. It retires the non-authoritative journal only when a
@@ -554,6 +559,8 @@ fm_backlog_directory_present "$STATE" "state directory" || {
 }
 # shellcheck source=bin/fm-wake-lib.sh
 . "$SCRIPT_DIR/fm-wake-lib.sh"
+# shellcheck source=bin/fm-brazil-lib.sh
+. "$SCRIPT_DIR/fm-brazil-lib.sh"
 # Supervision lease guard: post-landing cleanup is overlap territory between
 # the two Pi supervision actors; refuse while the OTHER actor holds this
 # task's live lease (contract: bin/fm-lease-lib.sh; no-op in homes without
@@ -1328,6 +1335,26 @@ fi
 MODE=$(grep '^mode=' "$META" | cut -d= -f2- || true)
 [ -n "$MODE" ] || MODE=no-mistakes
 BASE_BRANCH=$(grep '^base_branch=' "$META" | cut -d= -f2- || true)
+# A Brazil task's worktree= is one package of its own Brazil workspace
+# (bin/fm-brazil-lib.sh); the workspace, not a Treehouse slot, is what cleanup
+# checks and removes.
+PROJECT_KIND=
+WORKSPACE_SHELL=
+BRAZIL_PRIMARY=
+if [ "$KIND" != secondmate ] && [ "$(fm_meta_get "$META" project_kind)" = brazil ]; then
+  PROJECT_KIND=brazil
+  WORKSPACE_SHELL=$(fm_meta_get "$META" workspace_shell)
+  if ! BRAZIL_PRIMARY=$(fm_brazil_shell_primary "$WORKSPACE_SHELL" 2>/dev/null); then
+    BRAZIL_PRIMARY=
+    if fm_brazil_package_project "$PROJ"; then
+      BRAZIL_PRIMARY=$FM_BRAZIL_PRIMARY
+    fi
+  fi
+  if [ -z "$WORKSPACE_SHELL" ] || [ -z "$BRAZIL_PRIMARY" ]; then
+    echo "REFUSED: task $ID records a Brazil workspace, but its path or primary workspace cannot be resolved; nothing was changed" >&2
+    exit 1
+  fi
+fi
 
 # A record accepted as a legacy incarnation (no spawn_gen, and either
 # --legacy-record given or the record is windowless) may be torn down only
@@ -2225,6 +2252,52 @@ validate_worktree_teardown_safety() {
       return 1
     fi
   fi
+}
+
+# brazil_declared_packages_landed: the worktree= safety check above, run on every
+# other package a Brazil task declared. Each package is its own repository, so
+# the check reads that package's checkout and default branch. The task's
+# recorded code review still counts, because one review can carry several
+# packages, but a PR belongs to one repository. A declared package whose
+# worktree is already gone holds nothing to lose.
+# Bash locals are dynamically scoped, so the shared check reads this package's
+# copy, checkout, and branch for the length of this call only.
+brazil_package_teardown_safety() {  # <package-worktree> <primary-package>
+  local WT=$1 PROJ=$2 PR_URL='' BASE_BRANCH='' TEARDOWN_WORKTREE_BRANCH_FOR_SAFETY=''
+  validate_worktree_teardown_safety
+}
+
+brazil_declared_packages_landed() {
+  local package dir dir_real wt_real failed=0
+  wt_real=$(canonical_existing_dir "$WT") || wt_real=$WT
+  while IFS= read -r package; do
+    dir="$WORKSPACE_SHELL/src/$package"
+    dir_real=$(canonical_existing_dir "$dir") || continue
+    [ "$dir_real" != "$wt_real" ] || continue
+    if ! brazil_package_teardown_safety "$dir" "$BRAZIL_PRIMARY/src/$package"; then
+      echo "REFUSED: declared Brazil package $package at $dir holds work that has not landed." >&2
+      failed=1
+    fi
+  done < <(fm_brazil_shell_packages "$WORKSPACE_SHELL")
+  [ "$failed" = 0 ]
+}
+
+# teardown_remove_brazil_workspace: drop each declared package's local task
+# branch, then remove the whole workspace with brazil-worktree, which also
+# deletes its package worktrees and their fm-<id> branches.
+teardown_remove_brazil_workspace() {
+  local package dir branch tool_branch
+  tool_branch=$(basename "$WORKSPACE_SHELL")
+  while IFS= read -r package; do
+    dir="$WORKSPACE_SHELL/src/$package"
+    [ -d "$dir" ] || continue
+    branch=$(git -C "$dir" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)
+    if [ "$branch" != HEAD ] && [ "$branch" != "$tool_branch" ] &&
+      git -C "$dir" checkout --detach -q 2>/dev/null; then
+      git -C "$dir" branch -D "$branch" >/dev/null 2>&1 || true
+    fi
+  done < <(fm_brazil_shell_packages "$WORKSPACE_SHELL")
+  fm_brazil_remove_workspace_shell "$BRAZIL_PRIMARY" "$WORKSPACE_SHELL"
 }
 
 # Fix 1 (see script header): does the active-or-most-recent no-mistakes run in
@@ -3773,6 +3846,9 @@ if teardown_owns_worktree && [ -d "$WT" ] && [ "$FORCE" != "--force" ]; then
     fi
   fi
 fi
+if [ "$PROJECT_KIND" = brazil ] && [ "$FORCE" != "--force" ]; then
+  brazil_declared_packages_landed || exit 1
+fi
 
 # A Herdr close may reposition shared workspace order, so the whole
 # destructive sequence below (worktree return, pane close, record removal)
@@ -3875,7 +3951,10 @@ fi
 # kind=secondmate: a secondmate home's own runtime lifecycle is owned by the
 # dedicated process-event and firstmate-home removal machinery further below,
 # not by task-worktree cleanup.
-if [ "$KIND" != secondmate ] && teardown_owns_worktree; then
+if [ "$KIND" != secondmate ] && [ "$PROJECT_KIND" = brazil ]; then
+  conclude_task_no_mistakes_run "$WT"
+  reap_task_worktree_processes worktree "$WORKSPACE_SHELL" "$TASK_TMP"
+elif [ "$KIND" != secondmate ] && teardown_owns_worktree; then
   conclude_task_no_mistakes_run "$WT"
   reap_task_worktree_processes worktree "$WT" "$TASK_TMP"
 elif [ "$KIND" != secondmate ]; then
@@ -3930,6 +4009,11 @@ if [ "$BACKEND" = orca ] && [ "$KIND" != secondmate ]; then
       || { endpoint_close_refusal "$ID" "$BACKEND" "$T" 0; exit 1; }
   fi
   fm_backend_remove_worktree "$BACKEND" "$ORCA_WORKTREE_ID"
+elif [ "$PROJECT_KIND" = brazil ]; then
+  teardown_remove_brazil_workspace || {
+    echo "error: could not remove Brazil workspace $WORKSPACE_SHELL; teardown aborted with its records intact" >&2
+    exit 1
+  }
 elif [ "$KIND" != secondmate ] && ! teardown_owns_worktree; then
   :
 elif [ -d "$WT" ] && [ "$KIND" != secondmate ]; then

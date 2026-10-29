@@ -40,6 +40,7 @@ A no-mistakes run matched to the crew's branch and current code remains authorit
 
 When no authoritative run accounts for the task, inspect only its recorded backend and worktree inventory.
 Use `treehouse status` for treehouse-backed tmux, herdr, zellij, cmux, Paseo, Rex, t3code, tern, or hc tasks, and use the recorded `orca_worktree_id=` and `terminal=` for Orca tasks.
+A Brazil task (`project_kind=brazil`) holds no Treehouse slot; its inventory is the recorded `workspace_shell=`, which a relaunch validates before reuse.
 Do not sweep another home's endpoints or infer ownership from a matching window label.
 
 Before relaunch, prove that no live agent still owns the recorded task and that the existing worktree remains available.

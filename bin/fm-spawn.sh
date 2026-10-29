@@ -368,6 +368,14 @@
 #   containment test reads local refs only and never fetches, so this gate stays
 #   usable offline; a stale remote-tracking ref can therefore make an unpushed
 #   commit look contained, which is exactly why no remedy command is printed.
+#   A fresh ship or scout on a Brazil package gets its own Brazil workspace
+#   from brazil-worktree instead of a Treehouse slot, launches in that
+#   workspace's package worktree, and records project_kind=brazil and
+#   workspace_shell=; bin/fm-brazil-lib.sh owns that contract. It refuses on
+#   Orca, without brazil-worktree, when the workspace path already exists, or
+#   when the package's origin cannot be fetched, and a spawn that ends with no
+#   record before its launch removes the workspace it built. A relaunch first
+#   validates the recorded workspace and refuses one that is not intact.
 # Batch dispatch: pass one or more `id=repo` pairs instead of a single <id> <project>, e.g.
 #     fm-spawn.sh fix-a-k3=projects/foo add-b-q7=projects/bar [--scout]
 #   Each pair re-execs this script in single-task mode, so the single path stays the only
@@ -912,6 +920,8 @@ if [ -e "$STATE" ] || [ -L "$STATE" ]; then
 fi
 # shellcheck source=bin/fm-ff-lib.sh
 . "$SCRIPT_DIR/fm-ff-lib.sh"
+# shellcheck source=bin/fm-brazil-lib.sh
+. "$SCRIPT_DIR/fm-brazil-lib.sh"
 # shellcheck source=bin/fm-wake-lib.sh
 . "$SCRIPT_DIR/fm-wake-lib.sh"
 # shellcheck source=bin/fm-classify-lib.sh
@@ -1639,6 +1649,11 @@ SPAWN_TASK_SET_LOCK_HELD=0
 SPAWN_TREEHOUSE_PROJECT_LOCK=
 SPAWN_TREEHOUSE_PROJECT_LOCK_HELD=0
 SPAWN_SLOT_CLAIMED=0
+PROJECT_KIND=
+BRAZIL_PRIMARY=
+BRAZIL_PACKAGE=
+BRAZIL_SHELL=
+BRAZIL_SHELL_BUILT=0
 SPAWN_FRESH_ENDPOINT_OPENED=0
 SPAWN_FRESH_WIRING_PENDING=0
 SPAWN_TASK_TMP_CREATED=0
@@ -1914,6 +1929,23 @@ spawn_abort_cleanup() {
       fm_lock_release "$SPAWN_TREEHOUSE_PROJECT_LOCK" || true
     else
       echo "warning: leaving task $ID's slot claim on $WT in place; the Treehouse project lock is no longer held, so the next spawn's claim replaces it" >&2
+    fi
+  fi
+  # A Brazil workspace this spawn built holds no work until a launch is
+  # delivered, so a spawn that ends with no record removes it. The per-id lock
+  # is retaken so a retry of the same id is never undone.
+  if [ "$status" -ne 0 ] && [ "$BRAZIL_SHELL_BUILT" = 1 ] &&
+    { [ "$SPAWN_LAUNCH_SENT" = 0 ] || [ "$SPAWN_ENDPOINT_CLOSED" = 1 ]; } &&
+    [ ! -e "$STATE/$ID.meta" ] && [ ! -L "$STATE/$ID.meta" ]; then
+    BRAZIL_SHELL_BUILT=0
+    if [ -n "$SPAWN_TASK_LOCK" ] && fm_lock_try_acquire "$SPAWN_TASK_LOCK"; then
+      if [ ! -e "$STATE/$ID.meta" ] && [ ! -L "$STATE/$ID.meta" ] &&
+        ! fm_brazil_remove_workspace_shell "$BRAZIL_PRIMARY" "$BRAZIL_SHELL"; then
+        echo "warning: could not remove Brazil workspace $BRAZIL_SHELL after the failed spawn of $ID; remove it with: brazil-worktree remove --name $(basename "$BRAZIL_SHELL") --workspace $BRAZIL_PRIMARY" >&2
+      fi
+      fm_lock_release "$SPAWN_TASK_LOCK" || true
+    else
+      echo "warning: another spawn of $ID holds its spawn lock; leaving Brazil workspace $BRAZIL_SHELL in place" >&2
     fi
   fi
   if [ "$SPAWN_TREEHOUSE_PROJECT_LOCK_HELD" = 1 ]; then
@@ -4023,6 +4055,39 @@ if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ] &&
   echo "error: spawn refused: project $PROJ_ABS has no commit yet (unborn HEAD), so there is nothing to branch a worktree from; make one commit in the project, for example 'git -C $PROJ_ABS commit --allow-empty -m \"chore: initial commit\"', then spawn again" >&2
   exit 1
 fi
+# Brazil workspace isolation (bin/fm-brazil-lib.sh owns the contract). A fresh
+# ship or scout on a Brazil package gets its own workspace instead of a
+# Treehouse slot; a relaunch reads the task record, so a task keeps the path it
+# was spawned on.
+if [ "$KIND" != secondmate ] && [ "$RELAUNCH" -eq 1 ]; then
+  if [ "$(fm_meta_get "$RELAUNCH_META" project_kind)" = brazil ]; then
+    PROJECT_KIND=brazil
+    BRAZIL_SHELL=$(fm_meta_get "$RELAUNCH_META" workspace_shell)
+    fm_brazil_validate_workspace_shell "$BRAZIL_SHELL" "$RELAUNCH_WT" || {
+      echo "error: cannot relaunch $ID: its recorded Brazil workspace '${BRAZIL_SHELL:-none}' is not intact (see above); refusing to launch into a workspace that may have lost work" >&2
+      exit 1
+    }
+    BRAZIL_PRIMARY=$FM_BRAZIL_PRIMARY
+    BRAZIL_PACKAGE=$FM_BRAZIL_PACKAGE
+  fi
+elif [ "$KIND" != secondmate ] && fm_brazil_package_project "$PROJ_ABS"; then
+  PROJECT_KIND=brazil
+  BRAZIL_PRIMARY=$FM_BRAZIL_PRIMARY
+  BRAZIL_PACKAGE=$FM_BRAZIL_PACKAGE
+  BRAZIL_SHELL=$(fm_brazil_shell_path "$BRAZIL_PRIMARY" "$ID")
+  if [ "$BACKEND" = orca ]; then
+    echo "error: spawn refused: $PROJ_ABS is a Brazil package, which gets its own Brazil workspace, and Orca owns its own worktree; spawn it on a session backend instead" >&2
+    exit 1
+  fi
+  command -v brazil-worktree >/dev/null 2>&1 || {
+    echo "error: spawn refused: $PROJ_ABS is a Brazil package, which needs brazil-worktree to build its task workspace; install it with: toolbox install brazilworktreecli" >&2
+    exit 1
+  }
+  if [ -e "$BRAZIL_SHELL" ] || [ -L "$BRAZIL_SHELL" ]; then
+    echo "error: spawn refused: Brazil workspace $BRAZIL_SHELL already exists; if no task owns it, remove it with: brazil-worktree remove --name $(basename "$BRAZIL_SHELL") --workspace $BRAZIL_PRIMARY" >&2
+    exit 1
+  fi
+fi
 # Project capacity admission (bin/fm-project-capacity-lib.sh owns the
 # declaration, what holds a place, and why this is race-safe). A fresh worker
 # for a project whose declared capacity is already held is deferred here, before
@@ -4134,6 +4199,9 @@ if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
     fm_brief_worker_role "$STATE" "$ID" "$FM_ROOT" &&
       printf '\n' &&
       cat "$SOURCE_BRIEF" &&
+      if [ "$PROJECT_KIND" = brazil ]; then
+        fm_brazil_launch_section "$BRAZIL_SHELL" "$BRAZIL_PACKAGE" "$FM_ROOT"
+      fi &&
       if [ "$KIND" = ship ] && [ "$MODE" = no-mistakes ]; then
         fm_brief_intent_overlay "$CAPTAIN_INTENT"
       fi
@@ -5821,6 +5889,21 @@ elif [ "$RELAUNCH" -eq 1 ]; then
     fi
   fi
   [ "$KIND" = secondmate ] || validate_spawn_worktree "relaunch" "$T"
+elif [ "$PROJECT_KIND" = brazil ]; then
+  # The task's own Brazil workspace replaces the Treehouse slot. The package add
+  # fetches origin and resets the new worktree to its tip, the refresh a pooled
+  # slot gets below, and refuses rather than start from a stale base.
+  BRAZIL_SHELL_BUILT=1
+  fm_brazil_build_workspace_shell "$BRAZIL_PRIMARY" "$BRAZIL_SHELL" || {
+    echo "error: could not build Brazil workspace $BRAZIL_SHELL for $ID; $(spawn_endpoint_hint)" >&2
+    exit 1
+  }
+  fm_brazil_add_package "$BRAZIL_SHELL" "$BRAZIL_PACKAGE" "$BASE_BRANCH" >&2 || {
+    echo "error: could not add $BRAZIL_PACKAGE to Brazil workspace $BRAZIL_SHELL for $ID; $(spawn_endpoint_hint)" >&2
+    exit 1
+  }
+  WT="$BRAZIL_SHELL/src/$BRAZIL_PACKAGE"
+  validate_spawn_worktree "brazil-worktree" "$T"
 elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
   # A t3code slot was leased and validated in its target branch above.
   if [ "$BACKEND" != t3code ]; then
@@ -5910,7 +5993,7 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
     SPAWN_SLOT_CLAIMED=1
   fi
 fi
-if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ] && [ "$BACKEND" != t3code ]; then
+if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ] && [ "$BACKEND" != t3code ] && [ "$PROJECT_KIND" != brazil ]; then
   freshen_spawn_worktree_base "$WT" "$BASE_BRANCH" "$PROJ_ABS" "$MODE" || exit 1
 fi
 
@@ -7119,6 +7202,11 @@ preserve_relaunch_meta() {
   if [ "$KIND" = secondmate ]; then
     echo "home=$PROJ_ABS"
     echo "projects=$SECONDMATE_PROJECTS"
+  fi
+  # A relaunch carries these forward through preserve_relaunch_meta.
+  if [ "$RELAUNCH" -eq 0 ] && [ "$PROJECT_KIND" = brazil ]; then
+    echo "project_kind=brazil"
+    echo "workspace_shell=$BRAZIL_SHELL"
   fi
   if [ "$SPAWN_CONTROL_PARENT" = 1 ] && [ -n "${FM_CONTROL_RELAUNCH_TX:-}" ]; then
     echo "control_relaunch_tx=$FM_CONTROL_RELAUNCH_TX"

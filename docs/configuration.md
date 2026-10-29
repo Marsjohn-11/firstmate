@@ -633,6 +633,8 @@ Task meta records `backend=` only for a non-default backend; an absent `backend=
 - A tern task additionally records `tern_session_id=`, `tern_tab_id=`, and `tern_block_id=`.
 - For hc endpoint fields and automatic-selection provenance, see [Task shape and metadata](hc-backend.md#task-shape-and-metadata).
 
+- A Brazil-package task additionally records `project_kind=brazil` and `workspace_shell=` for its own Brazil workspace; `bin/fm-brazil-lib.sh` owns that contract.
+
 ### Task selectors
 
 Task selectors for `fm-peek.sh`, `fm-send.sh`, and `fm-crew-state.sh` resolve centrally through `fm_backend_resolve_selector`.
