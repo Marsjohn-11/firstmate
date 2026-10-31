@@ -1,0 +1,45 @@
+diff --git a/tests/fm-home-summary-refresh.test.sh b/tests/fm-home-summary-refresh.test.sh
+index 4e421efb..704f3076 100755
+--- a/tests/fm-home-summary-refresh.test.sh
++++ b/tests/fm-home-summary-refresh.test.sh
+@@ -365,8 +365,14 @@ while ! jq -e --arg now "$NOW_THREE" '.generated == $now' \
+   sleep 0.1
+   i=$((i + 1))
+ done
+-[ ! -e "$BACKOFF_HOME/state/.home-summary-refresh.backoff" ] \
+-  || fail "the resumed publication kept the deadline-miss record"
++
++# The worker renames the ledger into place before it removes the record.
++i=0
++while [ -e "$BACKOFF_HOME/state/.home-summary-refresh.backoff" ]; do
++  [ "$i" -lt 50 ] || fail "the resumed publication kept the deadline-miss record"
++  sleep 0.1
++  i=$((i + 1))
++done
+ kill "$WATCH_PID" >/dev/null 2>&1 || true
+ wait "$WATCH_PID" >/dev/null 2>&1 || true
+ WATCH_PID=
+@@ -534,7 +540,10 @@ PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$HOME_DIR" \
+   FM_HOME_SUMMARY_TIMEOUT=1 "$WRITER" --best-effort \
+   || fail "lock timeout changed the best-effort caller result"
+ elapsed=$(( $(date +%s) - started ))
+-[ "$elapsed" -lt 11 ] || fail "best-effort refresh waited $elapsed seconds on its lock"
++
++# The reap child then waits up to 8 s for the same held lock before it gives
++# up on recording the miss.
++[ "$elapsed" -lt 15 ] || fail "best-effort refresh waited $elapsed seconds on its lock"
+ PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$HOME_DIR" \
+   FM_HOME_SUMMARY_TIMEOUT=1 "$WRITER" --best-effort \
+   || fail "repeated lock timeout changed the best-effort caller result"
+@@ -674,7 +683,10 @@ PATH="$MKBIN:$FAKEBIN:$PATH" FM_TEST_REAL_MKDIR="$REAL_MKDIR" \
+   "$WRITER" --best-effort >/dev/null 2>"$TMP_ROOT/stalled-state.err" \
+   || fail "state initialization timeout changed the best-effort caller result"
+ elapsed=$(( $(date +%s) - started ))
+-[ "$elapsed" -lt 11 ] \
++
++# The stalled state directory also holds the reap and log children to their
++# own 10 s and 2 s bounds, each with a 1 s kill grace.
++[ "$elapsed" -lt 18 ] \
+   || fail "best-effort refresh waited $elapsed seconds before bounded state initialization"
+ pass "best-effort refresh bounds state initialization"
+ 

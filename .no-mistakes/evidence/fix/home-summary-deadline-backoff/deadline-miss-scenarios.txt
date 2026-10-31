@@ -1,0 +1,19 @@
+=== S1: single deadline miss (worker ignores TERM, killed at 3s deadline) ===
+caller rc=0 elapsed=4s
+backoff record: 1
+leftover tmp files: []
+log tail: [2026-10-31T08:48:04Z] refresh exceeded its 3-second deadline
+
+=== S2: two lifecycle callers time out together, 5 rounds ===
+Terminated: 15
+round 1: rcs=0,0 misses=2 leftovers=[]
+Terminated: 15
+round 2: rcs=0,0 misses=2 leftovers=[]
+Terminated: 15
+round 3: rcs=0,0 misses=2 leftovers=[]
+Terminated: 15
+round 4: rcs=0,0 misses=1 leftovers=[]
+round 5: rcs=0,0 misses=1 leftovers=[]
+
+=== S3: successful publication clears the record ===
+rc=0 record exists? no

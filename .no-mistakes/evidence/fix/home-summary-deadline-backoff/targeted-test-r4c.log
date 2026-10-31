@@ -1,0 +1,7 @@
+ok - watcher-carried status append publishes the real home summary
+ok - large backlog snapshots and home-summary publication stay within exec limits
+ok - fleet snapshot transport does not require or mutate operational state
+ok - parent snapshot consumes large child ledgers without argument transport
+ok - live watcher cadence bounds publication staleness without signals
+not ok - the resumed publication kept the deadline-miss record
+tests/lib.sh: line 284: 13855 Killed: 9               PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$BACKOFF_HOME" FM_SNAPSHOT_NOW="$NOW_THREE" FM_SNAPSHOT_NOW_EPOCH="$EPOCH_THREE" FM_POLL=1 FM_HOME_SUMMARY_INTERVAL=08 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=9999999 FM_HEARTBEAT=9999999 "$WATCH" > "$TMP_ROOT/backoff-watch.out" 2> "$TMP_ROOT/backoff-watch.err"

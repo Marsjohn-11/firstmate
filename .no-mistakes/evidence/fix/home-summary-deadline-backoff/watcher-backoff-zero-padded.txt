@@ -1,0 +1,18 @@
+=== S6: real fm-watch.sh in lab tmux (FM_POLL=1, FM_HOME_SUMMARY_INTERVAL=0300), ledger due, backoff record '08' fresh ===
+t+~40s: watcher pid alive: 26461 bash
+  last watcher beat: 01:53:02, now 01:53:03
+  ledger mtime: Jan  1 00:00:00 2000 (unchanged => refresh held off; 08 parsed as 8 -> capped 4 misses -> 300*8=2400s delay)
+  watcher stderr: []
+aged backoff record to 2000-01-01; waiting for resumed publication...
+  after 2s: ledger mtime Oct 31 01:53:05 2026, generated=2026-10-31T08:53:05Z
+  backoff record present: no (expected no)
+  watcher still alive: 26461 bash
+=== S6b: real fm-watch.sh, FM_HOME_SUMMARY_INTERVAL=08 (invalid octal), fresh record '1' => 8s backoff ===
+ledger republished -846723198s after watcher start and record write (expected >= ~8s, not on first poll)
+record present: yes (expected no)
+watcher stderr: []  watcher exit line: [check: rearm-resurface
+exit=0]
+--- rerun after clearing the downtime marker left by killing the previous lab watcher ---
+ledger republished 12s after watcher start and record write (expected >= ~8s, not on first poll)
+record present: no (expected no)
+watcher stderr: []  watcher exited: []

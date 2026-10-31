@@ -1,0 +1,36 @@
+load: load averages: 37.18 36.27 33.91
+== S1 success publishes and bumps generation
+rc=0 ledger=yes generation=1 record=none
+== S2 killed worker: bounded, reaped, counted
+attempt 1 rc=0 elapsed=14s leftovers=0 record=1
+Terminated: 15
+attempt 2 rc=0 elapsed=9s leftovers=0 record=2
+Terminated: 15
+attempt 3 rc=0 elapsed=8s leftovers=0 record=3
+after success: record=none generation=2
+== S3 same-second miss after a publish is still recorded
+round 1 publish_mtime=1793459784 miss_start=1793459785 same_second=no record=1
+Terminated: 15
+round 2 publish_mtime=1793460005 miss_start=1793460005 same_second=yes record=1
+Terminated: 15
+round 3 publish_mtime=1793460014 miss_start=1793460015 same_second=no record=1
+round 4 publish_mtime=1793460029 miss_start=1793460030 same_second=no record=1
+same-second-or-adjacent misses recorded: 4/4
+== S4 concurrent timeouts count both
+round 1 misses=2 elapsed=7s leftovers=0
+round 2 misses=2 elapsed=334s leftovers=0
+round 3 misses=2 elapsed=9s leftovers=0
+round 4 misses=2 elapsed=11s leftovers=0
+Terminated: 15
+round 5 misses=2 elapsed=7s leftovers=0
+round 6 misses=2 elapsed=7s leftovers=0
+concurrent rounds counting both: 6/6
+== S5 older miss cannot undo a newer success (success lands while the stalled attempt is running)
+round 1 generation 6 -> 7 record=none leftovers=0
+Terminated: 15
+round 2 generation 7 -> 8 record=none leftovers=0
+round 3 generation 8 -> 9 record=none leftovers=0
+superseded rounds with record clear: 3/3
+== S6 reap stalls on a hung rm: caller still bounded
+rc=0 elapsed=14s (bound: 3s worker + 10s reap + 2s log)
+load: load averages: 51.21 46.41 38.74

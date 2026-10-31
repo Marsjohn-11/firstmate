@@ -1,0 +1,10 @@
+== head 1346f755
+round 1: stalls=       1 record=1 lock= lockpid=
+round 2: stalls=       1 record=2 lock= lockpid=
+round 3: stalls=       1 record=2 lock= lockpid=
+round 4: stalls=       1 record=1 lock= lockpid=
+== head + bounded retry-count lock wait (patched copy outside worktree)
+round 1: stalls=       1 record=2 lock= lockpid=
+round 2: stalls=       1 record=2 lock= lockpid=
+round 3: stalls=       1 record=2 lock= lockpid=
+round 4: stalls=       1 record=2 lock= lockpid=

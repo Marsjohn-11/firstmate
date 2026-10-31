@@ -1,0 +1,10 @@
+=== S4: a slow attempt times out AFTER a newer refresh published; record must stay clear ===
+after newer publication: record=none
+after the older attempt's deadline miss: record=none (expected none)
+
+=== S4b: control - same timeout with no newer publication records the miss ===
+record=1 (expected 1)
+
+=== S5: state FS stalls during cleanup: rm of attempt files and head of the backoff record hang, ignoring TERM ===
+default caller: rc=124, returned after 5.6s (worker deadline 3s + reap bound 2s; unbounded would be 60s+)
+best-effort caller: rc=0, returned after 5.6s (worker deadline 3s + reap bound 2s; unbounded would be 60s+)

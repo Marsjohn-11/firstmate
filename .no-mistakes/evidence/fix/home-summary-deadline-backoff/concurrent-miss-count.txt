@@ -1,0 +1,17 @@
+=== S2 repeat: 10 more rounds of two concurrent lifecycle callers timing out (load: 16.66 16.71 21.77) ===
+round 1: misses=2 (expected 2) wall=6s
+round 2: misses=2 (expected 2) wall=5s
+round 3: misses=2 (expected 2) wall=4s
+round 4: misses=2 (expected 2) wall=5s
+round 5: misses=2 (expected 2) wall=4s
+round 6: misses=2 (expected 2) wall=5s
+round 7: misses=2 (expected 2) wall=5s
+round 8: misses=2 (expected 2) wall=4s
+round 9: misses=2 (expected 2) wall=5s
+round 10: misses=1 (expected 2) wall=6s
+=== direct reap-child timing on a dead-holder lock, two concurrent children, no outer bound (parent bound is 2s) ===
+--- give-up time of an unbounded reap child while a LIVE process holds the refresh lock for 6s ---
+try 1: reap child returned after 6.92s (parent bound 2s)
+try 2: reap child returned after 5.86s (parent bound 2s)
+try 3: reap child returned after 5.30s (parent bound 2s)
+load: 18.26 17.52 21.57

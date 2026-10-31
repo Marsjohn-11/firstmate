@@ -1,0 +1,6 @@
+== S1 success publishes
+rc=0 ledger=yes record=none
+== S2 killed worker: bounded, reaped, counted
+attempt 1 rc=0 elapsed=15s leftovers=0 record=1
+attempt 2 rc=0 elapsed=12s leftovers=0 record=1
+Terminated: 15

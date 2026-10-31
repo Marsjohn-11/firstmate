@@ -1,0 +1,33 @@
+ 8:11  up 2 days, 21:24, 7 users, load averages: 41.53 36.97 34.10
+ok - watcher-carried status append publishes the real home summary
+ok - large backlog snapshots and home-summary publication stay within exec limits
+ok - fleet snapshot transport does not require or mutate operational state
+ok - parent snapshot consumes large child ledgers without argument transport
+ok - live watcher cadence bounds publication staleness without signals
+ok - the watcher backs off its refresh after a missed deadline and resumes once the delay passes
+ok - fleet snapshot consumes the published local ledger by default
+ok - writer kill and replacement preserve an atomic JSON ledger
+ok - best-effort publication logs and continues
+Terminated: 15
+Terminated: 15
+ok - best-effort refresh bounds publication lock acquisition
+ok - best-effort refresh bounds validation and publication
+ok - the parent removes a killed worker's temporary files and counts consecutive deadline misses
+Terminated: 15
+Terminated: 15
+Terminated: 15
+Terminated: 15
+ok - concurrent deadline misses each count toward the backoff
+ok - a deadline miss superseded by a newer publication leaves the backoff record clear
+ok - a deadline miss after a same-second publication is still counted
+ok - best-effort refresh bounds state initialization
+ok - best-effort refresh logs worker termination
+ok - best-effort refresh bounds failure reporting fallback
+ok - valid publication ignores an unavailable failure record
+ok - publication completes on a home carrying accumulated status history
+ok - producer skips remote per-task state probes
+ok - a stalled publication does not delay the watcher liveness beacon
+not ok - a dead publication lock wedged publication
+bash tests/fm-home-summary-refresh.test.sh  27.70s user 31.67s system 5% cpu 18:23.81 total
+exit=1
+ 8:30  up 2 days, 21:42, 7 users, load averages: 39.97 40.27 37.34

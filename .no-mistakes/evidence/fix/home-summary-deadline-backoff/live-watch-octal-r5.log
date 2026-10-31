@@ -1,0 +1,6 @@
+oct0300a: record age when watcher first beat: 206s
+oct0300a: FM_HOME_SUMMARY_INTERVAL=0300 record=1 aged 200s -> hold (want hold, record age at verdict 242s), watcher alive, record now: 1
+oct0300b: record age when watcher first beat: 182s
+oct0300b: FM_HOME_SUMMARY_INTERVAL=0300 record=1 aged 180s -> hold (want hold, record age at verdict 232s), watcher alive, record now: 1
+dec300ctl: record age when watcher first beat: 204s
+dec300ctl: FM_HOME_SUMMARY_INTERVAL=300 record=1 aged 200s -> hold (want hold, record age at verdict 248s), watcher alive, record now: 1

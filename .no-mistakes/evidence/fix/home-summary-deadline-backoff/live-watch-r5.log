@@ -1,0 +1,5 @@
+pad3000: FM_HOME_SUMMARY_INTERVAL=03000 record=1 aged 2000s -> hold (want hold, record age at verdict 2050s), watcher alive, record now: 1
+pad08: FM_HOME_SUMMARY_INTERVAL=08 record=1 aged 100s -> refresh (want refresh, record age at verdict 0s), watcher alive, record now: cleared
+misses08: FM_HOME_SUMMARY_INTERVAL=0300 record=08 aged 1000s -> hold (want hold, record age at verdict 1034s), watcher alive, record now: 08
+oct0300: FM_HOME_SUMMARY_INTERVAL=0300 record=1 aged 250s -> hold (want hold, record age at verdict 295s), watcher alive, record now: 1
+base: FM_HOME_SUMMARY_INTERVAL=300 record=1 aged 400s -> refresh (want refresh, record age at verdict 0s), watcher alive, record now: cleared

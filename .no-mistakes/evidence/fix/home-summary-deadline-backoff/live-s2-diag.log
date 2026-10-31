@@ -1,0 +1,23 @@
+seed rc=0 record=none
+Terminated: 15
+attempt 1 rc=0 elapsed=15s record=none lock=/var/folders/tv/b4_jb7290610qhwsd01ngyhr0000gq/T//fm-hs-lab.WqFklJ/home/state/.home-summary-refresh.lock
+attempt 2 rc=0 elapsed=14s record=none lock=/var/folders/tv/b4_jb7290610qhwsd01ngyhr0000gq/T//fm-hs-lab.WqFklJ/home/state/.home-summary-refresh.lock
+[2026-10-31T10:39:42Z] refresh exceeded its 3-second deadline
+Terminated: 15
+attempt 3 HUNG; tree:
+total 16
+drwxr-xr-x@ 8 marsjohn  staff   256 Oct 31 03:52 .
+drwxr-xr-x@ 8 marsjohn  staff   256 Oct 31 03:39 ..
+lrwxr-xr-x@ 1 marsjohn  staff   124 Oct 31 03:39 .home-summary-refresh.lock -> /private/var/folders/tv/b4_jb7290610qhwsd01ngyhr0000gq/T/fm-hs-lab.WqFklJ/home/state/.home-summary-refresh.lock.owner.gRYRN8
+drwx------@ 4 marsjohn  staff   128 Oct 31 03:39 .home-summary-refresh.lock.owner.gRYRN8
+lrwxr-xr-x@ 1 marsjohn  staff   130 Oct 31 03:52 .home-summary-refresh.lock.steal -> /private/var/folders/tv/b4_jb7290610qhwsd01ngyhr0000gq/T/fm-hs-lab.WqFklJ/home/state/.home-summary-refresh.lock.steal.owner.hOEkOq
+drwx------@ 4 marsjohn  staff   128 Oct 31 03:52 .home-summary-refresh.lock.steal.owner.hOEkOq
+-rw-r--r--@ 1 marsjohn  staff   124 Oct 31 03:52 .home-summary-refresh.log
+-rw-------@ 1 marsjohn  staff  1033 Oct 31 03:39 home-summary.json
+/Users/marsjohn/.no-mistakes/evidence/01M68FG7W1HY9PW30Q1BNCWGCR/live-s2-diag.sh: line 24: kill: (77737) - No such process
+attempt 3 rc=0 elapsed=730s record=none lock=/var/folders/tv/b4_jb7290610qhwsd01ngyhr0000gq/T//fm-hs-lab.WqFklJ/home/state/.home-summary-refresh.lock
+[2026-10-31T10:39:42Z] refresh exceeded its 3-second deadline
+[2026-10-31T10:39:54Z] refresh exceeded its 3-second deadline
+attempt 4 rc=0 elapsed=11s record=1 lock=
+[2026-10-31T10:39:54Z] refresh exceeded its 3-second deadline
+[2026-10-31T10:52:04Z] refresh exceeded its 3-second deadline

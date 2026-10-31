@@ -1,0 +1,28 @@
+== S1: parent reap/backoff writes are bounded when the state fs stalls
+writer rc=0 elapsed=6s head-stall-reached=yes
+error log:
+  [2026-10-31T08:34:23Z] refresh exceeded its 3-second deadline
+PASS   S1
+== S2: two concurrent timed-out parents count both misses (no lost increment)
+Terminated: 15
+round 1: backoff record=1 leftover tmp files=0
+Terminated: 15
+round 2: backoff record= leftover tmp files=0
+Terminated: 15
+round 3: backoff record=1 leftover tmp files=0
+FAIL   S2
+== S3: a newer success is not undone by an older timed-out attempt
+round 1: ledger=fm-secondmate-home-summary.v1 backoff record=absent
+round 2: ledger=fm-secondmate-home-summary.v1 backoff record=absent
+round 3: ledger=fm-secondmate-home-summary.v1 backoff record=absent
+PASS   S3
+== S4: zero-padded interval 0300 backs off 300s (decimal), not 192s (octal)
+miss 250s ago, interval 0300: watcher alive held
+miss 310s ago, interval 0300: watcher alive refreshed; record now absent
+PASS   S4
+== S5: interval 09 and record '08' do not crash the watcher (base-10 parsing)
+interval 09, record 08 fresh: watcher alive held
+PASS   S5
+== S5b: reap child increments a zero-padded '08' record to 9
+record after miss: 9
+PASS   S5b

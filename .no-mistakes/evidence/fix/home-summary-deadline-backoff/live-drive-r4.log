@@ -1,0 +1,26 @@
+== S1 success publishes
+rc=0 ledger=yes record=none
+== S2 killed worker: bounded, reaped, counted
+attempt 1 rc=0 elapsed=7s leftovers=0 record=none
+attempt 2 rc=0 elapsed=5s leftovers=0 record=1
+Terminated: 15
+attempt 3 rc=0 elapsed=5s leftovers=0 record=2
+after success: record=none
+== S3 concurrent timeouts count both
+Terminated: 15
+round 1 misses=2 elapsed=7s leftovers=0
+round 2 misses=2 elapsed=5s leftovers=0
+round 3 misses=2 elapsed=8s leftovers=0
+round 4 misses=2 elapsed=7s leftovers=0
+round 5 misses=2 elapsed=5s leftovers=0
+Terminated: 15
+round 6 misses=2 elapsed=6s leftovers=0
+round 7 misses=2 elapsed=7s leftovers=0
+Terminated: 15
+round 8 misses=2 elapsed=6s leftovers=0
+concurrent rounds counting both: 8/8
+== S4 superseded miss leaves record clear
+Terminated: 15
+record=none
+== S5 reap stalls on a hung rm: caller still bounded
+rc=0 elapsed=13s (bound: 3s worker + 5s reap)

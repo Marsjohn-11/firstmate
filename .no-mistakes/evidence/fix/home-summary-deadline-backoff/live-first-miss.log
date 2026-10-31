@@ -1,0 +1,8 @@
+round 1 gap=0s ledger_mtime-attempt_start=0s record=none
+round 2 gap=0s ledger_mtime-attempt_start=0s record=none
+round 3 gap=0s ledger_mtime-attempt_start=0s record=none
+round 4 gap=0s ledger_mtime-attempt_start=-1s record=1
+round 1 gap=2s ledger_mtime-attempt_start=-3s record=1
+round 2 gap=2s ledger_mtime-attempt_start=-2s record=1
+round 3 gap=2s ledger_mtime-attempt_start=-2s record=1
+round 4 gap=2s ledger_mtime-attempt_start=-3s record=1
