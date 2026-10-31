@@ -4280,6 +4280,31 @@ test_procevent_reannounced_result_surfaces_under_its_own_headline_lap_after_lap(
   pass "a re-announced process-event row surfaces under its own headline, lap after lap"
 }
 
+# A marker written before markers recorded queue sequences is empty. The key it
+# names must surface once more under its own headline, and the marker must then
+# record that row's sequence so the still-queued row is left to the drain.
+test_procevent_legacy_empty_marker_surfaces_once_and_records_sequence() {
+  local dir state out marker seq recorded
+  dir=$(make_case procevent-legacy-marker); state="$dir/state"; out="$dir/watch.out"
+  marker="$state/.seen-procevent-$(printf '%s' "procevent:legacy-src:3" | LC_ALL=C od -An -tx1 | tr -d ' \n')"
+  : > "$marker"
+  append_wake "$state" check "procevent:legacy-src:3" "check: procevent remote-reply legacy-src 3"
+  seq=$(awk -F '\t' '$4 == "procevent:legacy-src:3" { print $2 }' "$state/.wake-queue")
+  [ -n "$seq" ] || fail "fixture: the legacy-marker row was not queued"
+  surface_once "$dir" "$out" || fail "a key with an empty legacy marker was not surfaced: $(cat "$out")"
+  grep -F "check: process-event result captured: procevent:legacy-src:3" "$out" >/dev/null \
+    || fail "a key with an empty legacy marker did not surface under its own headline: $(cat "$out")"
+  recorded=$(head -n 1 "$marker")
+  [ "$recorded" = "$seq" ] || fail "the legacy marker recorded '$recorded', not the surfaced row's sequence $seq"
+
+  : > "$out"
+  surface_once "$dir" "$out" || fail "the still-queued row was not left to the drain: $(cat "$out")"
+  ! grep -F "process-event result captured" "$out" >/dev/null \
+    || fail "an upgraded marker re-announced its still-queued row: $(cat "$out")"
+  FM_STATE_OVERRIDE="$state" "$DRAIN" >/dev/null 2>&1 || fail "legacy marker fixture drain failed"
+  pass "an empty legacy marker surfaces its key once and then records the row's sequence"
+}
+
 test_procevent_marker_keys_are_injective() {
   local dir state out pid marker_count
   dir=$(make_case procevent-marker-identity); state="$dir/state"; out="$dir/watch.out"
@@ -5046,6 +5071,7 @@ fm_test_run \
   test_procevent_captured_result_surfaces_proactively \
   test_procevent_unacknowledged_result_redrains_until_handled \
   test_procevent_reannounced_result_surfaces_under_its_own_headline_lap_after_lap \
+  test_procevent_legacy_empty_marker_surfaces_once_and_records_sequence \
   test_procevent_marker_keys_are_injective \
   test_procevent_headlines_classify_queue_keys \
   test_procevent_launch_failed_episodes_are_each_delivered \
