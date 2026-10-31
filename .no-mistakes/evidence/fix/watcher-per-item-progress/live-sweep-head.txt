@@ -1,0 +1,5 @@
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - tombstone cleanup respects a live reaper and recovers a recycled reaper pid
+SWEEP_SPAN=34s WORST_BEACON_AGE=5s GRACE=12s CHECK_RUNS=26 HEALTHY_THROUGHOUT=yes
+ok - a watcher stays beacon-fresh and healthy throughout a sweep longer than the stale grace
+rc=0

@@ -1,0 +1,4 @@
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - tombstone cleanup respects a live reaper and recovers a recycled reaper pid
+not ok - beacon went quiet for 44s while the 34s sweep was still running (grace 12s)
+rc=1

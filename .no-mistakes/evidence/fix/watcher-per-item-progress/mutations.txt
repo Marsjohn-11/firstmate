@@ -1,0 +1,6 @@
+ok - the cycle-turnover marker is touched exactly once per cycle and stays distinct from the liveness beacon (3 turnovers, 33 beats, 3 cycles)
+not ok - the signal scan reported 0 times over three absorbed logs; it must report once per log
+mutA rc=1
+ok - the cycle-turnover marker is touched exactly once per cycle and stays distinct from the liveness beacon (3 turnovers, 33 beats, 3 cycles)
+not ok - the signal scan reported 2 times over four logs, two of which exit the body early; it must report once per log
+mutB rc=1

@@ -1,0 +1,1 @@
+ok - the pending-reply tick reports progress once per selected record, including records that leave the loop early

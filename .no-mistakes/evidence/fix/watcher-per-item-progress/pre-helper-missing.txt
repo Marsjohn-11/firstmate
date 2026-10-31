@@ -1,0 +1,4 @@
+ok - the cycle-turnover marker is touched exactly once per cycle and stays distinct from the liveness beacon (3 turnovers, 33 beats, 3 cycles)
+tests/fm-watch-triage.test.sh: line 4818: count_beats: command not found
+tests/fm-watch-triage.test.sh: line 4819: [: : integer expression expected
+not ok - the signal scan reported  times over three absorbed logs; it must report once per log
