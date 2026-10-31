@@ -1,0 +1,2 @@
+old: 200 identity+size reads in 52s
+new: 200 identity+size reads in 22s

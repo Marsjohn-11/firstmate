@@ -4,7 +4,7 @@ ok - an explicit resolved [key=X] closes the keyed decision
 ok - a later unrelated terminal line never clears an open decision
 ok - a reserved decision key can only be opened or closed by its owning library
 ok - no open decisions across the fleet prints nothing
-WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 28617.1791604887.UH3XBK
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 48719.1793421900.UfGq47
 ok - the open-decision section is fleet-wide, not scoped to this drain's own queued records
 ok - a buried open decision surfaces even when the wake queue itself is empty
 ok - the fleet-wide decision scan does not follow status symlinks
