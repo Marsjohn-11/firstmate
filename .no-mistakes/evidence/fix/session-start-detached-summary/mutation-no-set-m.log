@@ -1,0 +1,18 @@
+not ok - the summary refresh never reached its stalled validation:  
+================================================================================
+SESSION START - /private/var/folders/tv/b4_jb7290610qhwsd01ngyhr0000gq/T/fm-session-start-tests.EcC5rV/truncated-home-summary/home
+================================================================================
+
+LOCK
+--------------------------------------------------------------------------------
+
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  STARTUP TRUNCATED - SESSION START HIT ITS 3s RUNTIME BOUND
+●  It stopped during the "lock" stage, so everything above is COMPLETE
+●  only up to that point.
+●  RECONCILE these stages before acting on anything they would have shown:
+●    lock role bootstrap wake-queue supervision-instructions read-once fleet-state network-checks context next-step
+●  Rerun bin/fm-session-start.sh now to finish taking the helm. If it truncates
+●  again, raise FM_SESSION_START_TIMEOUT and report the slow stage - a stage that
+●  cannot finish inside the bound is a fleet problem, not a reporting detail.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

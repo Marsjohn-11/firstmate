@@ -1,0 +1,6 @@
+after 1 polls:
+{
+  "schema": "fm-secondmate-home-summary.v1",
+  "home": "/var/folders/tv/b4_jb7290610qhwsd01ngyhr0000gq/T//fm-lab.SHUQWQ/home",
+  "generated_epoch": 1793431302
+}

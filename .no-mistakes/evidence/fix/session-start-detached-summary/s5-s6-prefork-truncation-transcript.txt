@@ -1,0 +1,12 @@
+[s5-real-prefork-stall]
+digest exit=0 elapsed=41s
+truncation banner: STARTUP TRUNCATED - SESSION START HIT ITS 40s RUNTIME BOUND
+refresh stalled pre-fork before truncation: yes
+stalled refresh still alive after truncation: 1 shim process(es)
+ledger within 15s of release: PUBLISHED
+[s6-mutant-prefork-stall]
+digest exit=0 elapsed=41s
+truncation banner: STARTUP TRUNCATED - SESSION START HIT ITS 40s RUNTIME BOUND
+refresh stalled pre-fork before truncation: yes
+stalled refresh still alive after truncation: 0 shim process(es)
+ledger within 15s of release: ABSENT

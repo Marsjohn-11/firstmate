@@ -1,0 +1,5 @@
+ok - context digest distinguishes ABSENT, empty-but-present, and populated files
+ok - session start: a slow summary refresh delays the ledger, not the digest
+ok - session start: a truncated digest does not cut the detached summary refresh short
+ok - a hung per-task endpoint read hits its configured bound, reports the task, and leaves nothing stuck
+# focused: all assertions passed

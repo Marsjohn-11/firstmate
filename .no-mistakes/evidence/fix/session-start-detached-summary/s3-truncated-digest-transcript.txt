@@ -1,0 +1,6 @@
+digest exit=0 elapsed=34s
+truncation banner: STARTUP TRUNCATED - SESSION START HIT ITS 25s RUNTIME BOUND
+stages left to reconcile: bootstrap wake-queue supervision-instructions read-once fleet-state network-checks context next-step
+refresh stalled marker present: yes
+ledger present while stalled: no
+ledger after release (0s): {"schema":"fm-secondmate-home-summary.v1","generated_epoch":1793431464}

@@ -1,0 +1,6 @@
+digest exit=0 elapsed=15s
+refresh stalled marker present: yes
+ledger present while stalled: no
+refresh process alive: 0
+ledger still absent 3s later: yes
+ledger published 1s after release: {"schema":"fm-secondmate-home-summary.v1","generated_epoch":1793431326}

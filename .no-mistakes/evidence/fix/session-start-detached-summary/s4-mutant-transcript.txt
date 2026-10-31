@@ -1,0 +1,5 @@
+[mutant: set -m removed]
+digest exit=0 elapsed=26s
+truncation banner: STARTUP TRUNCATED - SESSION START HIT ITS 25s RUNTIME BOUND
+refresh stalled marker present: yes
+ledger 15s after release: PUBLISHED
