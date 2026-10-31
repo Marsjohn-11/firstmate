@@ -1,0 +1,45 @@
+
+===== Scenario A: pre-upgrade empty marker for procevent:legacy-src:3 =====
+marker .seen-procevent-70726f636576656e743a6c65676163792d7372633a33 content: []
+queue rows (seq kind key):
+  1 check procevent:legacy-src:3
+watcher exit=0 output:
+  | check: process-event result captured: procevent:legacy-src:3
+marker .seen-procevent-70726f636576656e743a6c65676163792d7372633a33 content: [1]
+
+===== Scenario A2: second watcher, same still-queued row =====
+watcher exit=0 output:
+  | check: rearm-resurface
+
+===== Scenario B: first delivery of procevent:re-src:7 =====
+queue rows (seq kind key):
+  1 check procevent:re-src:7
+watcher exit=0 output:
+  | check: process-event result captured: procevent:re-src:7
+marker .seen-procevent-70726f636576656e743a72652d7372633a37 content: [1]
+drained + acknowledged
+
+===== Scenario B lap 1: reconcile re-announces procevent:re-src:7 on a fresh row =====
+queue rows (seq kind key):
+  2 check procevent:re-src:7
+watcher exit=0 output:
+  | check: process-event result captured: procevent:re-src:7
+marker .seen-procevent-70726f636576656e743a72652d7372633a37 content: [2]
+drained + acknowledged
+
+===== Scenario B lap 2: reconcile re-announces procevent:re-src:7 on a fresh row =====
+queue rows (seq kind key):
+  3 check procevent:re-src:7
+watcher exit=0 output:
+  | check: process-event result captured: procevent:re-src:7
+marker .seen-procevent-70726f636576656e743a72652d7372633a37 content: [3]
+drained + acknowledged
+
+===== Scenario C (adversarial): surfaced stranded key re-queued on a newer row =====
+first watcher exit=0 output:
+  | check: process-event source stranded: procevent:st-src:stranded:1-2
+drained + acknowledged
+queue rows (seq kind key):
+  2 check procevent:st-src:stranded:1-2
+second watcher exit=0 output:
+  | check: rearm-resurface

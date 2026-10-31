@@ -1,0 +1,9 @@
+1..7
+ok - a captured process-event result wakes a healthy watcher proactively, with no manual drain
+ok - an unacknowledged process-event result re-drains until handling is acknowledged
+ok - a re-announced process-event row surfaces under its own headline, lap after lap
+ok - an empty legacy marker surfaces its key once and then records the row's sequence
+ok - complete process-event queue keys map to distinct seen markers
+ok - process-event queue keys surface under their own headlines
+ok - every launch-failure episode is delivered under the failed-to-start headline
+FM_TEST_COMPLETE
