@@ -1,0 +1,9 @@
+ok - real named lab reproduced the exact restored one-tab one-pane childless no-agent shell shape
+--- herdr calls made by cleanup with .meta present: 0
+ok - live: journal with task metadata skips all Herdr discovery and leaves the projection intact
+--- herdr calls with one metadata-less journal:
+workspace list --session fm-lab-meta-skip-17606-19302
+session list --json --session fm-lab-meta-skip-17606-19302
+ok - live: one metadata-less journal re-enables discovery without touching the meta-backed projection
+ok - live control: once task metadata is gone the same projection is closed and its journal retired
+exit=0
