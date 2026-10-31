@@ -831,22 +831,11 @@ EOF
   pass "context digest distinguishes ABSENT, empty-but-present, and populated files"
 }
 
-# A slow summary producer must not hold the digest. Stall the refresh's ledger
-# validation until the test releases it, under a deadline far longer than the
-# digest is allowed to take, and require the digest to return while that
-# refresh is still stalled - then require the refresh it left running to
-# publish once released, so the detachment never drops the publication.
-test_slow_home_summary_never_blocks_the_digest() {
-  local rec root home fakebin stallbin stalled release out started elapsed i
-  rec=$(new_world slow-home-summary)
-  IFS='|' read -r root home fakebin <<EOF
-$rec
-EOF
-  make_fake_toolchain "$fakebin"
-  make_fake_ps_claude "$fakebin"
-  stallbin="${root%/root}/stallbin"
-  stalled="${root%/root}/summary-stalled"
-  release="${root%/root}/summary-release"
+# make_summary_stall_jq <dir>: a jq that holds the summary refresh's ledger
+# validation until $FM_TEST_SUMMARY_RELEASE exists, after touching
+# $FM_TEST_SUMMARY_STALLED.
+make_summary_stall_jq() {
+  local stallbin=$1
   mkdir -p "$stallbin"
   cat > "$stallbin/jq" <<'SH'
 #!/usr/bin/env bash
@@ -865,6 +854,25 @@ done
 exec "$FM_TEST_REAL_JQ" "$@"
 SH
   chmod +x "$stallbin/jq"
+}
+
+# A slow summary producer must not hold the digest. Stall the refresh's ledger
+# validation until the test releases it, under a deadline far longer than the
+# digest is allowed to take, and require the digest to return while that
+# refresh is still stalled - then require the refresh it left running to
+# publish once released, so the detachment never drops the publication.
+test_slow_home_summary_never_blocks_the_digest() {
+  local rec root home fakebin stallbin stalled release out started elapsed i
+  rec=$(new_world slow-home-summary)
+  IFS='|' read -r root home fakebin <<EOF
+$rec
+EOF
+  make_fake_toolchain "$fakebin"
+  make_fake_ps_claude "$fakebin"
+  stallbin="${root%/root}/stallbin"
+  stalled="${root%/root}/summary-stalled"
+  release="${root%/root}/summary-release"
+  make_summary_stall_jq "$stallbin"
 
   started=$(date +%s)
   out=$(FM_TEST_REAL_JQ="$(command -v jq)" FM_TEST_SUMMARY_STALLED="$stalled" \
@@ -888,6 +896,54 @@ SH
   wait_for_home_summary "$home" 30 \
     || fail "the detached summary refresh did not publish once released: $(cat "$home/state/.home-summary-refresh.log" 2>/dev/null)"
   pass "session start: a slow summary refresh delays the ledger, not the digest"
+}
+
+# A truncated digest's group kill must not take the detached summary refresh
+# with it. Stall the refresh's ledger validation, hang every git call made after
+# that stall so the digest runs past its own runtime bound, and release the
+# stall only after the truncation. The refresh must still publish.
+test_home_summary_survives_a_truncated_digest() {
+  local rec root home fakebin stallbin stalled release out status=0 i
+  rec=$(new_world truncated-home-summary)
+  IFS='|' read -r root home fakebin <<EOF
+$rec
+EOF
+  make_fake_toolchain "$fakebin"
+  make_fake_ps_claude "$fakebin"
+  stallbin="${root%/root}/stallbin"
+  stalled="${root%/root}/summary-stalled"
+  release="${root%/root}/summary-release"
+  make_summary_stall_jq "$stallbin"
+  cat > "$stallbin/git" <<'SH'
+#!/usr/bin/env bash
+if [ -e "$FM_TEST_SUMMARY_STALLED" ]; then
+  trap '' TERM
+  sleep 600
+fi
+exec "$FM_TEST_REAL_GIT" "$@"
+SH
+  chmod +x "$stallbin/git"
+
+  out=$(FM_TEST_REAL_JQ="$(command -v jq)" FM_TEST_REAL_GIT="$(command -v git)" \
+    FM_TEST_SUMMARY_STALLED="$stalled" FM_TEST_SUMMARY_RELEASE="$release" FM_HOME_SUMMARY_TIMEOUT=90 \
+    FM_TIMEOUT_MECHANISM_OVERRIDE=bash FM_SESSION_START_TIMEOUT=3 FM_STARTUP_NETWORK_TIMEOUT=2 \
+    run_session_start "$home" "$root" "$stallbin:$fakebin:$BASE_PATH") || status=$?
+
+  expect_code 0 "$status" "a truncated session start must still exit 0"
+  assert_contains "$out" "STARTUP TRUNCATED - SESSION START HIT ITS" "the digest was not truncated"
+  i=0
+  while [ ! -e "$stalled" ] && [ "$i" -lt 300 ]; do
+    sleep 0.1
+    i=$((i + 1))
+  done
+  [ -e "$stalled" ] || fail "the summary refresh never reached its stalled validation: $(cat "$home/state/.home-summary-refresh.log" 2>/dev/null) $out"
+  [ ! -e "$home/state/home-summary.json" ] \
+    || fail "the summary published although its validation was still stalled"
+
+  : > "$release"
+  wait_for_home_summary "$home" 30 \
+    || fail "the truncated digest's group kill cut the summary refresh short: $(cat "$home/state/.home-summary-refresh.log" 2>/dev/null)"
+  pass "session start: a truncated digest does not cut the detached summary refresh short"
 }
 
 # --- lock refusal: read-only path --------------------------------------------
@@ -3185,6 +3241,7 @@ EOF
 
 test_context_digest_absent_empty_present
 test_slow_home_summary_never_blocks_the_digest
+test_home_summary_survives_a_truncated_digest
 test_lock_refusal_read_only_path
 test_lock_write_failure_read_only_path
 test_trace_context_effective_state_is_frozen_after_lock
