@@ -133,8 +133,9 @@
 #   meta's backend_detect= line.
 #   codex-app is not a known backend yet; docs/codex-app-backend.md owns that
 #   blocked backend contract. Default tmux spawns do not write backend= to meta;
-#   absent backend= means tmux. Orca, cmux, paseo, tern, and hc do not support
-#   --secondmate spawns.
+#   absent backend= means tmux. Orca, cmux, paseo, and tern do not support
+#   --secondmate spawns. An hc secondmate's terminal carries this home's
+#   identity labels and is shown in the secondmate home's own Herdr.app space.
 #   A rex crewmate or scout opens one tab in the Rex session the launching
 #   firstmate runs in when it runs directly inside Rex, otherwise in its home's
 #   own Rex session; a --secondmate launch opens its tab in that secondmate
@@ -2341,10 +2342,6 @@ if [ "$RELAUNCH" -eq 0 ]; then
   fi
   if [ "$BACKEND" = tern ] && [ "$KIND" = secondmate ]; then
     echo "error: backend=tern does not support --secondmate spawns yet" >&2
-    exit 1
-  fi
-  if [ "$BACKEND" = hc ] && [ "$KIND" = secondmate ]; then
-    echo "error: backend=hc does not support --secondmate spawns yet" >&2
     exit 1
   fi
   fm_backend_runtime_check "$BACKEND" || exit 1
