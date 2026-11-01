@@ -417,7 +417,33 @@ SH
   pass "hc: Herdr.app names a new task tab, and a space only while it holds just that tab"
 }
 
+test_name_sweep_names_existing_default_session_tasks() {
+  local out tag
+  setup_case name-sweep
+  tag=$(hometag_of)
+  mkdir -p "$HOMEDIR/state"
+  cat > "$FB/herdr-app" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$FAKE_HC_DIR/app-log"
+[ "${1:-}" = ls ] && printf '{"spaces":[{"id":"fm-%s","tabs":[{"id":"%s-fm-a1"},{"id":"%s-fm-a2"}]}]}\n' "$TAG" "$TAG" "$TAG"
+exit 0
+SH
+  chmod +x "$FB/herdr-app"
+  write_terminal "$D" t1 live fm-a1 "$tag" zsh /bin/zsh
+  jq --arg s "fm-$tag" --arg t "$tag-fm-a1" '.labels["herdr.space"] = $s | .labels["herdr.tab"] = $t' "$D/t1.json" > "$D/t1.tmp" && mv "$D/t1.tmp" "$D/t1.json"
+  printf 'window=default:t1\nendpoint_task_id=a1\nbackend=hc\nhc_session=default\nhc_terminal=t1\n' > "$HOMEDIR/state/a1.meta"
+  printf 'window=fmtest:t2\nendpoint_task_id=a2\nbackend=hc\nhc_session=fmtest\nhc_terminal=t2\n' > "$HOMEDIR/state/a2.meta"
+  out=$(TAG=$tag FAKE_HC_DIR=$D PATH="$FB:$PATH" FM_HC_BIN="$FB/hc" FM_HOME=$HOMEDIR FM_ROOT_OVERRIDE=$HOMEDIR \
+    bash "$FM_TEST_ROOT/bin/fm-hc-app-names.sh" --spaces 2>&1)
+  assert_contains "$out" "requested a1" "a default-session task is named"
+  assert_not_contains "$out" "a2" "a task on a session the app does not show is skipped"
+  assert_contains "$(cat "$D/app-log")" "do tab.rename --id $tag-fm-a1 --name a1" "the tab is named after the task"
+  assert_contains "$(cat "$D/app-log")" "do space.rename --id fm-$tag --name firstmate" "--spaces names a shared space too"
+  pass "hc: the name sweep names existing default-session task tabs from their own labels"
+}
+
 fm_test_run \
+  test_name_sweep_names_existing_default_session_tasks \
   test_app_names_a_new_tab_and_only_a_new_space \
   test_absence_proof_needs_the_recorded_core_or_a_finished_own_terminal \
   test_hc_is_spawn_capable_and_needs_app_signals \

@@ -365,9 +365,10 @@ fm_backend_hc_create_task() {  # <session> <window-label> <cwd>
 # answers `herdr-app do`, so anything else is a silent no-op; FM_HC_APP_NAMES=0
 # turns it off. It waits for the app to adopt the tab, names the tab after the
 # task, and names the space after the home only while this tab is its only
-# one, so a space the captain renamed later keeps its name. Never fails.
-fm_backend_hc_app_name() {  # <session> <space-id> <tab-id> <tab-name>
-  local session=$1 space=$2 tab=$3 name=$4 tries=${FM_HC_APP_NAME_TRIES:-60} ls tabs space_name
+# one, so a space the captain renamed later keeps its name; [space-too] names
+# the space regardless. Never fails.
+fm_backend_hc_app_name() {  # <session> <space-id> <tab-id> <tab-name> [space-too]
+  local session=$1 space=$2 tab=$3 name=$4 space_too=${5:-0} tries=${FM_HC_APP_NAME_TRIES:-60} ls tabs space_name
   [ "$session" = default ] && [ "${FM_HC_APP_NAMES:-1}" != 0 ] || return 0
   command -v herdr-app >/dev/null 2>&1 || return 0
   # fm-<prefix>-<hash> names the space after its home's prefix.
@@ -379,7 +380,9 @@ fm_backend_hc_app_name() {  # <session> <space-id> <tab-id> <tab-name>
     case " $tabs " in
       *" $tab "*)
         herdr-app "do" tab.rename --id "$tab" --name "$name" >/dev/null 2>&1 || true
-        [ "$tabs" != "$tab" ] || herdr-app "do" space.rename --id "$space" --name "$space_name" >/dev/null 2>&1 || true
+        if [ "$tabs" = "$tab" ] || [ "$space_too" = 1 ]; then
+          herdr-app "do" space.rename --id "$space" --name "$space_name" >/dev/null 2>&1 || true
+        fi
         return 0
         ;;
     esac

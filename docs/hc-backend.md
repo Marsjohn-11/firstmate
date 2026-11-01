@@ -76,6 +76,7 @@ A secondmate's terminal keeps the launching home's `firstmate.home` label, so th
 
 On the `default` session, which Herdr.app shows, the spawn also asks an open window in the background to name the tab after the task id, and to name the space after its home (`firstmate`, `2ndmate-<id>`) while that tab is the space's only one.
 Without a window this does nothing, and `FM_HC_APP_NAMES=0` turns it off.
+`bin/fm-hc-app-names.sh` names the tabs of task terminals that already run, and with `--spaces` their spaces too.
 The `herdr.space`/`herdr.tab` label contract above is the app's documented bridge (its window projects labeled terminals as spaces/tabs and keeps unlabeled ones hidden), verified against a real window: [`verification/runtime-backends.md`](verification/runtime-backends.md#hc) records the live exercise.
 
 ```text

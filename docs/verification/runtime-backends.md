@@ -3655,6 +3655,7 @@ Herdr 1 calls ran on a named `fm-lab-` session provisioned and torn down through
 | `claude` in an hc terminal, with and without `--settings '{"env":{"CLAUDE_CODE_DISABLE_TERMINAL_TITLE":"0"}}'`, where the user's settings set that variable to `1` | Without the override `status` stayed `null` and `reported` `false`; with it `hc get` reported `{"app":"claude-code","state":"idle"}`, and the same with an empty value. |
 | `fm-control.sh mv1 relaunch --backend hc` of a live Claude in a Herdr pane, with transcript saving on | The old agent's session id, read from its `sessions/<pid>.json`, was the session the hc replacement ran; `hc get` reported `{"app":"claude-code","state":"done"}`. |
 | `fm-control.sh mv1 relaunch --backend herdr` of that hc task | `backend=herdr` on a new pane in this seat's Herdr lab session, which read `alive`; the hc terminal answered not-found and the worktree status was unchanged. |
+| `bin/fm-hc-app-names.sh --spaces` over a task terminal created unnamed | Herdr.app showed `tmp / 1` before and `firstmate / sweep-probe` after. |
 
 The commands are in the task evidence; `tests/fm-control-relaunch.test.sh`, `tests/fm-backend-hc.test.sh`, and `tests/fm-secondmate-liveness.test.sh` pin the logic portably.
 
