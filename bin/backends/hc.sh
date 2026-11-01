@@ -32,7 +32,10 @@
 # herdr.space=<id> and herdr.tab=<id> labels, and an unknown id becomes a new
 # space or tab. create_task sets herdr.space=FM_HC_SPACE (default
 # fm-<hometag>) and herdr.tab=<scoped label>, so a home's tasks group in one
-# space with one tab each. Naming the space needs the app window and is not done.
+# space with one tab each. The app names an unknown space after its first
+# terminal's folder and a tab by its position, so create_task also asks the
+# open window, in the background, to name the tab after the task and a space
+# it just created after the home (fm_backend_hc_app_name).
 #
 # Measured limits on hc 0.1.13 and 0.1.14 (docs/hc-backend.md "Limits"):
 #   - `hc send` always presses Enter after pasting. There is no paste without
@@ -352,9 +355,39 @@ fm_backend_hc_create_task() {  # <session> <window-label> <cwd>
     || { echo "error: hc run failed for $label: $out" >&2; return 1; }
   address=$(printf '%s' "$out" | jq -r '.address // empty' 2>/dev/null)
   fm_backend_hc_address_valid "$address" || { echo "error: hc run did not return a terminal address for $label (got: $out)" >&2; return 1; }
+  fm_backend_hc_app_name "$session" "${FM_HC_SPACE:-fm-$home}" "$scoped" "${label#fm-}" \
+    </dev/null >/dev/null 2>&1 &
   printf '%s\n' "$address"
 }
 
+# fm_backend_hc_app_name: best-effort Herdr.app names for a new task terminal.
+# Only the window's own session (`default`) is shown, and only an open window
+# answers `herdr-app do`, so anything else is a silent no-op; FM_HC_APP_NAMES=0
+# turns it off. It waits for the app to adopt the tab, names the tab after the
+# task, and names the space after the home only while this tab is its only
+# one, so a space the captain renamed later keeps its name. Never fails.
+fm_backend_hc_app_name() {  # <session> <space-id> <tab-id> <tab-name>
+  local session=$1 space=$2 tab=$3 name=$4 tries=${FM_HC_APP_NAME_TRIES:-60} ls tabs space_name
+  [ "$session" = default ] && [ "${FM_HC_APP_NAMES:-1}" != 0 ] || return 0
+  command -v herdr-app >/dev/null 2>&1 || return 0
+  # fm-<prefix>-<hash> names the space after its home's prefix.
+  space_name=${space#fm-}
+  space_name=${space_name%-*}
+  while [ "$tries" -gt 0 ]; do
+    ls=$(herdr-app ls 2>/dev/null) || return 0
+    tabs=$(printf '%s' "$ls" | jq -r --arg s "$space" '.spaces[]? | select(.id == $s) | [.tabs[]?.id] | join(" ")' 2>/dev/null)
+    case " $tabs " in
+      *" $tab "*)
+        herdr-app "do" tab.rename --id "$tab" --name "$name" >/dev/null 2>&1 || true
+        [ "$tabs" != "$tab" ] || herdr-app "do" space.rename --id "$space" --name "$space_name" >/dev/null 2>&1 || true
+        return 0
+        ;;
+    esac
+    tries=$((tries - 1))
+    sleep 0.5
+  done
+  return 0
+}
 
 # fm_backend_hc_capture: the screen plus <lines> of history, the same window
 # tmux's `capture-pane -S -<lines>` returns.

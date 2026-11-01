@@ -389,7 +389,36 @@ test_absence_proof_needs_the_recorded_core_or_a_finished_own_terminal() {
   pass "hc: absence is proven only on the recorded core or by the task's own finished terminal"
 }
 
+test_app_names_a_new_tab_and_only_a_new_space() {
+  local out
+  setup_case app-name
+  cat > "$FB/herdr-app" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$FAKE_HC_DIR/app-log"
+[ "${1:-}" = ls ] && cat "$FAKE_HC_DIR/app-ls.json"
+exit 0
+SH
+  chmod +x "$FB/herdr-app"
+  printf '{"spaces":[{"id":"fm-firstmate-1234abcd","tabs":[{"id":"tab-a"}]}]}\n' > "$D/app-ls.json"
+  hc_shell 'FM_HC_APP_NAME_TRIES=2 fm_backend_hc_app_name default fm-firstmate-1234abcd tab-a task-a'
+  out=$(cat "$D/app-log")
+  assert_contains "$out" "do tab.rename --id tab-a --name task-a" "the new tab is named after its task"
+  assert_contains "$out" "do space.rename --id fm-firstmate-1234abcd --name firstmate" "a space holding only the new tab is named after its home"
+  : > "$D/app-log"
+  printf '{"spaces":[{"id":"fm-firstmate-1234abcd","tabs":[{"id":"tab-0"},{"id":"tab-b"}]}]}\n' > "$D/app-ls.json"
+  hc_shell 'FM_HC_APP_NAME_TRIES=2 fm_backend_hc_app_name default fm-firstmate-1234abcd tab-b task-b'
+  out=$(cat "$D/app-log")
+  assert_contains "$out" "do tab.rename --id tab-b --name task-b" "a later tab is named too"
+  assert_not_contains "$out" "space.rename" "an existing space keeps the name it has"
+  : > "$D/app-log"
+  hc_shell 'FM_HC_APP_NAME_TRIES=2 fm_backend_hc_app_name fmtest fm-firstmate-1234abcd tab-b task-b'
+  hc_shell 'FM_HC_APP_NAMES=0 FM_HC_APP_NAME_TRIES=2 fm_backend_hc_app_name default fm-firstmate-1234abcd tab-b task-b'
+  [ ! -s "$D/app-log" ] || fail "a session the app does not show, or an opt-out, must not reach the app: $(cat "$D/app-log")"
+  pass "hc: Herdr.app names a new task tab, and a space only while it holds just that tab"
+}
+
 fm_test_run \
+  test_app_names_a_new_tab_and_only_a_new_space \
   test_absence_proof_needs_the_recorded_core_or_a_finished_own_terminal \
   test_hc_is_spawn_capable_and_needs_app_signals \
   test_required_tool_check_uses_the_adapter_resolver \

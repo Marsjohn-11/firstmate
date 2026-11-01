@@ -74,6 +74,10 @@ The terminal carries these labels:
 
 A secondmate's terminal keeps the launching home's `firstmate.home` label, so that home can probe, steer, and close it, but its `herdr.space` is the secondmate home's own `fm-<hometag>`, the space its own workers use.
 
+On the `default` session, which Herdr.app shows, the spawn also asks an open window in the background to name the tab after the task id, and to name the space after its home (`firstmate`, `2ndmate-<id>`) while that tab is the space's only one.
+Without a window this does nothing, and `FM_HC_APP_NAMES=0` turns it off.
+The `herdr.space`/`herdr.tab` label contract above is the app's documented bridge (its window projects labeled terminals as spaces/tabs and keeps unlabeled ones hidden), verified against a real window: [`verification/runtime-backends.md`](verification/runtime-backends.md#hc) records the live exercise.
+
 ```text
 backend=hc
 backend_detect=app-terminal
@@ -127,8 +131,7 @@ A local secondmate whose terminal dies is respawned on hc by the liveness sweep,
 - Right after a terminal starts, `hc get` can report no foreground process yet, and agent state reads `unreadable` until the shell is up.
 - A remote secondmate still runs only on Herdr.
 - A worker inherits `HC_SESSION`, `HC_TERMINAL_ID`, `HC_TERMINAL_SOCKET`, and `HC_SCOPE` from its terminal, and the `config/launch-env-allowlist` floor keeps them; whether a real harness then reports native status under Firstmate's launch is not verified.
-- Naming a Herdr.app space needs the app window and is not done.
-  The `herdr.space`/`herdr.tab` label contract above is the app's documented bridge (its window projects labeled terminals as spaces/tabs and keeps unlabeled ones hidden), verified against a real window: [`verification/runtime-backends.md`](verification/runtime-backends.md#hc) records the live exercise.
+- No harness reports OSC 7501 status under Firstmate's launch, so Herdr.app lists no agents and busy state reads `unknown`.
 - hc has no event stream this adapter consumes; supervision polls like tmux.
 
 ## Tests
