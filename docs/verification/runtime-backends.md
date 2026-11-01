@@ -3653,6 +3653,7 @@ Herdr 1 calls ran on a named `fm-lab-` session provisioned and torn down through
 | `herdr-app do tab.rename --id <unknown>` | Exit 0 with `{"error":"no tab ..."}`, so a caller reads `.ok`. |
 | `hc run --on <machine> --label herdr.space=<new id> --label herdr.tab=<new id>` (remote core `0.1.15`) | Herdr.app showed a new space `<machine>/<id>` on that machine with that tab; `tab.rename` and `space.rename` with the `<machine>/` prefix applied; `hc kill` plus `hc rm` removed the space. |
 | `claude` in an hc terminal, with and without `--settings '{"env":{"CLAUDE_CODE_DISABLE_TERMINAL_TITLE":"0"}}'`, where the user's settings set that variable to `1` | Without the override `status` stayed `null` and `reported` `false`; with it `hc get` reported `{"app":"claude-code","state":"idle"}`, and the same with an empty value. |
+| `fm-control.sh mv1 relaunch --backend hc` of a live Claude in a Herdr pane, with transcript saving on | The old agent's session id, read from its `sessions/<pid>.json`, was the session the hc replacement ran; `hc get` reported `{"app":"claude-code","state":"done"}`. |
 
 The commands are in the task evidence; `tests/fm-control-relaunch.test.sh`, `tests/fm-backend-hc.test.sh`, and `tests/fm-secondmate-liveness.test.sh` pin the logic portably.
 
