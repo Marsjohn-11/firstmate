@@ -3326,6 +3326,24 @@ test_secondmate_spawns_fresh_on_hc() {
   pass "fm-spawn --secondmate --backend hc: a local secondmate spawns in its own Herdr.app space"
 }
 
+test_control_move_without_a_session_record_starts_fresh() {
+  local dir out rc=0 launched
+  dir=$(new_case control-move-fresh rl97)
+  add_ship_task "$dir" rl97 claude
+  make_hc_stub "$dir"
+  out=$(run_control_hc "$dir" rl97 relaunch --backend hc --note "moved") || rc=$?
+  expect_code 0 "$rc" "the move should succeed"$'\n'"$out"
+  launched=$(cat "$dir/fake/hc/launched-command")
+  assert_not_contains "$launched" "--resume" "with no live session record the replacement starts fresh"
+  assert_contains "$launched" '"env":{"CLAUDE_CODE_DISABLE_TERMINAL_TITLE":"0"}' \
+    "an hc Claude worker must keep its program status on"
+  rc=0
+  out=$(run_control "$dir" rl97 relaunch --note "in place") || rc=$?
+  assert_not_contains "$(cat "$dir/fake/literal")" "CLAUDE_CODE_DISABLE_TERMINAL_TITLE" \
+    "a non-hc launch must leave the user's terminal-title setting alone"
+  pass "fm-control relaunch --backend hc: without a live session record the replacement starts fresh"
+}
+
 test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint
 test_relaunch_refuses_before_exit_when_the_composer_holds_pending_text
 test_relaunch_refuses_before_exit_when_the_composer_state_is_unproven
@@ -3420,3 +3438,4 @@ test_control_relaunch_moves_a_running_task_to_hc
 test_control_move_refuses_before_stop_when_hc_is_unreachable
 test_control_relaunch_moves_a_secondmate_into_its_own_hc_space
 test_secondmate_spawns_fresh_on_hc
+test_control_move_without_a_session_record_starts_fresh

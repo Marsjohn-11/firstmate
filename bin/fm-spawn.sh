@@ -2878,6 +2878,11 @@ launch_template() {
   # busy hooks share that value, in state/<id>.claude-settings.json, and the
   # file also carries feedbackDrafts and attribution so those session keys
   # stay in force.
+  # On hc, both settings forms also set CLAUDE_CODE_DISABLE_TERMINAL_TITLE=0
+  # (claude_program_status_settings): Claude reports its program status
+  # (OSC 7501), which hc's busy state and Herdr.app's agent list read, only
+  # when that variable is unset or false, and a user-scope settings env that
+  # sets it would otherwise silence every hc worker.
   # __CLAUDEPERMFLAG__ is the permission flag config/claude-permission-mode
   # selects (header above): --dangerously-skip-permissions by default, or
   # --permission-mode auto when configured.
@@ -3618,6 +3623,14 @@ muse_credential_present() {
 # agent, a stale one, a malformed reference - degrades to that same
 # fresh-session launch rather than refusing, because nothing here is a safety
 # property; it preserves a display and supervision signal.
+# claude_program_status_settings: the Claude settings fragment that keeps
+# program status (OSC 7501) on for an hc worker, or nothing on any other
+# backend (the launch template's settings comment owns why).
+claude_program_status_settings() {
+  [ "$BACKEND" = hc ] || return 0
+  printf '%s' '"env":{"CLAUDE_CODE_DISABLE_TERMINAL_TITLE":"0"}'
+}
+
 relaunch_resume_args() {  # <harness> <backend> <target>
   local harness=${1-} backend=${2-} target=${3-} identity agent ref flag
   [ "$backend" = herdr ] || return 0
@@ -6480,6 +6493,8 @@ BUSY_GEN=
       if [ "$KEEP_AI_TRAILERS" != 1 ]; then
         session_keys='"feedbackDrafts":"off","attribution":{"commit":"","pr":"","sessionUrl":false},'
       fi
+      program_status=$(claude_program_status_settings)
+      [ -z "$program_status" ] || session_keys="$session_keys$program_status,"
       printf '{%s%s}\n' "$session_keys" "$hooks_json" >"$STATE_REAL/$ID.claude-settings.json"
     else
       mkdir -p "$WT/.claude"
@@ -7438,7 +7453,8 @@ case "$LAUNCH" in
   if [ "$KIND" = secondmate ]; then
     LAUNCH=${LAUNCH//__CLAUDESETTINGS__/$(shell_quote "$STATE_REAL/$ID.claude-settings.json")}
   else
-    claude_settings="'{\"feedbackDrafts\":\"off\"__CLAUDEATTRIBUTION__}'"
+    program_status=$(claude_program_status_settings)
+    claude_settings="'{\"feedbackDrafts\":\"off\"__CLAUDEATTRIBUTION__${program_status:+,$program_status}}'"
     LAUNCH=${LAUNCH//__CLAUDESETTINGS__/$claude_settings}
   fi
   ;;

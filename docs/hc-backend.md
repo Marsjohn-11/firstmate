@@ -131,7 +131,8 @@ A local secondmate whose terminal dies is respawned on hc by the liveness sweep,
 - Right after a terminal starts, `hc get` can report no foreground process yet, and agent state reads `unreadable` until the shell is up.
 - A remote secondmate still runs only on Herdr.
 - A worker inherits `HC_SESSION`, `HC_TERMINAL_ID`, `HC_TERMINAL_SOCKET`, and `HC_SCOPE` from its terminal, and the `config/launch-env-allowlist` floor keeps them; whether a real harness then reports native status under Firstmate's launch is not verified.
-- No harness reports OSC 7501 status under Firstmate's launch, so Herdr.app lists no agents and busy state reads `unknown`.
+- Busy state and Herdr.app's agent list come from the program status a harness reports (OSC 7501); a harness that reports none reads `unknown`.
+  Claude reports it only when `CLAUDE_CODE_DISABLE_TERMINAL_TITLE` is unset or false, so every hc Claude launch sets it to `0` in its own `--settings` env, which also turns Claude's terminal titles back on there.
 - hc has no event stream this adapter consumes; supervision polls like tmux.
 
 ## Tests

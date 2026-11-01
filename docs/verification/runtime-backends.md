@@ -3645,13 +3645,14 @@ Herdr 1 calls ran on a named `fm-lab-` session provisioned and torn down through
 | Step | Result |
 | --- | --- |
 | `fm-control.sh mv1 relaunch --backend hc --note ...` on a ship with a live Claude in a Herdr pane | `relaunched mv1 harness=claude from=claude ... backend=hc endpoint=fm-lab-hc-84101:t1`; the record carried `backend=hc`, `hc_core=<id>`, no `herdr_*` keys, and the same `worktree=`; `git status --porcelain` and `HEAD` were unchanged; the old Herdr pane read `pane_not_found`. |
-| `fm-control.sh mv1 exit` on hc | `stopped mv1 ... backend=hc`; `fm_backend_agent_state hc` then read `dead` (the login shell), with `foreground.name` `toolbox-exec` while Claude ran. |
+| `fm-control.sh mv1 exit` on hc | `stopped mv1 ... backend=hc`; `fm_backend_agent_state hc` then read `dead` (the login shell), with `foreground.name` naming the user's Claude launcher wrapper while Claude ran. |
 | `fm-control.sh mv1 relaunch --note ...` on hc | Adopted the same terminal `t1` and read `alive`. |
 | `fm-spawn.sh smlive <home> --secondmate --backend hc --harness claude` | Terminal labels `firstmate.home=<parent tag>`, `herdr.space=fm-2ndmate-smlive-<hash>`, cwd the secondmate home; the liveness probe read `alive`. |
 | `fm-control.sh smlive exit`, then `fm_secondmate_liveness_probe` and `fm_secondmate_liveness_relaunch` | Probe `relaunchable state=dead`; the respawn stayed `backend=hc` on a new terminal `t2` that read `alive`, and `t1` was removed. |
 | `fm_backend_hc_create_task default fm-app-probe /tmp` from a scratch home, with the Herdr.app window open | The app showed `firstmate / app-probe`; before naming, an adopted test terminal showed its folder (`tmp`) and position (`1`). |
 | `herdr-app do tab.rename --id <unknown>` | Exit 0 with `{"error":"no tab ..."}`, so a caller reads `.ok`. |
-| `hc run --on beefy --label herdr.space=<new id> --label herdr.tab=<new id>` (beefy core `0.1.15`) | Herdr.app showed a new space `beefy/<id>` on machine `beefy` with that tab; `tab.rename` and `space.rename` with the `beefy/` prefix applied; `hc kill` plus `hc rm` removed the space. |
+| `hc run --on <machine> --label herdr.space=<new id> --label herdr.tab=<new id>` (remote core `0.1.15`) | Herdr.app showed a new space `<machine>/<id>` on that machine with that tab; `tab.rename` and `space.rename` with the `<machine>/` prefix applied; `hc kill` plus `hc rm` removed the space. |
+| `claude` in an hc terminal, with and without `--settings '{"env":{"CLAUDE_CODE_DISABLE_TERMINAL_TITLE":"0"}}'`, where the user's settings set that variable to `1` | Without the override `status` stayed `null` and `reported` `false`; with it `hc get` reported `{"app":"claude-code","state":"idle"}`, and the same with an empty value. |
 
 The commands are in the task evidence; `tests/fm-control-relaunch.test.sh`, `tests/fm-backend-hc.test.sh`, and `tests/fm-secondmate-liveness.test.sh` pin the logic portably.
 
@@ -3660,5 +3661,4 @@ The commands are in the task evidence; `tests/fm-control-relaunch.test.sh`, `tes
 - A spawn with a real harness rather than the stand-in.
 - `send --wait`'s `started`/`working` proof against a real status-reporting harness; the lab run covered a non-reporting shell, whose verdict falls to the composer screen.
 - Submit confirmation against a real harness composer beyond the brief pointer.
-- Native `status.state`: Claude under Firstmate's launch reported no OSC 7501 status, so the app's agent list stayed empty.
 - A move or relaunch of a remote secondmate onto hc.
