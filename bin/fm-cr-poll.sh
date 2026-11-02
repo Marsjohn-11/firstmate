@@ -13,6 +13,10 @@
 #   cr-no-destination: <url> (packages: ...)
 #                                 a package would ship with no destination branch,
 #                                 so CRUX cannot merge it
+#   cr-merge-failed: <url> - <reason>
+#                                 CRUX tried to merge the latest revision and
+#                                 failed, such as on a merge conflict, so the
+#                                 review is red however its analyzers read
 #   cr-comment-baseline: ...      the comment set moved to the other credential
 #                                 path and was re-baselined
 #   cr-watcher-stale: <reason>    the poll cannot see the review
@@ -22,12 +26,13 @@
 # means no news. A failed mcurl read falls back to builder-mcp before anything
 # is declared stale (bin/fm-cr-lib.sh owns both credential paths).
 #
-# Dedupe state lives in two sidecars written by tmp+rename:
+# Dedupe state lives in three sidecars written by tmp+rename:
 #   state/<id>.cr-seen       cr=, state=<shipped|abandoned|in-review|draft|stale>,
 #                            comments=, source=<mcurl|fallback>, and for stale
 #                            stale_reason=, stale_since=, stale_emitted=,
 #                            stale_reminders=
 #   state/<id>.cr-dest-seen  cr=, state=<ok|missing>, missing_pkgs=
+#   state/<id>.cr-merge-seen cr=, state=<ok|failed>, reason=
 # A sidecar that names another CR is ignored.
 #
 # Usage: fm-cr-poll.sh <task-id> <cr-url>
@@ -52,6 +57,7 @@ CR_URL=$FM_CR_URL
 CR_ID=$FM_CR_ID
 SEEN="$STATE/$ID.cr-seen"
 DEST_SEEN="$STATE/$ID.cr-dest-seen"
+MERGE_SEEN="$STATE/$ID.cr-merge-seen"
 STALE_BACKOFF=${FM_CR_STALE_BACKOFF:-3600 14400 86400}
 
 read_seen_field() {
@@ -83,6 +89,32 @@ write_dest_seen() {
   printf 'cr=%s\nstate=%s\n' "$CR_URL" "$1" > "$tmp"
   [ -z "${2:-}" ] || printf 'missing_pkgs=%s\n' "$2" >> "$tmp"
   mv -f -- "$tmp" "$DEST_SEEN"
+}
+
+write_merge_seen() {
+  local tmp
+  tmp=$(mktemp "$MERGE_SEEN.XXXXXX") || return 1
+  printf 'cr=%s\nstate=%s\n' "$CR_URL" "$1" > "$tmp"
+  [ -z "${2:-}" ] || printf 'reason=%s\n' "$2" >> "$tmp"
+  mv -f -- "$tmp" "$MERGE_SEEN"
+}
+
+# report_merge_failure <revision-or-fallback-json>: a new or changed failure
+# emits once; a cleared one resets silently.
+report_merge_failure() {
+  local failure reason prev_merge_state prev_reason
+  failure=$(fm_cr_merge_failure "$1") || return 0
+  prev_merge_state=$(read_seen_field "$MERGE_SEEN" state)
+  if [ -z "$failure" ]; then
+    [ "$prev_merge_state" = ok ] || write_merge_seen ok "" || true
+    return 0
+  fi
+  reason=$(fm_cr_merge_failure_reason "$failure")
+  prev_reason=$(read_seen_field "$MERGE_SEEN" reason)
+  if [ "$prev_merge_state" != failed ] || [ "$prev_reason" != "$reason" ]; then
+    write_merge_seen failed "$reason" || true
+    echo "cr-merge-failed: $CR_URL - $reason"
+  fi
 }
 
 fmt_age() {
@@ -193,6 +225,7 @@ if [ "$dest_rc" = 0 ]; then
 fi
 
 status=
+status_body=
 comments=
 comments_degraded=0
 draft_note=
@@ -229,6 +262,7 @@ try_fallback() {
     return 1
   fi
   status=$fb_status
+  status_body=$fb
   source=fallback
   if fm_cr_fallback_has_comments "$fb"; then
     comments=$(fm_cr_fallback_comment_ids "$fb" || true)
@@ -264,6 +298,7 @@ case "$verdict" in
         exit 0
       fi
       [ -n "$status" ] || { emit_stale "CRUX returned no status field"; exit 0; }
+      status_body=$data
       # A set, not a count, so adding one comment while fixing another still wakes.
       comments=$(fm_cr_unresolved_comment_ids "$data" || true)
     fi
@@ -303,6 +338,9 @@ case "$verdict" in
     try_fallback "mcurl could not reach CRUX fetching revisions (network? timeout?)" || exit 0
     ;;
 esac
+
+# A draft (PENDING) revision has no merge attempt to report.
+[ -z "$status_body" ] || report_merge_failure "$status_body"
 
 case "$status" in
   SHIPPED|MERGED)

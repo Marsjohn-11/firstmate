@@ -2,7 +2,7 @@
 # Behavior tests for bin/fm-cr-analyzers.sh, the analyzer gate firstmate runs
 # before relaying a code review as ready.
 #
-# Verdicts are GREEN (0), RED (1), ABSTAINED (3, a gating Pass measured
+# Verdicts are GREEN (0), RED (1, including a CRUX merge failure), ABSTAINED (3, a gating Pass measured
 # nothing), and UNREADABLE (4). A non-Pass analyzer required for nothing, and an
 # Integration Tests Skipped with a listed structural reason, is advisory.
 # Most cases inject a captured analyzer fixture through FM_CR_ANALYZERS_BODY;
@@ -90,6 +90,71 @@ test_merge_gating_red_keeps_advisory_out_of_blockers() {
   advisory_section=$(printf '%s' "$out" | sed -n '/^advisory/,$p')
   assert_contains "$advisory_section" "AutoSDE" "the advisory analyzer belongs under the advisory heading"
   pass "on the red path, a non-gating non-Pass analyzer stays advisory, not a blocker"
+}
+
+# ---------------------------------------------------------------------------
+# RED: CRUX failed to merge the review, even with every analyzer Pass
+
+test_could_not_run_merge_conflict_is_red() {
+  local out
+  run_body CR-7000001 merge-conflict-could-not-run.json
+  out=$LAST_OUT
+  expect_code 1 "$LAST_STATUS" "a MergeService merge-conflict comment must turn the gate red"
+  assert_contains "$out" "RED: https://code.amazon.com/reviews/CR-7000001 - CRUX could not merge this review" "the red verdict names the merge failure"
+  assert_contains "$out" "CRUX merge: conflict - Package ExamplePackage had merge conflicts (CRUX Auto-Merge could not run)" "the blocker names the conflicting package and the comment title"
+  assert_contains "$out" "auto-merge was cleared, so CRUX will not retry" "a cleared auto-merge is named"
+  assert_not_contains "$out" "GREEN" "green analyzers must not hide a merge conflict"
+  pass "a CRUX Auto-Merge could not run comment with a merge conflict => RED, exit 1"
+}
+
+test_merge_failed_banner_text_is_red() {
+  # The builder-mcp shape, with the review page's banner text in a merge
+  # status field and auto-merge still armed.
+  local out
+  run_body CR-7000002 merge-failed-banner-fallback.json
+  out=$LAST_OUT
+  expect_code 1 "$LAST_STATUS" "Merge failed. Package <X> had merge conflicts. must turn the gate red"
+  assert_contains "$out" "CRUX merge: conflict - Package ExamplePackage had merge conflicts" "the blocker names the package from the banner text"
+  assert_not_contains "$out" "auto-merge was cleared" "an armed auto-merge is not reported cleared"
+  pass "Merge failed. Package <X> had merge conflicts. in the merge status => RED, exit 1"
+}
+
+test_failed_merge_with_auto_merge_cleared_is_red() {
+  local out
+  run_body CR-7000003 merge-failed-auto-merge-cleared.json
+  out=$LAST_OUT
+  expect_code 1 "$LAST_STATUS" "a failed merge that cleared auto-merge must turn the gate red"
+  assert_contains "$out" "CRUX merge: failed - CRUX Auto-Merge failed" "the blocker names the failed merge"
+  assert_contains "$out" "auto-merge was cleared, so CRUX will not retry" "the cleared auto-merge is named"
+  pass "a failed merge with auto-merge cleared and no conflict => RED, exit 1"
+}
+
+test_merge_failure_red_keeps_analyzer_blockers() {
+  local body out status=0
+  body=$(jq -c '.analyzers[0].status = "Fail" | .analyzers[0].status_message = "1 build failed"' "$FIXTURES/merge-conflict-could-not-run.json")
+  out=$(FM_CR_ANALYZERS_BODY="$body" "$ANALYZERS" CR-7000004 2>&1) || status=$?
+  expect_code 1 "$status" "a merge failure plus a failing analyzer is red"
+  assert_contains "$out" "CRUX merge: conflict" "the merge failure is named"
+  assert_contains "$out" "Dry Run Build: Fail - 1 build failed" "the failing analyzer is still named"
+  pass "a merge failure and a failing analyzer are both named on the red path"
+}
+
+# assert_merge_failure_ignored <cr> <jq-filter> <why>: the filter applied to the
+# merge-conflict fixture leaves no live merge failure, so the gate is not red.
+assert_merge_failure_ignored() {
+  local cr=$1 filter=$2 why=$3 body out status=0
+  body=$(jq -c "$filter" "$FIXTURES/merge-conflict-could-not-run.json")
+  out=$(FM_CR_ANALYZERS_BODY="$body" "$ANALYZERS" "$cr" 2>&1) || status=$?
+  expect_code 0 "$status" "$why"
+  assert_not_contains "$out" "CRUX merge" "$why"
+}
+
+test_merge_failure_ignored_when_not_live() {
+  assert_merge_failure_ignored CR-7000005 '.revision.cr_revision.id.review_revision_id.revision = 3'     "a merge failure on an earlier revision is superseded by the latest revision"
+  assert_merge_failure_ignored CR-7000006 '.revision.cr_revision.status = "SHIPPED"'     "a shipped review has no live merge failure"
+  assert_merge_failure_ignored CR-7000007 '.revision.cr_revision.comments[0].cr_comment.content = "## ✅ CRUX Auto-Merge succeeded"'     "a merge success comment is not a failure"
+  assert_merge_failure_ignored CR-7000008 '.revision.cr_revision.comments[0].cr_comment.author.entity_id = {"type":"USER","id":"reviewer"}'     "a reviewer quoting the failure text is not CRUX reporting one"
+  pass "a superseded, shipped, successful, or quoted merge failure leaves the gate green"
 }
 
 # ---------------------------------------------------------------------------
@@ -304,6 +369,11 @@ test_all_green_exits_zero
 test_fallback_shape_green
 test_merge_gating_red_names_the_blocker
 test_merge_gating_red_keeps_advisory_out_of_blockers
+test_could_not_run_merge_conflict_is_red
+test_merge_failed_banner_text_is_red
+test_failed_merge_with_auto_merge_cleared_is_red
+test_merge_failure_red_keeps_analyzer_blockers
+test_merge_failure_ignored_when_not_live
 test_advisory_only_is_not_red_with_advisory_line
 test_iac_integ_skip_is_advisory
 test_no_pipeline_integ_skip_is_advisory

@@ -156,7 +156,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-cr-check.sh` | Record a task's canonical CRUX review URL as `cr=` and arm its bound review poll |
 | `fm-cr-poll.sh` | One watcher poll of a recorded review: landed, abandoned, new reviewer comments, missing destination branch, or unable to see it |
 | `fm-cr-lib.sh` | Shared CRUX read path over mcurl with the builder-mcp fallback, plus comment, snapshot, and analyzer parsing |
-| `fm-cr-analyzers.sh` | Analyzer gate before relaying a review as ready: green, red, abstained, or unreadable |
+| `fm-cr-analyzers.sh` | Analyzer gate before relaying a review as ready: green, red (including a failed CRUX merge), abstained, or unreadable |
 | `fm-cr-revise-guard.sh` | Check run before and after each `cr -r`, refusing to replace a draft revision that carries reviewer comments |
 | `fm-brazil-lib.sh` | Per-task Brazil workspace contract: build, package add, validation, and removal through `brazil worktree` (brazilcli), falling back to the deprecated standalone `brazil-worktree` |
 | `fm-worktree-add.sh` | Declare another package by adding its worktree to the task's own Brazil workspace |

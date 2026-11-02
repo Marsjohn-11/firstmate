@@ -5,12 +5,16 @@
 # It reads the latest revision's CRUX analyzers (mcurl, then builder-mcp, through
 # bin/fm-cr-lib.sh) and answers whether the merge-gating ones are green. An
 # analyzer whose pass_required_for is non-empty gates the merge and must be Pass;
-# one required for nothing is advisory and never blocks.
+# one required for nothing is advisory and never blocks. A CRUX merge failure on
+# the latest revision, such as a merge conflict, also blocks, because green
+# analyzers cannot land a review CRUX failed to merge (fm_cr_merge_failure in
+# bin/fm-cr-lib.sh owns the signals).
 #
 #   exit 0  GREEN       every merge-gating analyzer passed and measured something,
 #                       or is an Integration Tests skip with a structural reason
-#   exit 1  RED         a merge-gating analyzer is not Pass; each is named with
-#                       its status message so the real reason can be relayed
+#   exit 1  RED         CRUX failed to merge the review, or a merge-gating
+#                       analyzer is not Pass; each blocker is named with its
+#                       reason so it can be relayed
 #   exit 3  ABSTAINED   nothing gating failed, but at least one gating Pass
 #                       measured nothing ("Private package, no permissions to
 #                       scan", a Change Guardian skip with no infrastructure
@@ -34,7 +38,7 @@ usage() {
 usage: fm-cr-analyzers.sh <CR-<digits>|https://code.amazon.com/reviews/CR-<digits>>
   Analyzer gate for relaying a code review as ready.
     exit 0  GREEN       every merge-gating analyzer passed and measured something
-    exit 1  RED         a merge-gating analyzer is not Pass
+    exit 1  RED         CRUX failed to merge it, or a merge-gating analyzer is not Pass
     exit 3  ABSTAINED   nothing gating failed, but a gating Pass measured nothing
     exit 4  UNREADABLE  the review could not be read
     exit 2  usage or bad input
@@ -153,6 +157,10 @@ done <<EOF
 $LINES
 EOF
 
+MERGE_FAILURE=$(fm_cr_merge_failure "$BODY") || unreadable "the review body's merge state did not parse"
+merge_blocker=
+[ -z "$MERGE_FAILURE" ] || merge_blocker="CRUX merge: $(fm_cr_merge_failure_reason "$MERGE_FAILURE")"
+
 print_lines() {  # <heading> <lines>
   [ -n "$2" ] || return 0
   echo "$1"
@@ -163,8 +171,13 @@ abstained_count=0
 [ -z "$abstained" ] || abstained_count=$(printf '%s\n' "$abstained" | grep -c .)
 measured=$(( GATING_TOTAL - benign_skips - abstained_count ))
 
-if [ -n "$blockers" ]; then
+if [ -n "$merge_blocker" ]; then
+  print_lines "RED: $CR_URL - CRUX could not merge this review:" "$merge_blocker"
+  print_lines "merge-gating analyzers not Pass:" "$blockers"
+elif [ -n "$blockers" ]; then
   print_lines "RED: $CR_URL - merge-gating analyzers not Pass:" "$blockers"
+fi
+if [ -n "$merge_blocker" ] || [ -n "$blockers" ]; then
   print_lines "passed without measuring anything:" "$abstained"
   print_lines "advisory (not blocking):" "$advisories"
   echo "fm-cr-analyzers: gate red - do not relay this review as ready" >&2

@@ -988,6 +988,43 @@ test_check_fallback_detects_missing_destination() {
   pass "the destination-branch guard survives an mcurl outage via the fallback"
 }
 
+MERGE_FIXTURES="$ROOT/tests/fixtures/cr-analyzers"
+
+test_check_emits_cr_merge_failed_once_and_resets_on_new_revision() {
+  # CRUX can fail a merge while every analyzer is green; the poll must say so
+  # once, and a new revision supersedes the failure.
+  local state fakebin body out
+  { read -r state; read -r fakebin; } < <(new_case merge-failed)
+  arm "$state" task CR-7100001 >/dev/null || fail "arm failed"
+  body=$(cat "$MERGE_FIXTURES/merge-conflict-could-not-run.json")
+  out=$(run_check "$state" task "$fakebin" FAKE_REVISIONS_BODY="$(revisions_json 2)" FAKE_REVISION_BODY="$body")
+  assert_contains "$out" "cr-merge-failed: https://code.amazon.com/reviews/CR-7100001 - conflict - Package ExamplePackage had merge conflicts" \
+    "a merge conflict must wake with the review and the conflicting package"
+  assert_contains "$out" "auto-merge was cleared" "the cleared auto-merge is named"
+  assert_grep "state=failed" "$state/task.cr-merge-seen" "the merge sidecar records the failure"
+  out=$(run_check "$state" task "$fakebin" FAKE_REVISIONS_BODY="$(revisions_json 2)" FAKE_REVISION_BODY="$body")
+  assert_not_contains "$out" "cr-merge-failed" "an unchanged merge failure stays silent"
+  body=$(printf '%s' "$body" | jq -c '.revision.cr_revision.id.review_revision_id.revision = 3')
+  out=$(run_check "$state" task "$fakebin" FAKE_REVISIONS_BODY="$(revisions_json 3)" FAKE_REVISION_BODY="$body")
+  assert_not_contains "$out" "cr-merge-failed" "a new revision supersedes the failure"
+  assert_grep "state=ok" "$state/task.cr-merge-seen" "the merge sidecar resets once the failure no longer applies"
+  pass "a CRUX merge failure wakes once as cr-merge-failed and resets on a new revision"
+}
+
+test_check_fallback_detects_merge_failed_banner() {
+  local state fakebin stub out
+  { read -r state; read -r fakebin; } < <(new_case fallback-merge-failed)
+  arm "$state" task CR-7100002 >/dev/null || fail "arm failed"
+  stub=$(make_fake_fallback "$state" "$(cat "$MERGE_FIXTURES/merge-failed-banner-fallback.json")")
+  out=$(run_check "$state" task "$fakebin" \
+    FM_CR_FALLBACK_BIN="$stub" \
+    FAKE_REVISIONS_HTTP_CODE=403 \
+    FAKE_REVISIONS_BODY="$(posture_body)")
+  assert_contains "$out" "cr-merge-failed: https://code.amazon.com/reviews/CR-7100002 - conflict - Package ExamplePackage had merge conflicts" \
+    "the merge failure must still surface through the builder-mcp fallback"
+  pass "the merge-failure check survives an mcurl outage via the fallback"
+}
+
 test_check_fallback_without_comments_reports_degraded_not_silence() {
   # The affordable fallback read carries no comments (buying them risks the
   # watcher's hard check timeout, and a killed check prints NOTHING - the exact
@@ -1387,6 +1424,8 @@ test_check_stale_records_backoff_timestamps
 test_check_stale_preexisting_sidecar_reenters_reminder_cycle
 test_check_stale_preserves_comment_set
 test_check_falls_back_to_builder_mcp_on_posture_403
+test_check_emits_cr_merge_failed_once_and_resets_on_new_revision
+test_check_fallback_detects_merge_failed_banner
 test_check_truncated_fallback_reply_is_not_trusted
 test_check_posture_403_is_named_distinctly_from_expiry
 test_check_plain_auth_403_names_mwinit

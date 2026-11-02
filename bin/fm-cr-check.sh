@@ -6,7 +6,8 @@
 # bin/fm-cr-poll.sh, which owns the transitions the poll reports. The CR rail
 # never publishes or merges a review autonomously (AGENTS.md section 7), so the
 # poll only reports what CRUX shows: landed, abandoned, new reviewer comments,
-# a missing destination branch, or a poll that cannot see the review.
+# a missing destination branch, a failed merge, or a poll that cannot see the
+# review.
 #
 # Only the canonical https://code.amazon.com/reviews/CR-<digits> URL is
 # accepted (bin/fm-delivery-target-lib.sh). The metadata write is atomic and
@@ -94,7 +95,7 @@ fm_lock_release "$META_LOCK"
 META_LOCK_HELD=0
 
 # Poll sidecars that name another review say nothing about this one.
-for sidecar in "$STATE/$ID.cr-seen" "$STATE/$ID.cr-dest-seen"; do
+for sidecar in "$STATE/$ID.cr-seen" "$STATE/$ID.cr-dest-seen" "$STATE/$ID.cr-merge-seen"; do
   [ -f "$sidecar" ] && [ ! -L "$sidecar" ] || continue
   [ "$(sed -n 's/^cr=//p' "$sidecar" | head -1)" = "$URL" ] || rm -f -- "$sidecar"
 done

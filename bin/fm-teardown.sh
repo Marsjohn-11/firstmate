@@ -1669,7 +1669,7 @@ remove_pr_poll_artifacts() {
   rm -f "$state_dir/$id.check.sh" "$state_dir/$id.pr-poll" \
     "$state_dir/$id.pr-poll-registration" "$state_dir/$id.pr-poll-retirement" \
     "$state_dir/$id.merge-authority" "$state_dir/$id.check-trust" \
-    "$state_dir/$id.cr-seen" "$state_dir/$id.cr-dest-seen" || return 1
+    "$state_dir/$id.cr-seen" "$state_dir/$id.cr-dest-seen" "$state_dir/$id.cr-merge-seen" || return 1
 }
 
 pr_number_from_target() {

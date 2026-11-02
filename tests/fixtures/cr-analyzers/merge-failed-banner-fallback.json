@@ -1,0 +1,21 @@
+{
+  "content": {
+    "crId": "CR-7000002",
+    "revisionSummary": {"id": {"review_revision_id": {"cr": "CR-7000002", "revision": 3}}, "status": "OPEN"},
+    "analyzers": [
+      {"partner_id": "Dry Run Build", "status": "Pass", "status_message": "1 build passed", "retryable": true, "pass_required_for": ["Auto-Publish", "Merge"]},
+      {"partner_id": "GK-CRUX-Analyzer", "status": "Pass", "status_message": "No enforced HIGH severity violations were found.", "retryable": true, "pass_required_for": ["Auto-Publish", "Merge"]}
+    ],
+    "revisionDetails": {
+      "revision": {
+        "cr_revision": {
+          "id": {"review_revision_id": {"cr": "CR-7000002", "revision": 3}},
+          "status": "OPEN",
+          "auto_merge": {"auto_merge_state": {"rerun_analyzers_state": "DISABLED", "package_details": [{"package_detail": {"package_name": "ExamplePackage", "merge_strategy": "DEFAULT_MERGE"}}]}},
+          "merge_status": {"status": "mergeError", "details": "Merge failed. Package ExamplePackage had merge conflicts. See the comments tab for details."},
+          "comments": []
+        }
+      }
+    }
+  }
+}

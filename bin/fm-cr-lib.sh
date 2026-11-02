@@ -21,6 +21,9 @@
 #   fm_cr_tip_commits_from_snapshot <snapshot-json>  each package's uploaded tip
 #   fm_cr_landing_read <cr>        latest status and uploaded tips, either path
 #   fm_cr_analyzers_array / fm_cr_analyzer_gating_total / fm_cr_analyzer_lines
+#   fm_cr_merge_failure <revision-or-fallback-json>  a CRUX merge failure on
+#                                  the latest revision, or nothing
+#   fm_cr_merge_failure_reason <merge-failure-line>  that failure in plain words
 #   fm_cr_fallback_*               the builder-mcp credential path
 #
 # Failure returns, so callers map them to their own diagnostics:
@@ -411,4 +414,71 @@ fm_cr_analyzer_lines() {
         ((.status_message // "") | gsub("[\r\n\t]+"; " ")) ]
     | @tsv
   ' 2>/dev/null || return 4
+}
+
+# Merge-failure helpers. CRUX exposes no merge-status field. The review page's
+# "Merge failed. Package <X> had merge conflicts." banner is built from a
+# MergeService TOP comment on the latest revision, and a failed auto-merge
+# clears the revision's auto_merge. A failure counts only while the review is
+# unmerged and the comment sits on the latest revision, because a new revision
+# supersedes it. Both credential paths carry the revision at
+# .revision.cr_revision (mcurl) or .content.revisionDetails.revision.cr_revision
+# (builder-mcp).
+#
+# fm_cr_merge_failure <revision-or-fallback-json>: nothing when no failure
+# applies, else one TSV line
+#   <conflict|failed>\t<packages, space-separated, or ->\t<cleared|armed>\t<title>
+# where cleared means auto-merge was turned off, so CRUX will not retry. Every
+# field is non-empty, because a shell read collapses adjacent tabs.
+fm_cr_merge_failure() {
+  printf '%s' "$1" | jq -r '
+    def fail_title: test("CRUX ((Auto-)?Merge|(AutoVerify|FastTrack) merge) ((partially )?failed|could not run)"; "i");
+    def banner_re: "Merge failed\\.\\s+Packages?\\s+(?<pkgs>.+?)\\s+had merge conflicts";
+    def conflict_rows:
+      [ split("\n")[] | split("|") | select(length >= 3)
+        | select((.[0] | gsub("\\s"; "")) | test("^[0-9]+$"))
+        | select(.[length - 1] | test("Merge conflict detected"; "i"))
+        | (.[1] | gsub("^\\s+|\\s+$"; "")) as $cell
+        | (($cell | capture("^\\[(?<n>[^\\]]+)\\]").n) // $cell) ];
+    def banner_pkgs:
+      [ capture(banner_re).pkgs | gsub(",|\\band\\b"; " ") | splits("\\s+") | select(length > 0) ];
+    (.revision.cr_revision // .content.revisionDetails.revision.cr_revision // {}) as $r
+    | ($r.status // .content.revisionSummary.status // "") as $status
+    | ($r.id.review_revision_id.revision // .content.revisionSummary.id.review_revision_id.revision) as $latest
+    | select($status | test("^(SHIPPED|MERGED|CANCELED|ABANDONED|CLOSED|WITHDRAWN)$") | not)
+    | [ $r.comments[]?.cr_comment
+        | select(.author.entity_id.id == "MergeService")
+        | select($latest == null or ((.location.comment_location.revision // $latest) == $latest))
+        | select((.content // "") | (fail_title or test(banner_re))) ]
+      as $fails
+    | [ $r | walk(if type == "object" then del(.comments) else . end)
+        | .. | strings | select(test(banner_re)) ] as $banners
+    | select(($fails | length) > 0 or ($banners | length) > 0)
+    | ($fails | sort_by(.created_at // "") | last) as $c
+    | (($c.content // "") | conflict_rows + banner_pkgs) as $from_comment
+    | ([ $banners[] | banner_pkgs[] ]) as $from_banner
+    | ($from_comment + $from_banner | unique) as $pkgs
+    | (if ($pkgs | length) > 0 or (($c.content // "") | test("Merge conflict detected|had merge conflicts"; "i"))
+       then "conflict" else "failed" end) as $kind
+    | (if ($r.auto_merge.auto_merge_state // null) == null then "cleared" else "armed" end) as $am
+    | ((($c.content // "") | (split("\n")[0] // "") | gsub("^[#\\s]+|[^ -~]"; "") | gsub("^\\s+|\\s+$"; ""))
+       | if . == "" then "Merge failed" else . end) as $title
+    | [ $kind, (if ($pkgs | length) > 0 then $pkgs | join(" ") else "-" end), $am, $title ] | @tsv
+  ' 2>/dev/null || return 4
+}
+
+# fm_cr_merge_failure_reason <merge-failure-line>: one plain-English reason,
+# shared by every tool that reports the failure.
+fm_cr_merge_failure_reason() {
+  local kind pkgs auto title reason
+  IFS="$(printf '\t')" read -r kind pkgs auto title <<EOF
+$1
+EOF
+  [ "$pkgs" != - ] || pkgs=
+  case "$kind" in
+    conflict) reason="conflict - ${pkgs:+Package $pkgs }had merge conflicts ($title); rebase onto the destination branch and post a new revision" ;;
+    *) reason="failed - $title; see the review's comments for the reason" ;;
+  esac
+  [ "$auto" != cleared ] || reason="$reason; auto-merge was cleared, so CRUX will not retry"
+  printf '%s\n' "$reason"
 }

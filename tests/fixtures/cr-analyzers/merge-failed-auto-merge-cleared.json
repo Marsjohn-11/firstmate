@@ -1,0 +1,22 @@
+{
+  "analyzers": [
+    {"partner_id": "Dry Run Build", "status": "Pass", "status_message": "1 build passed", "retryable": true, "pass_required_for": ["Auto-Publish", "Merge"]},
+    {"partner_id": "GK-CRUX-Analyzer", "status": "Pass", "status_message": "No enforced HIGH severity violations were found.", "retryable": true, "pass_required_for": ["Auto-Publish", "Merge"]}
+  ],
+  "revision": {
+    "cr_revision": {
+      "id": {"review_revision_id": {"cr": "CR-7000003", "revision": 1}},
+      "status": "OPEN",
+      "comments": [
+        {"cr_comment": {
+          "author": {"entity_id": {"type": "AAA", "id": "MergeService"}},
+          "location": {"comment_location": {"cr": "CR-7000003", "revision": 1, "location": "v4:TOP::::::", "post": 4}},
+          "parent": null,
+          "fixed": false,
+          "created_at": "2026-11-02T03:10:00.000Z",
+          "content": "## ❌ CRUX Auto-Merge failed\n\n\\#|Package|Reason\n-|-|-\n1|[ExamplePackage](https://code.amazon.com/packages/ExamplePackage)|The destination branch could not be updated."
+        }}
+      ]
+    }
+  }
+}
