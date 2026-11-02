@@ -81,7 +81,7 @@ test_existing_workspace_refused_before_any_endpoint() {
   status=$?
   [ "$status" -ne 0 ] || fail "an existing workspace path must refuse the spawn"
   assert_contains "$out" "Brazil workspace $SHELL_PATH already exists" "the refusal should name the workspace"
-  assert_contains "$out" "brazil-worktree remove --name fm-$id" "the refusal should name the cleanup command"
+  assert_contains "$out" "brazil worktree delete --name fm-$id" "the refusal should name the cleanup command"
   assert_absent "$HOME_DIR/state/$id.meta" "no record should be published"
   [ ! -s "$FAKEBIN_DIR/.spawn-window" ] || fail "no endpoint should be created for a refused workspace"
   [ -d "$SHELL_PATH" ] || fail "the existing workspace must be left alone"
@@ -91,20 +91,20 @@ test_existing_workspace_refused_before_any_endpoint() {
 test_missing_tool_refused() {
   local id=brz-notool-a1 out status
   make_case notool "$id"
-  rm -f "$FAKEBIN_DIR/brazil-worktree"
+  rm -f "$FAKEBIN_DIR/brazil" "$FAKEBIN_DIR/brazil-worktree"
   mkdir -p "$HOME_DIR/user-home"
-  out=$(env PATH="$FAKEBIN_DIR:$(fm_test_base_path_sans "$PATH" brazil-worktree)" \
+  out=$(env PATH="$FAKEBIN_DIR:$(fm_test_base_path_sans "$PATH" brazil brazil-worktree)" \
     FM_ROOT_OVERRIDE='' FM_HOME="$HOME_DIR" HOME="$HOME_DIR/user-home" CLAUDE_CONFIG_DIR='' \
     FM_STATE_OVERRIDE="$HOME_DIR/state" FM_DATA_OVERRIDE="$HOME_DIR/data" \
     FM_PROJECTS_OVERRIDE="$HOME_DIR/projects" FM_CONFIG_OVERRIDE="$HOME_DIR/config" \
     FM_SPAWN_NO_GUARD=1 FM_FAKE_PANE_PATH="$WT_PATH" TMUX=fake,1,0 \
     "$ROOT/bin/fm-spawn.sh" "$id" "$PROJECT_DIR" --scout 2>&1)
   status=$?
-  [ "$status" -ne 0 ] || fail "a Brazil spawn without brazil-worktree must be refused"
-  assert_contains "$out" "toolbox install brazilworktreecli" "the refusal should name the install command"
+  [ "$status" -ne 0 ] || fail "a Brazil spawn without a worktree tool must be refused"
+  assert_contains "$out" "toolbox update brazilcli" "the refusal should name brazilcli"
   assert_absent "$HOME_DIR/state/$id.meta" "no record should be published"
   assert_absent "$SHELL_PATH" "no workspace should exist"
-  pass "a Brazil spawn refuses without brazil-worktree rather than falling back to a shared workspace"
+  pass "a Brazil spawn refuses without brazil worktree rather than falling back to a shared workspace"
 }
 
 test_stale_base_refused_and_workspace_removed() {
@@ -118,7 +118,7 @@ test_stale_base_refused_and_workspace_removed() {
   assert_absent "$HOME_DIR/state/$id.meta" "no record should be published"
   assert_absent "$SHELL_PATH" "the half-built workspace should be removed"
   git -C "$PROJECT_DIR" show-ref --verify --quiet "refs/heads/fm-$id" && fail "no workspace branch should be left behind"
-  assert_grep "remove --name fm-$id" "$CASE_DIR/brazil.log" "the cleanup should go through brazil-worktree"
+  assert_grep "brazil worktree delete --name fm-$id" "$CASE_DIR/brazil.log" "the cleanup should go through brazil worktree"
   pass "a spawn that cannot fetch its package's origin refuses and removes the workspace it built"
 }
 

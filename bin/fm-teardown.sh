@@ -183,7 +183,7 @@
 # A Brazil task (project_kind=brazil, bin/fm-brazil-lib.sh) runs the same
 # landed-work check on worktree= and on every other package its workspace
 # declares, reaps processes under the whole workspace, then removes it with
-# `brazil-worktree remove` instead of a Treehouse return. A removal that fails
+# the Brazil worktree tool instead of a Treehouse return. A removal that fails
 # or leaves the workspace behind aborts with the task records intact.
 # A Herdr presentation journal never authorizes cleanup. Teardown still closes
 # only the exact task pane from ordinary endpoint metadata and never calls
@@ -2283,7 +2283,7 @@ brazil_declared_packages_landed() {
 }
 
 # teardown_remove_brazil_workspace: drop each declared package's local task
-# branch, then remove the whole workspace with brazil-worktree, which also
+# branch, then remove the whole workspace with the Brazil worktree tool, which also
 # deletes its package worktrees and their fm-<id> branches.
 teardown_remove_brazil_workspace() {
   local package dir branch tool_branch

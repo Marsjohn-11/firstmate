@@ -370,10 +370,10 @@
 #   usable offline; a stale remote-tracking ref can therefore make an unpushed
 #   commit look contained, which is exactly why no remedy command is printed.
 #   A fresh ship or scout on a Brazil package gets its own Brazil workspace
-#   from brazil-worktree instead of a Treehouse slot, launches in that
+#   from the Brazil worktree tool instead of a Treehouse slot, launches in that
 #   workspace's package worktree, and records project_kind=brazil and
 #   workspace_shell=; bin/fm-brazil-lib.sh owns that contract. It refuses on
-#   Orca, without brazil-worktree, when the workspace path already exists, or
+#   Orca, without that tool, when the workspace path already exists, or
 #   when the package's origin cannot be fetched, and a spawn that ends with no
 #   record before its launch removes the workspace it built. A relaunch first
 #   validates the recorded workspace and refuses one that is not intact.
@@ -1976,7 +1976,7 @@ spawn_abort_cleanup() {
     if [ -n "$SPAWN_TASK_LOCK" ] && fm_lock_try_acquire "$SPAWN_TASK_LOCK"; then
       if [ ! -e "$STATE/$ID.meta" ] && [ ! -L "$STATE/$ID.meta" ] &&
         ! fm_brazil_remove_workspace_shell "$BRAZIL_PRIMARY" "$BRAZIL_SHELL"; then
-        echo "warning: could not remove Brazil workspace $BRAZIL_SHELL after the failed spawn of $ID; remove it with: brazil-worktree remove --name $(basename "$BRAZIL_SHELL") --workspace $BRAZIL_PRIMARY" >&2
+        echo "warning: could not remove Brazil workspace $BRAZIL_SHELL after the failed spawn of $ID; remove it with: $(fm_brazil_remove_command "$(basename "$BRAZIL_SHELL")" "$BRAZIL_PRIMARY")" >&2
       fi
       fm_lock_release "$SPAWN_TASK_LOCK" || true
     else
@@ -4194,12 +4194,12 @@ elif [ "$KIND" != secondmate ] && fm_brazil_package_project "$PROJ_ABS"; then
     echo "error: spawn refused: $PROJ_ABS is a Brazil package, which gets its own Brazil workspace, and Orca owns its own worktree; spawn it on a session backend instead" >&2
     exit 1
   fi
-  command -v brazil-worktree >/dev/null 2>&1 || {
-    echo "error: spawn refused: $PROJ_ABS is a Brazil package, which needs brazil-worktree to build its task workspace; install it with: toolbox install brazilworktreecli" >&2
+  fm_brazil_tool_kind || {
+    echo "error: spawn refused: $PROJ_ABS is a Brazil package, which needs \`brazil worktree\` to build its task workspace; $(fm_brazil_tool_missing_message)" >&2
     exit 1
   }
   if [ -e "$BRAZIL_SHELL" ] || [ -L "$BRAZIL_SHELL" ]; then
-    echo "error: spawn refused: Brazil workspace $BRAZIL_SHELL already exists; if no task owns it, remove it with: brazil-worktree remove --name $(basename "$BRAZIL_SHELL") --workspace $BRAZIL_PRIMARY" >&2
+    echo "error: spawn refused: Brazil workspace $BRAZIL_SHELL already exists; if no task owns it, remove it with: $(fm_brazil_remove_command "$(basename "$BRAZIL_SHELL")" "$BRAZIL_PRIMARY")" >&2
     exit 1
   fi
 fi
@@ -6055,7 +6055,7 @@ elif [ "$PROJECT_KIND" = brazil ]; then
     exit 1
   }
   WT="$BRAZIL_SHELL/src/$BRAZIL_PACKAGE"
-  validate_spawn_worktree "brazil-worktree" "$T"
+  validate_spawn_worktree "brazil worktree" "$T"
 elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
   # A t3code slot was leased and validated in its target branch above.
   if [ "$BACKEND" != t3code ]; then

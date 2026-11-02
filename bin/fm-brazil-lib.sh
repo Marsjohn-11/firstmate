@@ -7,25 +7,39 @@
 # checkout sits at `<workspace>/src/<Package>`.
 #
 # bin/fm-spawn.sh gives every fresh ship or scout on such a project its own
-# workspace, built with `brazil-worktree create --empty` at
+# empty workspace, built with the worktree tool at
 # `<workspace>/worktrees/fm-<id>` (the task's workspace shell), and adds the
 # project's own package there. The task's worktree= is that package worktree,
 # `<shell>/src/<Package>`, and the task record also carries project_kind=brazil
 # and workspace_shell=<shell>. The worker declares every other package it
 # changes with bin/fm-worktree-add.sh. bin/fm-teardown.sh checks every declared
-# package for unlanded work before `brazil-worktree remove` deletes the shell.
+# package for unlanded work before the worktree tool deletes the shell.
+#
+# The worktree tool is `brazil worktree`, which ships with brazilcli. The
+# deprecated standalone `brazil-worktree` (brazilworktreecli) is used only when
+# `brazil` lacks that subcommand. Each operation maps to both:
+#   build the empty shell   brazil worktree create --name N --workspace W
+#                           brazil-worktree create --name N --workspace W --empty
+#   add a package           brazil worktree use --name N --workspace W --package P
+#                           brazil-worktree addPackage --name N --workspace W --package P
+#   delete the shell        brazil worktree delete --name N --workspace W --force
+#                           brazil-worktree remove --name N --workspace W
+# `brazil worktree delete` refuses unpushed commits without --force, so it gets
+# --force: teardown has already proven every package landed, and the
+# standalone remove never checked. `brazil worktree create` makes no src/ for
+# an empty shell, so the build creates it.
 #
 # Shell contract, read by spawn's relaunch, teardown, and fm-worktree-add.sh:
 #   <shell>/.fm-primary   the primary workspace's real path
 #   <shell>/.fm-packages  declared packages, one per line, the project's first
 #
-# brazil-worktree names each package's branch after the shell (fm-<id>),
+# Both tools name each package's branch after the shell (fm-<id>),
 # reuses an existing branch of that name, and deletes it on remove. On a
-# package the primary lacks, addPackage runs a Brazil checkout in the PRIMARY
+# package the primary lacks, the add runs a Brazil checkout in the PRIMARY
 # workspace, so fm_brazil_add_package refuses both cases before calling it.
 #
 # Every tool and network call is bounded (bin/fm-timeout-lib.sh):
-# FM_BRAZIL_TOOL_TIMEOUT (default 300s) for brazil-worktree, and
+# FM_BRAZIL_TOOL_TIMEOUT (default 300s) for each worktree tool call, and
 # FM_BRAZIL_FETCH_TIMEOUT (default 60s) for each origin round trip.
 #
 # Sourced; callers already run under `set -eu`. Functions print errors to
@@ -35,6 +49,9 @@
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/fm-timeout-lib.sh"
 
 FM_BRAZIL_TOOL_OUTPUT=
+FM_BRAZIL_TOOL_LABEL=
+FM_BRAZIL_TOOL_KIND=
+FM_BRAZIL_TOOL_KIND_PATH=
 FM_BRAZIL_PRIMARY=
 FM_BRAZIL_PACKAGE=
 
@@ -98,21 +115,86 @@ _fm_brazil_timeout() {  # <env-value> <default> <name>
   printf '%s\n' "$value"
 }
 
-# _fm_brazil_tool <args...>: one bounded brazil-worktree call. Its combined
-# output is kept in FM_BRAZIL_TOOL_OUTPUT for the caller's diagnostic.
+# fm_brazil_tool_kind: sets FM_BRAZIL_TOOL_KIND to `brazilcli` when
+# `brazil worktree` works, else `standalone` when `brazil-worktree` is on PATH,
+# and returns non-zero when neither is. The answer is cached per PATH.
+fm_brazil_tool_kind() {
+  local rc=0
+  if [ -n "$FM_BRAZIL_TOOL_KIND" ] && [ "$FM_BRAZIL_TOOL_KIND_PATH" = "$PATH" ]; then
+    return 0
+  fi
+  FM_BRAZIL_TOOL_KIND=
+  FM_BRAZIL_TOOL_KIND_PATH=$PATH
+  if command -v brazil >/dev/null 2>&1; then
+    fm_run_timed 60 brazil worktree --help >/dev/null 2>&1 || rc=$?
+    if [ "$rc" -eq 0 ]; then
+      FM_BRAZIL_TOOL_KIND=brazilcli
+      return 0
+    fi
+  fi
+  if command -v brazil-worktree >/dev/null 2>&1; then
+    FM_BRAZIL_TOOL_KIND=standalone
+    return 0
+  fi
+  return 1
+}
+
+# fm_brazil_tool_missing_message: the refusal for a host with no worktree tool.
+fm_brazil_tool_missing_message() {
+  printf '%s\n' "\`brazil worktree\` is not available; install or update brazilcli with: toolbox update brazilcli"
+}
+
+# fm_brazil_remove_command <name> <primary>: the command that deletes task
+# workspace <name> with the host's worktree tool, for cleanup hints.
+fm_brazil_remove_command() {
+  if fm_brazil_tool_kind && [ "$FM_BRAZIL_TOOL_KIND" = standalone ]; then
+    printf 'brazil-worktree remove --name %s --workspace %s\n' "$1" "$2"
+  else
+    printf 'brazil worktree delete --name %s --workspace %s --force\n' "$1" "$2"
+  fi
+}
+
+# _fm_brazil_tool_label <create|add|delete>: the host tool's name for <op>.
+_fm_brazil_tool_label() {
+  if [ "$FM_BRAZIL_TOOL_KIND" = brazilcli ]; then
+    case "$1" in create) echo 'brazil worktree create' ;; add) echo 'brazil worktree use' ;; *) echo 'brazil worktree delete' ;; esac
+  else
+    case "$1" in create) echo 'brazil-worktree create' ;; add) echo 'brazil-worktree addPackage' ;; *) echo 'brazil-worktree remove' ;; esac
+  fi
+}
+
+# _fm_brazil_tool <create|add|delete> <name> <primary> [<package>]: one bounded
+# worktree tool call, mapped to the host's tool. Its combined output is kept in
+# FM_BRAZIL_TOOL_OUTPUT for the caller's diagnostic.
 _fm_brazil_tool() {
-  local timeout rc=0
+  local op=$1 name=$2 primary=$3 package=${4:-} timeout rc=0
+  local -a cmd
   timeout=$(_fm_brazil_timeout "${FM_BRAZIL_TOOL_TIMEOUT:-}" 300 FM_BRAZIL_TOOL_TIMEOUT) || return 1
-  FM_BRAZIL_TOOL_OUTPUT=$(fm_run_timed "$timeout" brazil-worktree "$@" 2>&1) || rc=$?
+  _fm_brazil_require_tool || return 1
+  if [ "$FM_BRAZIL_TOOL_KIND" = brazilcli ]; then
+    case "$op" in
+      create) cmd=(brazil worktree create --name "$name" --workspace "$primary") ;;
+      add) cmd=(brazil worktree use --name "$name" --workspace "$primary" --package "$package") ;;
+      delete) cmd=(brazil worktree delete --name "$name" --workspace "$primary" --force) ;;
+    esac
+  else
+    case "$op" in
+      create) cmd=(brazil-worktree create --name "$name" --workspace "$primary" --empty) ;;
+      add) cmd=(brazil-worktree addPackage --name "$name" --workspace "$primary" --package "$package") ;;
+      delete) cmd=(brazil-worktree remove --name "$name" --workspace "$primary") ;;
+    esac
+  fi
+  FM_BRAZIL_TOOL_LABEL=$(_fm_brazil_tool_label "$op")
+  FM_BRAZIL_TOOL_OUTPUT=$(fm_run_timed "$timeout" "${cmd[@]}" 2>&1) || rc=$?
   if fm_timed_out "$rc"; then
-    FM_BRAZIL_TOOL_OUTPUT="brazil-worktree $1 timed out after ${timeout}s${FM_BRAZIL_TOOL_OUTPUT:+$'\n'$FM_BRAZIL_TOOL_OUTPUT}"
+    FM_BRAZIL_TOOL_OUTPUT="$FM_BRAZIL_TOOL_LABEL timed out after ${timeout}s${FM_BRAZIL_TOOL_OUTPUT:+$'\n'$FM_BRAZIL_TOOL_OUTPUT}"
   fi
   return "$rc"
 }
 
 _fm_brazil_require_tool() {
-  command -v brazil-worktree >/dev/null 2>&1 && return 0
-  echo "fm-brazil-lib: brazil-worktree is not on PATH; install it with: toolbox install brazilworktreecli" >&2
+  fm_brazil_tool_kind && return 0
+  echo "fm-brazil-lib: $(fm_brazil_tool_missing_message)" >&2
   return 1
 }
 
@@ -128,7 +210,7 @@ _fm_brazil_shell_bounded() {
 }
 
 # fm_brazil_build_workspace_shell <primary> <shell>: builds the task's empty
-# workspace with brazil-worktree and writes .fm-primary. Refuses an existing
+# workspace with the worktree tool and writes .fm-primary. Refuses an existing
 # path rather than reusing it, and removes what a failed create left behind.
 fm_brazil_build_workspace_shell() {
   local primary=$1 shell=$2 name
@@ -142,20 +224,24 @@ fm_brazil_build_workspace_shell() {
   fi
   name=$(basename "$shell")
   if [ -e "$shell" ] || [ -L "$shell" ]; then
-    echo "fm-brazil-lib: workspace $shell already exists; refusing to reuse it. If no task owns it, remove it with: brazil-worktree remove --name $name --workspace $primary" >&2
+    echo "fm-brazil-lib: workspace $shell already exists; refusing to reuse it. If no task owns it, remove it with: $(fm_brazil_remove_command "$name" "$primary")" >&2
     return 1
   fi
   _fm_brazil_require_tool || return 1
-  if ! _fm_brazil_tool create --name "$name" --workspace "$primary" --empty; then
-    echo "fm-brazil-lib: brazil-worktree create --name $name failed for $primary" >&2
+  if ! _fm_brazil_tool create "$name" "$primary"; then
+    echo "fm-brazil-lib: $FM_BRAZIL_TOOL_LABEL --name $name failed for $primary" >&2
     [ -z "$FM_BRAZIL_TOOL_OUTPUT" ] || printf '%s\n' "$FM_BRAZIL_TOOL_OUTPUT" >&2
     if [ -e "$shell" ] && ! fm_brazil_remove_workspace_shell "$primary" "$shell"; then
-      echo "fm-brazil-lib: the partial workspace $shell is left behind; remove it with: brazil-worktree remove --name $name --workspace $primary" >&2
+      echo "fm-brazil-lib: the partial workspace $shell is left behind; remove it with: $(fm_brazil_remove_command "$name" "$primary")" >&2
     fi
     return 1
   fi
-  if [ ! -d "$shell/src" ]; then
-    echo "fm-brazil-lib: brazil-worktree create reported success but $shell/src does not exist" >&2
+  if ! fm_brazil_is_workspace "$shell"; then
+    echo "fm-brazil-lib: $FM_BRAZIL_TOOL_LABEL reported success but $shell is not a Brazil workspace" >&2
+    return 1
+  fi
+  if ! mkdir -p "$shell/src"; then
+    echo "fm-brazil-lib: could not create $shell/src" >&2
     return 1
   fi
   printf '%s\n' "$primary" > "$shell/.fm-primary"
@@ -230,7 +316,7 @@ fm_brazil_add_package() {
       echo "A task adds packages only from its own workspace, because each workspace builds against its own version set." >&2
       echo "Split cross-workspace work into one task per workspace: report needs-decision to firstmate." >&2
     fi
-    echo "Never run brazil-worktree or brazil workspace commands against the primary workspace to work around this." >&2
+    echo "Never run brazil worktree, brazil-worktree, or brazil workspace commands against the primary workspace to work around this." >&2
     return 1
   fi
   if [ -e "$dest" ] || [ -L "$dest" ]; then
@@ -247,7 +333,7 @@ fm_brazil_add_package() {
     return 1
   fi
   if git -C "$pkg_src" show-ref --verify --quiet "refs/heads/$name"; then
-    echo "error: branch '$name' already exists in $pkg_src; brazil-worktree would reuse it and its removal deletes it. If no task owns it, inspect it and delete it by hand: git -C '$pkg_src' branch -D $name" >&2
+    echo "error: branch '$name' already exists in $pkg_src; the worktree tool would reuse it and its removal deletes it. If no task owns it, inspect it and delete it by hand: git -C '$pkg_src' branch -D $name" >&2
     return 1
   fi
   _fm_brazil_require_tool || return 1
@@ -283,15 +369,15 @@ fm_brazil_add_package() {
     return 1
   fi
 
-  if ! _fm_brazil_tool addPackage --name "$name" --workspace "$primary" --package "$package"; then
-    echo "error: brazil-worktree addPackage --name $name --package $package failed for $primary" >&2
+  if ! _fm_brazil_tool add "$name" "$primary" "$package"; then
+    echo "error: $FM_BRAZIL_TOOL_LABEL --name $name --package $package failed for $primary" >&2
     [ -z "$FM_BRAZIL_TOOL_OUTPUT" ] || printf '%s\n' "$FM_BRAZIL_TOOL_OUTPUT" >&2
     return 1
   fi
   # git -C walks up to any enclosing repository, so prove the tool made this
   # package's own worktree before a hard reset can reach anything else.
   if ! _fm_brazil_package_worktree "$dest" "$pkg_src"; then
-    echo "error: brazil-worktree addPackage reported success but '$dest' is not a worktree of $pkg_src" >&2
+    echo "error: $FM_BRAZIL_TOOL_LABEL reported success but '$dest' is not a worktree of $pkg_src" >&2
     return 1
   fi
   _fm_brazil_track "$shell" "$package"
@@ -352,7 +438,7 @@ fm_brazil_validate_workspace_shell() {
 }
 
 # fm_brazil_remove_workspace_shell <primary> <shell>: removes the task workspace
-# and its package worktrees and fm-<id> branches with `brazil-worktree remove`.
+# and its package worktrees and fm-<id> branches with the worktree tool.
 # Removes nothing outside <primary>/worktrees/fm-<id>. Returns non-zero, naming
 # what survives, when the tool fails or leaves the shell behind.
 fm_brazil_remove_workspace_shell() {
@@ -363,16 +449,16 @@ fm_brazil_remove_workspace_shell() {
   fi
   name=$(basename "$shell")
   _fm_brazil_require_tool || return 1
-  if ! _fm_brazil_tool remove --name "$name" --workspace "$primary"; then
+  if ! _fm_brazil_tool delete "$name" "$primary"; then
     # A workspace already gone leaves the tool nothing to find; the call above
     # still clears any registration it kept.
     [ -e "$shell" ] || [ -L "$shell" ] || return 0
-    echo "fm-brazil-lib: brazil-worktree remove --name $name failed for $primary" >&2
+    echo "fm-brazil-lib: $FM_BRAZIL_TOOL_LABEL --name $name failed for $primary" >&2
     [ -z "$FM_BRAZIL_TOOL_OUTPUT" ] || printf '%s\n' "$FM_BRAZIL_TOOL_OUTPUT" >&2
     return 1
   fi
   if [ -e "$shell" ] || [ -L "$shell" ]; then
-    echo "fm-brazil-lib: workspace $shell still exists after brazil-worktree remove" >&2
+    echo "fm-brazil-lib: workspace $shell still exists after $FM_BRAZIL_TOOL_LABEL" >&2
     return 1
   fi
 }
@@ -385,12 +471,12 @@ fm_brazil_launch_section() {
   cat <<EOF
 
 # Brazil workspace
-This task has its own Brazil workspace at \`$shell\`, built with brazil-worktree from the primary workspace \`$primary\`.
+This task has its own Brazil workspace at \`$shell\`, built with the Brazil worktree tool from the primary workspace \`$primary\`.
 Your package worktree is \`$shell/src/$package\`.
 It starts on branch \`$(basename "$shell")\` at a fresh fetch of origin, with that branch's upstream set; create your ship branch there as Setup says.
 Declare every other package before you change it: \`$fm_root/bin/fm-worktree-add.sh <Package>\` fetches its origin and adds it at \`$shell/src/<Package>\`.
 Only packages checked out in the primary workspace can be added; if the helper refuses one, append \`needs-decision:\` rather than working around it.
-Never run \`brazil-worktree\` or \`brazil workspace\` commands against the primary workspace.
+Never run \`brazil worktree\`, \`brazil-worktree\`, or \`brazil workspace\` commands against the primary workspace.
 Cleanup checks every declared package for uncommitted or unlanded work.
 EOF
 }

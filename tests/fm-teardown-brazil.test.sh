@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Behavior tests for fm-teardown on a Brazil task (project_kind=brazil): every
 # package the task declared in its own Brazil workspace faces the landed-work
-# check, and the workspace is removed with brazil-worktree rather than returned
+# check, and the workspace is removed with brazil worktree rather than returned
 # to a Treehouse pool. bin/fm-brazil-lib.sh owns the workspace contract.
 set -u
 
@@ -79,7 +79,7 @@ commit_in() {  # <worktree> <file>
 }
 
 assert_workspace_removed() {
-  assert_grep "remove --name fm-$ID --workspace $WS" "$CASE_DIR/brazil.log" "$1: the workspace should be removed through brazil-worktree"
+  assert_grep "brazil worktree delete --name fm-$ID --workspace $WS --force" "$CASE_DIR/brazil.log" "$1: the workspace should be removed through brazil worktree"
   assert_absent "$SHELL_PATH" "$1: the workspace should be gone"
   assert_absent "$CASE_DIR/state/$ID.meta" "$1: the task record should be removed"
   assert_absent "$CASE_DIR/treehouse.log" "$1: a Brazil task must never be returned to a Treehouse pool"
@@ -89,7 +89,7 @@ assert_refused_intact() {
   [ "$1" -ne 0 ] || fail "$2: teardown must refuse"
   assert_present "$SHELL_PATH" "$2: the workspace must be kept"
   assert_present "$CASE_DIR/state/$ID.meta" "$2: the task record must be kept"
-  assert_no_grep "remove --name" "$CASE_DIR/brazil.log" "$2: nothing may be removed"
+  assert_no_grep "delete --name" "$CASE_DIR/brazil.log" "$2: nothing may be removed"
 }
 
 test_landed_workspace_is_removed() {
@@ -103,7 +103,7 @@ test_landed_workspace_is_removed() {
   assert_workspace_removed "landed"
   git -C "$WS/src/PkgA" show-ref --verify --quiet "refs/heads/fm/$ID" && fail "the worker's ship branch should be dropped"
   git -C "$WS/src/PkgB" show-ref --verify --quiet "refs/heads/fm-$ID" && fail "the declared package's workspace branch should be gone"
-  pass "a Brazil task whose packages all landed is removed with brazil-worktree, with its branches"
+  pass "a Brazil task whose packages all landed is removed with brazil worktree, with its branches"
 }
 
 test_unlanded_declared_package_refuses() {
@@ -184,7 +184,7 @@ test_failed_removal_keeps_the_records() {
   FM_FAKE_BRAZIL_KEEP=1 run_teardown
   status=$?
   [ "$status" -ne 0 ] || fail "a workspace that survives removal must fail teardown"
-  assert_grep "still exists after brazil-worktree remove" "$CASE_DIR/stderr" "the survivor should be named"
+  assert_grep "still exists after brazil worktree delete" "$CASE_DIR/stderr" "the survivor should be named"
   assert_grep "teardown aborted with its records intact" "$CASE_DIR/stderr" "teardown should say it kept the records"
   assert_present "$CASE_DIR/state/$ID.meta" "the task record must be kept for a retry"
   assert_absent "$CASE_DIR/treehouse.log" "a failed removal must not fall back to a Treehouse return"

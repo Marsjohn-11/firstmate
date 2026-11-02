@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Behavior tests for bin/fm-brazil-lib.sh, the per-task Brazil workspace
 # contract: detection, workspace build, package add, workspace validation, and
-# removal, against the brazil-worktree stand-in in tests/brazil-helpers.sh.
+# removal, against the Brazil worktree stand-ins in tests/brazil-helpers.sh:
+# `brazil worktree` by default, and the standalone brazil-worktree fallback.
 set -u
 
 # shellcheck source=tests/brazil-helpers.sh
@@ -12,8 +13,13 @@ set -u
 TMP_ROOT=$(fm_test_tmproot fm-brazil-lib)
 FAKEBIN=$(fm_fakebin "$TMP_ROOT")
 fm_brazil_fake_tool "$FAKEBIN"
+mkdir -p "$TMP_ROOT/standalone-bin" "$TMP_ROOT/both-bin"
+fm_brazil_fake_tool "$TMP_ROOT/standalone-bin" standalone
+fm_brazil_fake_tool "$TMP_ROOT/both-bin" both
 BASE_PATH=$PATH
-NO_TOOL_PATH=$(fm_test_base_path_sans "$BASE_PATH" brazil-worktree)
+NO_TOOL_PATH=$(fm_test_base_path_sans "$BASE_PATH" brazil brazil-worktree)
+STANDALONE_PATH="$TMP_ROOT/standalone-bin:$BASE_PATH"
+BOTH_PATH="$TMP_ROOT/both-bin:$BASE_PATH"
 export PATH="$FAKEBIN:$BASE_PATH"
 export FM_FAKE_BRAZIL_LOG="$TMP_ROOT/brazil.log"
 unset FM_WORKPLACE FM_BRAZIL_FETCH_TIMEOUT FM_BRAZIL_TOOL_TIMEOUT
@@ -64,12 +70,13 @@ test_detects_brazil_package_projects() {
 test_build_creates_an_empty_workspace() {
   new_case build PkgA
   fm_brazil_build_workspace_shell "$WS" "$SHELL_PATH" || fail "the workspace build should succeed"
-  assert_grep "create --name fm-t1 --workspace $WS --empty" "$FM_FAKE_BRAZIL_LOG" \
-    "the build should call brazil-worktree create --empty for fm-<id>"
+  assert_grep "brazil worktree create --name fm-t1 --workspace $WS" "$FM_FAKE_BRAZIL_LOG" \
+    "the build should call brazil worktree create for fm-<id>"
+  assert_no_grep "--empty" "$FM_FAKE_BRAZIL_LOG" "brazil worktree create has no --empty flag"
   assert_equals "$WS/worktrees/fm-t1" "$SHELL_PATH" "the task workspace should sit in the primary's worktrees/"
   assert_equals "$WS" "$(fm_brazil_shell_primary "$SHELL_PATH")" "the workspace should record its primary"
   [ -d "$SHELL_PATH/src" ] || fail "the workspace should have an empty src/"
-  pass "the workspace build runs brazil-worktree create and records the primary"
+  pass "the workspace build runs brazil worktree create and records the primary"
 }
 
 test_build_refuses_an_existing_workspace() {
@@ -79,7 +86,7 @@ test_build_refuses_an_existing_workspace() {
   out=$(fm_brazil_build_workspace_shell "$WS" "$SHELL_PATH" 2>&1)
   status=$?
   [ "$status" -ne 0 ] || fail "an existing workspace path must be refused"
-  assert_contains "$out" "brazil-worktree remove --name fm-t1 --workspace $WS" "the refusal should name the cleanup command"
+  assert_contains "$out" "brazil worktree delete --name fm-t1 --workspace $WS --force" "the refusal should name the cleanup command"
   assert_no_grep "create --name" "$FM_FAKE_BRAZIL_LOG" "nothing should be created over an existing path"
   pass "the workspace build refuses an existing path instead of reusing it"
 }
@@ -99,10 +106,10 @@ test_build_refuses_outside_the_contract() {
 test_build_requires_the_tool() {
   local out
   new_case build-notool PkgA
-  out=$(PATH="$NO_TOOL_PATH" fm_brazil_build_workspace_shell "$WS" "$SHELL_PATH" 2>&1) && fail "a build without brazil-worktree must fail"
-  assert_contains "$out" "toolbox install brazilworktreecli" "the refusal should name the install command"
+  out=$(PATH="$NO_TOOL_PATH" fm_brazil_build_workspace_shell "$WS" "$SHELL_PATH" 2>&1) && fail "a build without a worktree tool must fail"
+  assert_contains "$out" "toolbox update brazilcli" "the refusal should name the brazilcli install command"
   assert_absent "$SHELL_PATH" "no workspace should exist without the tool"
-  pass "the workspace build refuses without brazil-worktree on PATH"
+  pass "the workspace build refuses without brazil worktree or brazil-worktree on PATH"
 }
 
 test_build_removes_a_failed_create() {
@@ -111,7 +118,7 @@ test_build_removes_a_failed_create() {
   out=$(FM_FAKE_BRAZIL_PARTIAL=create fm_brazil_build_workspace_shell "$WS" "$SHELL_PATH" 2>&1) && fail "a failed create must fail the build"
   assert_contains "$out" "stub: create died" "the tool's own diagnostic should be shown"
   assert_absent "$SHELL_PATH" "the partial workspace should be removed"
-  assert_grep "remove --name fm-t1 --workspace $WS" "$FM_FAKE_BRAZIL_LOG" "the partial workspace should be removed through the tool"
+  assert_grep "brazil worktree delete --name fm-t1 --workspace $WS --force" "$FM_FAKE_BRAZIL_LOG" "the partial workspace should be removed through the tool"
   pass "a failed create is reported with the tool's output and its partial workspace removed"
 }
 
@@ -127,7 +134,7 @@ test_add_starts_from_a_fresh_fetch_with_upstream() {
   assert_equals fm-t1 "$(git -C "$dest" symbolic-ref --short HEAD)" "the worktree should sit on the workspace branch"
   assert_equals origin/mainline "$(git -C "$dest" rev-parse --abbrev-ref '@{upstream}')" "the branch should track origin's default branch"
   assert_equals PkgA "$(fm_brazil_shell_packages "$SHELL_PATH")" "the package should be declared"
-  assert_grep "addPackage --name fm-t1 --workspace $WS --package PkgA" "$FM_FAKE_BRAZIL_LOG" "the add should go through the tool"
+  assert_grep "brazil worktree use --name fm-t1 --workspace $WS --package PkgA" "$FM_FAKE_BRAZIL_LOG" "the add should go through the tool"
   assert_contains "$out" "tracking origin/mainline" "the add should report the upstream"
   pass "a package add fetches origin, starts at its tip, and sets the branch's upstream"
 }
@@ -165,7 +172,7 @@ test_add_is_idempotent() {
   : > "$FM_FAKE_BRAZIL_LOG"
   out=$(fm_brazil_add_package "$SHELL_PATH" PkgA 2>&1) || fail "adding a package twice should succeed: $out"
   assert_contains "$out" "already added" "the second add should say so"
-  assert_no_grep addPackage "$FM_FAKE_BRAZIL_LOG" "the second add should not reach the tool"
+  assert_no_grep "worktree use" "$FM_FAKE_BRAZIL_LOG" "the second add should not reach the tool"
   assert_equals "$before" "$(git -C "$SHELL_PATH/src/PkgA" rev-parse HEAD)" "the second add should not move the worktree"
   assert_equals 1 "$(fm_brazil_shell_packages "$SHELL_PATH" | grep -cx PkgA)" "the package should be declared once"
   pass "adding a package again is a no-op"
@@ -180,7 +187,7 @@ test_add_refuses_a_package_the_primary_lacks() {
   assert_contains "$out" "not checked out in this task's primary workspace" "the refusal should say why"
   assert_contains "$out" "$other" "the refusal should name the workspace that holds the package"
   assert_contains "$out" "needs-decision" "the refusal should route cross-workspace work to firstmate"
-  assert_no_grep addPackage "$FM_FAKE_BRAZIL_LOG" "the tool must never be asked for a package the primary lacks"
+  assert_no_grep "worktree use" "$FM_FAKE_BRAZIL_LOG" "the tool must never be asked for a package the primary lacks"
   assert_equals "$before" "$(cat "$WS/packageInfo")" "the primary's packageInfo must be untouched"
   assert_absent "$SHELL_PATH/src/PkgB" "no worktree should be created"
   pass "a package the primary lacks is refused before the tool can touch the primary"
@@ -195,7 +202,7 @@ test_add_refuses_bad_input() {
   fm_brazil_add_package "$SHELL_PATH" PkgA 2>/dev/null && fail "a non-worktree directory must not be overwritten"
   [ -f "$SHELL_PATH/src/PkgA/stray" ] || fail "the existing directory must be left alone"
   fm_brazil_add_package "$TMP_ROOT/add-bad" PkgA 2>/dev/null && fail "a directory without .fm-primary must be refused"
-  assert_no_grep addPackage "$FM_FAKE_BRAZIL_LOG" "no refused add should reach the tool"
+  assert_no_grep "worktree use" "$FM_FAKE_BRAZIL_LOG" "no refused add should reach the tool"
   pass "a package add refuses bad names, foreign directories, and a missing workspace marker"
 }
 
@@ -205,7 +212,7 @@ test_add_refuses_a_leftover_branch() {
   git -C "$WS/src/PkgA" branch fm-t1
   out=$(fm_brazil_add_package "$SHELL_PATH" PkgA 2>&1) && fail "an existing fm-<id> branch must be refused"
   assert_contains "$out" "branch 'fm-t1' already exists" "the refusal should name the branch"
-  assert_no_grep addPackage "$FM_FAKE_BRAZIL_LOG" "the tool must not reuse the leftover branch"
+  assert_no_grep "worktree use" "$FM_FAKE_BRAZIL_LOG" "the tool must not reuse the leftover branch"
   pass "a leftover fm-<id> branch is refused, because the tool would reuse and later delete it"
 }
 
@@ -216,7 +223,7 @@ test_add_refuses_a_stale_base() {
   out=$(fm_brazil_add_package "$SHELL_PATH" PkgA 2>&1) && fail "an unreachable origin must refuse the add"
   assert_contains "$out" "refusing to start the worktree from a stale base" "the refusal should say why"
   assert_contains "$out" "mwinit" "the refusal should name the usual fix"
-  assert_no_grep addPackage "$FM_FAKE_BRAZIL_LOG" "nothing should be added from a stale base"
+  assert_no_grep "worktree use" "$FM_FAKE_BRAZIL_LOG" "nothing should be added from a stale base"
 
   git -C "$WS/src/PkgA" remote remove origin
   out=$(fm_brazil_add_package "$SHELL_PATH" PkgA 2>&1) && fail "a package with no origin must be refused"
@@ -259,9 +266,9 @@ test_add_refuses_a_bogus_tool_result() {
 test_add_surfaces_tool_failure() {
   local out
   new_shell add-toolfail PkgA
-  out=$(FM_FAKE_BRAZIL_FAIL=addPackage fm_brazil_add_package "$SHELL_PATH" PkgA 2>&1) && fail "a failed addPackage must fail the add"
-  assert_contains "$out" "stub: forced addPackage failure" "the tool's own diagnostic should be shown"
-  pass "a failed addPackage is reported with the tool's output"
+  out=$(FM_FAKE_BRAZIL_FAIL=use fm_brazil_add_package "$SHELL_PATH" PkgA 2>&1) && fail "a failed add must fail the add"
+  assert_contains "$out" "stub: forced use failure" "the tool's own diagnostic should be shown"
+  pass "a failed add is reported with the tool's output"
 }
 
 # --- validation ---------------------------------------------------------------
@@ -308,11 +315,11 @@ test_remove_goes_through_the_tool() {
   new_shell remove PkgA
   fm_brazil_add_package "$SHELL_PATH" PkgA >/dev/null 2>&1 || fail "fixture: add PkgA"
   fm_brazil_remove_workspace_shell "$WS" "$SHELL_PATH" || fail "the removal should succeed"
-  assert_grep "remove --name fm-t1 --workspace $WS" "$FM_FAKE_BRAZIL_LOG" "the removal should go through the tool"
+  assert_grep "brazil worktree delete --name fm-t1 --workspace $WS --force" "$FM_FAKE_BRAZIL_LOG" "the removal should go through the tool"
   assert_absent "$SHELL_PATH" "the workspace should be gone"
   git -C "$WS/src/PkgA" show-ref --verify --quiet refs/heads/fm-t1 && fail "the workspace branch should be gone"
   fm_brazil_remove_workspace_shell "$WS" "$SHELL_PATH" || fail "removing a workspace already gone should succeed"
-  pass "the removal deletes the workspace and its branch through brazil-worktree"
+  pass "the removal deletes the workspace and its branch through brazil worktree delete"
 }
 
 test_remove_refuses_unbounded_paths() {
@@ -322,7 +329,7 @@ test_remove_refuses_unbounded_paths() {
   fm_brazil_remove_workspace_shell "$WS" "$WS/worktrees/../worktrees/fm-t1" 2>/dev/null && fail "a path stepping through .. must be refused"
   fm_brazil_remove_workspace_shell "$WS" "$TMP_ROOT/fm-t1" 2>/dev/null && fail "a path outside the primary must be refused"
   fm_brazil_remove_workspace_shell "relative" "relative/worktrees/fm-t1" 2>/dev/null && fail "a relative primary must be refused"
-  assert_no_grep "remove --name" "$FM_FAKE_BRAZIL_LOG" "no refused removal should reach the tool"
+  assert_no_grep "delete --name" "$FM_FAKE_BRAZIL_LOG" "no refused removal should reach the tool"
   [ -d "$SHELL_PATH" ] || fail "the task workspace must survive refused removals"
   pass "the removal refuses every path that is not <primary>/worktrees/fm-<id>"
 }
@@ -331,11 +338,57 @@ test_remove_reports_what_survives() {
   local out
   new_shell remove-left PkgA
   out=$(FM_FAKE_BRAZIL_KEEP=1 fm_brazil_remove_workspace_shell "$WS" "$SHELL_PATH" 2>&1) && fail "a workspace that survives removal must fail it"
-  assert_contains "$out" "still exists after brazil-worktree remove" "the survivor should be named"
-  out=$(FM_FAKE_BRAZIL_FAIL=remove fm_brazil_remove_workspace_shell "$WS" "$SHELL_PATH" 2>&1) && fail "a failed remove must fail the removal"
-  assert_contains "$out" "stub: forced remove failure" "the tool's own diagnostic should be shown"
+  assert_contains "$out" "still exists after brazil worktree delete" "the survivor should be named"
+  out=$(FM_FAKE_BRAZIL_FAIL=delete fm_brazil_remove_workspace_shell "$WS" "$SHELL_PATH" 2>&1) && fail "a failed delete must fail the removal"
+  assert_contains "$out" "stub: forced delete failure" "the tool's own diagnostic should be shown"
   [ -d "$SHELL_PATH" ] || fail "a failed removal must not fall back to deleting the workspace by hand"
   pass "a failed or incomplete removal is reported and leaves the workspace for a retry"
+}
+
+test_remove_forces_past_unpushed_work() {
+  new_shell remove-unpushed PkgA
+  fm_brazil_add_package "$SHELL_PATH" PkgA >/dev/null 2>&1 || fail "fixture: add PkgA"
+  git -C "$SHELL_PATH/src/PkgA" -c user.name=t -c user.email=t@t commit -q --allow-empty -m landed-by-review
+  [ -n "$(git -C "$SHELL_PATH/src/PkgA" log --oneline '@{u}..HEAD')" ] || fail "fixture: the branch should carry an unpushed commit"
+  fm_brazil_remove_workspace_shell "$WS" "$SHELL_PATH" || fail "the removal should not stop at work teardown already proved landed"
+  assert_absent "$SHELL_PATH" "the workspace should be gone"
+  pass "the removal passes --force, because teardown owns the landed-work check"
+}
+
+# --- standalone fallback ----------------------------------------------------
+
+test_standalone_tool_when_brazil_lacks_worktree() {
+  local out
+  new_case standalone PkgA
+  PATH="$STANDALONE_PATH" fm_brazil_build_workspace_shell "$WS" "$SHELL_PATH" || fail "the standalone build should succeed"
+  assert_grep "brazil-worktree create --name fm-t1 --workspace $WS --empty" "$FM_FAKE_BRAZIL_LOG" \
+    "the build should fall back to brazil-worktree create --empty"
+  [ -d "$SHELL_PATH/src" ] || fail "the standalone workspace should have src/"
+  out=$(PATH="$STANDALONE_PATH" fm_brazil_add_package "$SHELL_PATH" PkgA 2>&1) || fail "the standalone add should succeed: $out"
+  assert_grep "brazil-worktree addPackage --name fm-t1 --workspace $WS --package PkgA" "$FM_FAKE_BRAZIL_LOG" \
+    "the add should fall back to brazil-worktree addPackage"
+  out=$(PATH="$STANDALONE_PATH" fm_brazil_build_workspace_shell "$WS" "$SHELL_PATH" 2>&1) && fail "an existing workspace must be refused"
+  assert_contains "$out" "brazil-worktree remove --name fm-t1 --workspace $WS" "the refusal should name the standalone cleanup command"
+  PATH="$STANDALONE_PATH" fm_brazil_remove_workspace_shell "$WS" "$SHELL_PATH" || fail "the standalone removal should succeed"
+  assert_grep "brazil-worktree remove --name fm-t1 --workspace $WS" "$FM_FAKE_BRAZIL_LOG" \
+    "the removal should fall back to brazil-worktree remove"
+  assert_absent "$SHELL_PATH" "the workspace should be gone"
+  assert_no_grep "brazil worktree create" "$FM_FAKE_BRAZIL_LOG" "the build should not reach the missing subcommand"
+  assert_no_grep "brazil worktree use" "$FM_FAKE_BRAZIL_LOG" "the add should not reach the missing subcommand"
+  assert_no_grep "brazil worktree delete" "$FM_FAKE_BRAZIL_LOG" "the removal should not reach the missing subcommand"
+  pass "without brazil worktree, build, add, and removal use the standalone brazil-worktree"
+}
+
+test_brazil_worktree_preferred_over_standalone() {
+  new_case both PkgA
+  PATH="$BOTH_PATH" fm_brazil_build_workspace_shell "$WS" "$SHELL_PATH" || fail "the build should succeed"
+  PATH="$BOTH_PATH" fm_brazil_add_package "$SHELL_PATH" PkgA >/dev/null 2>&1 || fail "the add should succeed"
+  PATH="$BOTH_PATH" fm_brazil_remove_workspace_shell "$WS" "$SHELL_PATH" || fail "the removal should succeed"
+  assert_grep "brazil worktree create --name fm-t1" "$FM_FAKE_BRAZIL_LOG" "the build should use brazil worktree"
+  assert_grep "brazil worktree use --name fm-t1" "$FM_FAKE_BRAZIL_LOG" "the add should use brazil worktree"
+  assert_grep "brazil worktree delete --name fm-t1" "$FM_FAKE_BRAZIL_LOG" "the removal should use brazil worktree"
+  assert_no_grep "brazil-worktree" "$FM_FAKE_BRAZIL_LOG" "the standalone tool should not be called when brazil worktree works"
+  pass "brazil worktree is preferred whenever brazil has the subcommand"
 }
 
 test_launch_section_names_the_workspace() {
@@ -371,4 +424,7 @@ test_validate_rejects_a_damaged_workspace
 test_remove_goes_through_the_tool
 test_remove_refuses_unbounded_paths
 test_remove_reports_what_survives
+test_remove_forces_past_unpushed_work
+test_standalone_tool_when_brazil_lacks_worktree
+test_brazil_worktree_preferred_over_standalone
 test_launch_section_names_the_workspace
