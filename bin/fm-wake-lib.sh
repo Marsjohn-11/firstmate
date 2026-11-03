@@ -774,19 +774,26 @@ fm_lock_wait_pending_mutation() {
   fi
 }
 
+# Succeeds when bash sets $! for a process substitution, which starts at 4.4.
+fm_bash_procsub_sets_pid() {  # [major minor]
+  local major=${1:-${BASH_VERSINFO[0]}} minor=${2:-${BASH_VERSINFO[1]}}
+  [ "$major" -gt 4 ] || { [ "$major" -eq 4 ] && [ "$minor" -ge 4 ]; }
+}
+
 fm_lock_try_create() {
   local lockdir=$1 allowed_steal_owner=${2:-} ownerdir
   local FM_LOCK_PENDING_PREVIOUS_PID FM_LOCK_PENDING_PID=
   FM_LOCK_OWNER_DIR=
-  if [ "${BASH_VERSINFO[0]}" -lt 4 ]; then
-    # This bash also applies nounset to ${!:-}; isolate the safe probe.
+  if ! fm_bash_procsub_sets_pid; then
+    # Older bash also applies nounset to ${!:-}; isolate the safe probe.
     FM_LOCK_PENDING_PREVIOUS_PID=$(set +u; printf '%s' "$!")
-    # Bash 3.2 defers fatal signals until command substitutions finish, and
-    # does not expose a process substitution's pid through $!.
+    # Bash before 4.4 does not set $! for a process substitution, so reading
+    # it under nounset aborts. A command substitution needs no pid, and bash
+    # 3.2 defers fatal signals until it finishes.
     ownerdir=$(fm_lock_owner_dir "$lockdir") || return 1
   else
     FM_LOCK_PENDING_PREVIOUS_PID=${!:-}
-    # Newer bash can enter EXIT before the child finishes. A process
+    # Bash 4.4+ can enter EXIT before the child finishes. A process
     # substitution exposes its pid even before read returns the owner path.
     IFS= read -r ownerdir < <(fm_lock_owner_dir "$lockdir") || return 1
     FM_LOCK_PENDING_PID=$!

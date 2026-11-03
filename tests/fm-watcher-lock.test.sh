@@ -1002,6 +1002,35 @@ test_lock_reclaims_reused_pid_lock() {
 
 # A holder that took the lock through the library records its start time, and
 # while it stays alive a contender still reads that record as held.
+# Bash sets $! for a process substitution only from 4.4 on, so 4.0 to 4.3
+# (Amazon Linux 2 ships 4.2) must take the command-substitution owner read.
+test_lock_owner_read_gate_matches_procsub_pid_support() {
+  local probe lock="$TMP_ROOT/procsub-gate.lock" out major minor want
+  for probe in "3 2 1" "4 0 1" "4 2 1" "4 3 1" "4 4 0" "5 0 0" "5 2 0" "10 0 0"; do
+    read -r major minor want <<< "$probe"
+    out=0
+    FM_STATE_OVERRIDE="$TMP_ROOT/state" bash -c '
+      . "$1"
+      fm_bash_procsub_sets_pid "$2" "$3"
+    ' _ "$LIB" "$major" "$minor" >/dev/null 2>&1 || out=1
+    [ "$out" -eq "$want" ] \
+      || fail "bash $major.$minor process-substitution pid gate returned $out, want $want"
+  done
+  # With the gate closed, a nounset lock acquire with no prior background job
+  # must not read $!.
+  out=$(FM_STATE_OVERRIDE="$TMP_ROOT/state" bash -c '
+    set -u
+    . "$1"
+    fm_bash_procsub_sets_pid() { return 1; }
+    fm_lock_try_create "$2" || exit 7
+    fm_lock_release "$2"
+  ' _ "$LIB" "$lock" 2>&1) \
+    || fail "lock acquire without process-substitution pid support failed: $out"
+  [ -z "$out" ] || fail "lock acquire without process-substitution pid support warned: $out"
+  [ ! -e "$lock" ] && [ ! -L "$lock" ] || fail "lock acquire left $lock behind"
+  pass "lock owner read uses process substitution only where bash sets its pid"
+}
+
 test_lock_respects_live_holder_matching_its_start_time() {
   local dir state lockdir holder i out recorded expected
   dir=$(make_case lock-live-identity)
@@ -2941,6 +2970,7 @@ test_lock_resumes_own_interrupted_steal_reap
 test_lock_live_steal_mutex_is_not_reclaimed
 test_lock_does_not_steal_live_lock
 test_lock_reclaims_reused_pid_lock
+test_lock_owner_read_gate_matches_procsub_pid_support
 test_lock_respects_live_holder_matching_its_start_time
 test_lock_reclaims_holder_whose_identity_no_longer_recomputes
 test_lock_keeps_live_daemon_holder_with_stale_identity
