@@ -1,0 +1,19 @@
+lab core session fm-hclab-coreprobe-582213-31538 ready (server pid 582295)
+hc: hc 0.1.15  session=fm-hclab-coreprobe-582213-31538
+core_id=8a314de4cd387be34dc59dcff96e06c2 rc=0
+core_id stable across calls
+runtime_check hc rc: 0
+created address=t1
+recheck(live shell, recorded core)=unproven
+recheck(never-existed t9999, recorded core)=missing
+recheck(never-existed t9999, no recorded core)=unproven
+recheck(never-existed t9999, other core id)=unproven
+killed fm-hclab-coreprobe-582213-31538:t1
+recheck(killed terminal, recorded core)=missing
+recheck(killed terminal, wrong label)=missing
+validate_harness hc hermes: error: hermes is verified on the tmux backend only; backend=hc is unsupported
+rc=1
+validate_harness herdr hermes: error: hermes is verified on the tmux backend only; backend=herdr is unsupported
+rc=1
+validate_harness tmux hermes: rc=0
+teardown ok (fm-hclab-coreprobe-582213-31538)

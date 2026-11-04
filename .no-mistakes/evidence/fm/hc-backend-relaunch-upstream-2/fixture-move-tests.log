@@ -1,0 +1,13 @@
+ok - fm-spawn --relaunch --move-backend hc: a dead herdr task moves into an hc terminal in its own worktree
+ok - fm-spawn --relaunch --move-backend hc: refuses while the old agent is not proven stopped
+ok - fm-spawn --move-backend: refuses a same-backend, unsupported, or fresh-spawn move
+ok - fm-spawn --relaunch --move-backend hc: an abort before publication closes the new terminal and keeps the old record
+ok - fm-control relaunch --backend hc: exits the old agent, launches on hc, and completes the transaction
+ok - fm-control relaunch --backend hc: refuses before the old agent stops when hc cannot take the task
+ok - fm-control relaunch --backend herdr: refuses before the old agent stops when herdr cannot run
+ok - fm-control relaunch --backend hc: refuses a Hermes task before the old agent stops
+ok - fm-control relaunch --backend hc: a moved Claude agent resumes its conversation
+ok - fm-control relaunch --backend hc: without a live session record the replacement starts fresh
+ok - fm-spawn --relaunch --move-backend herdr: an hc task moves back to a Herdr pane in its worktree
+ok - fm-spawn --relaunch --move-backend hc: a core without an id records no hc_core instead of refusing
+ok - fm-spawn --relaunch on hc: an aborted rebind keeps the finished terminal, so a retry still proves it gone
