@@ -1,0 +1,4 @@
+ok - a spawn without the build-output setting exports and records nothing new
+ok - config/build-output-root creates, records, and exports the per-lane build-output directory
+ok - FM_BUILD_OUTPUT_ROOT overrides config/build-output-root, and a relative or dotted value stays off
+bash tests/$t.test.sh  9.75s user 3.44s system 59% cpu 22.171 total

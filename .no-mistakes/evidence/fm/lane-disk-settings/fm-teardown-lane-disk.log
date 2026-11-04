@@ -1,0 +1,5 @@
+ok - lane disk cleanup removes declared scratch and the recorded build output once work has landed
+ok - lane disk cleanup is off by default
+ok - FM_SCRATCH_DIRS overrides config/scratch-dirs
+ok - a refused teardown leaves scratch and build output untouched
+ok - clone discipline warns about separate full clones at teardown and deletes nothing
