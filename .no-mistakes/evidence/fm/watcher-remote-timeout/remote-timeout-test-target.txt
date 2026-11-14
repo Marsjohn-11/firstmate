@@ -1,0 +1,9 @@
+1..7
+ok - a bounded remote call that blocks returns 255 within its bound
+ok - a timed-out host backs off at once for bounded callers and clears on completion
+ok - a blocked remote poll cannot stall the watcher cycle's other checks
+ok - repeated timeouts queue one actionable wake naming the host and command
+ok - stuck hosts share one cycle's remote budget and the cycle still runs its other checks
+ok - a remote command's own 124 or 137 passes through as a normal completion
+ok - the timeout tick never rewrites a record and a new streak wakes again
+FM_TEST_COMPLETE

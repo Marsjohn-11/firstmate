@@ -1,0 +1,31 @@
+$ fm-on.sh --bounded rsm1 fm-remote-secondmate-control.sh state rsm1   (call 1, FM_REMOTE_CALL_TIMEOUT=2)
+error: remote command on host lab-host timed out after 2s (consecutive timeouts: 1): fm-remote-secondmate-control.sh state rsm1
+[rc=255]
+$ fm-on.sh --bounded rsm1 fm-remote-secondmate-control.sh state rsm1   (call 2, FM_REMOTE_CALL_TIMEOUT=2)
+error: remote command on host lab-host timed out after 2s (consecutive timeouts: 2): fm-remote-secondmate-control.sh state rsm1
+[rc=255]
+$ fm-on.sh --bounded rsm1 fm-remote-secondmate-control.sh state rsm1   (call 3, FM_REMOTE_CALL_TIMEOUT=2)
+error: remote command on host lab-host timed out after 2s (consecutive timeouts: 3): fm-remote-secondmate-control.sh state rsm1
+[rc=255]
+$ fm-on.sh --bounded ... (default backoff, immediately after)
+error: remote host lab-host is backing off for 240s after 3 consecutive timeouts (last: fm-remote-secondmate-control.sh state rsm1); not running fm-remote-secondmate-control.sh state rsm1
+[rc=255 in 0s]
+--- record:
+count=3
+last_at=1794631779
+bound=2
+command=fm-remote-secondmate-control.sh state rsm1
+streak=1794631775-1384175
+--- watcher cycle 1:
+check: remote host lab-host timed out 3 consecutive times running fm-remote-secondmate-control.sh state rsm1  (bound 2s); the remote command is alive but stuck - inspect that host (disk space, load, its remote job worker); bounded polls to it back off meanwhile
+[watcher rc=0]
+--- watcher cycle 2 (same streak, expect no repeat wake):
+check: rearm-resurface
+[watcher rc=0]
+--- host recovers:
+alive
+[rc=0]
+--- watcher cycle 3 after recovery (record cleared):
+check: rearm-resurface
+[watcher rc=0]
+files left:

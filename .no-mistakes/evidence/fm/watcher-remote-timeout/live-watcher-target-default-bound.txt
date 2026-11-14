@@ -1,0 +1,16 @@
+04:41:42 watcher start (root=/local/home/marsjohn/.no-mistakes/worktrees/912b065c2da1/01M7C4MX24J22NJS48ERR9H5PT)
+04:43:45 watcher exited after 123s
+--- fake ssh calls:
+04:41:43 ssh 1
+--- unrelated check log:
+04:43:44 unrelated check ran
+--- watcher stdout:
+check: /tmp/fm-w.F9IQSc/home/state/merge.check.sh: unrelated check ran
+--- watcher stderr (tail):
+--- timeout records:
+/tmp/fm-w.F9IQSc/home/state/remote-call-timeouts/lab-host
+count=1
+last_at=1794631423
+bound=120
+command=fm-remote-secondmate-control.sh state rsm1
+streak=1794631423-1153556

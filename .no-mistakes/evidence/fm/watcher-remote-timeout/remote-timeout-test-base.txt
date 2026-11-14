@@ -1,0 +1,2 @@
+1..7
+not ok - a timed-out remote call must report unavailable (255), got 1: error: remote route must be a safe secondmate id or SSH alias: --bounded

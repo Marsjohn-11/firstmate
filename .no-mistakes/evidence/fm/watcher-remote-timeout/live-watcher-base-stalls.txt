@@ -1,0 +1,9 @@
+04:39:06 watcher start (root=/tmp/fm-base.MgyVaF)
+04:41:36 watcher still running after 150s -> killing
+--- fake ssh calls:
+04:39:06 ssh 1
+--- unrelated check log:
+(never ran)
+--- watcher stdout:
+--- watcher stderr (tail):
+--- timeout records:

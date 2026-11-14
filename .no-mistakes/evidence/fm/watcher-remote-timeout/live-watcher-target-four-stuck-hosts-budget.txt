@@ -1,0 +1,13 @@
+04:46:46 watcher start, 4 secondmates on 4 stuck hosts, default FM_REMOTE_CALL_TIMEOUT/CYCLE_BUDGET
+04:49:18 watcher cycle finished after 152s
+--- fake ssh dials:
+04:46:46 ssh dial host-1
+04:48:47 ssh dial host-2
+--- unrelated check:
+04:49:18 unrelated check ran
+--- watcher stdout:
+check: /tmp/fm-w.y7dxkf/home/state/merge.check.sh: unrelated check ran
+--- timeout records:
+host-1
+--- budget file:
+150
