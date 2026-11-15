@@ -1,0 +1,63 @@
+### Relaunch R1: intact log stays armed at its cursor
+
+$ /local/home/marsjohn/.no-mistakes/worktrees/778ef3ccfd52/01M7EAQEN67PNJW937KWA8XWW7/bin/fm-procevent-remote-reply.sh rebase mega --if-moved
+unchanged: remote-reply-mega has no reply channel to rebase
+[exit 0]
+
+$ /local/home/marsjohn/.no-mistakes/worktrees/778ef3ccfd52/01M7EAQEN67PNJW937KWA8XWW7/bin/fm-procevent-remote-reply.sh arm mega
+registered: remote-reply-mega (remote-reply)
+armed: remote-reply-mega offset=0
+[exit 0]
+(mirrored)
+
+$ cat $FM_HOME/state/mega.status
+working: first host is up
+needs-decision [key=q1]: pick a cache size
+
+$ /local/home/marsjohn/.no-mistakes/worktrees/778ef3ccfd52/01M7EAQEN67PNJW937KWA8XWW7/bin/fm-procevent-remote-reply.sh registered mega
+[exit 0]
+
+$ /local/home/marsjohn/.no-mistakes/worktrees/778ef3ccfd52/01M7EAQEN67PNJW937KWA8XWW7/bin/fm-remote-secondmate-relaunch.sh mega codex default medium
+schema=fm-remote-secondmate-control.v1
+backend=herdr
+target=fm-remote:w1:p1
+herdr_session=fm-remote
+harness=codex
+model=default
+effort=medium
+retired: remote-reply-mega
+unchanged: remote-reply-mega offset=69
+[exit 0]
+
+$ /local/home/marsjohn/.no-mistakes/worktrees/778ef3ccfd52/01M7EAQEN67PNJW937KWA8XWW7/bin/fm-procevent-remote-reply.sh registered mega
+[exit 0]
+harness=codex
+effort=medium
+### Relaunch R2: desk rebuilt with a new log, relaunch rebases; only new lines mirrored
+
+$ /local/home/marsjohn/.no-mistakes/worktrees/778ef3ccfd52/01M7EAQEN67PNJW937KWA8XWW7/bin/fm-remote-secondmate-relaunch.sh mega claude default high
+schema=fm-remote-secondmate-control.v1
+backend=herdr
+target=fm-remote:w1:p1
+herdr_session=fm-remote
+harness=claude
+model=default
+effort=high
+retired: remote-reply-mega
+rebased: remote-reply-mega reason=prefix-changed
+[exit 0]
+
+$ /local/home/marsjohn/.no-mistakes/worktrees/778ef3ccfd52/01M7EAQEN67PNJW937KWA8XWW7/bin/fm-procevent-remote-reply.sh registered mega
+[exit 0]
+(new lines mirrored)
+
+$ cat $FM_HOME/state/mega.status
+working: first host is up
+needs-decision [key=q1]: pick a cache size
+note: rebuilt on a new host
+working: caught up after the move
+(count of already-mirrored line before=1 after=1)
+
+$ ssh transport log
+      2 ssh localhost fm-remote-delta-read.sh state/parent-replies.status 0 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 5 
+      2 ssh localhost fm-remote-delta-read.sh state/parent-replies.status 69 c0e73fc414f5a6270b44c62f9d309566d069aa1cd3c82e1e78af5a3871f5d5c6 0 

@@ -1,0 +1,5 @@
+ok - remote provisioning publishes durable parent state before its completion marker
+/tmp/fm-remote-parent-binding.qjolPE/remote-root/bin/fm-wake-lib.sh: line 770: $!: unbound variable
+error: remote provisioning failed; registry restored
+not ok - real remote secondmate seeding failed
+rc=1

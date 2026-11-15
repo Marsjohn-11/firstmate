@@ -1,0 +1,94 @@
+### Scenario A: first host; arm and mirror over real ssh
+
+$ /local/home/marsjohn/.no-mistakes/worktrees/778ef3ccfd52/01M7EAQEN67PNJW937KWA8XWW7/bin/fm-procevent-remote-reply.sh rebase mega --if-moved
+unchanged: remote-reply-mega has no reply channel to rebase
+[exit 0]
+
+$ /local/home/marsjohn/.no-mistakes/worktrees/778ef3ccfd52/01M7EAQEN67PNJW937KWA8XWW7/bin/fm-procevent-remote-reply.sh arm mega
+registered: remote-reply-mega (remote-reply)
+armed: remote-reply-mega offset=0
+[exit 0]
+(mirrored)
+
+$ cat $FM_HOME/state/mega.status
+working: first host is up
+needs-decision [key=q1]: pick a cache size
+
+$ /local/home/marsjohn/.no-mistakes/worktrees/778ef3ccfd52/01M7EAQEN67PNJW937KWA8XWW7/bin/fm-procevent-remote-reply.sh registered mega
+[exit 0]
+
+$ /local/home/marsjohn/.no-mistakes/worktrees/778ef3ccfd52/01M7EAQEN67PNJW937KWA8XWW7/bin/fm-procevent-remote-reply.sh rebase mega --if-moved
+retired: remote-reply-mega
+unchanged: remote-reply-mega offset=69
+[exit 0]
+
+$ /local/home/marsjohn/.no-mistakes/worktrees/778ef3ccfd52/01M7EAQEN67PNJW937KWA8XWW7/bin/fm-procevent-remote-reply.sh registered mega
+[exit 0]
+
+$ /local/home/marsjohn/.no-mistakes/worktrees/778ef3ccfd52/01M7EAQEN67PNJW937KWA8XWW7/bin/fm-crew-state.sh mega
+state: parked · source: status-log · pick a cache size · remote endpoint alive on localhost
+[exit 0]
+### Scenario B: desk rebuilt -> new log -> continuity break, channel dead
+
+$ stop live listener pid= (desk goes down)
+(continuity break recorded)
+
+$ cat $FM_HOME/state/mega.status
+working: first host is up
+needs-decision [key=q1]: pick a cache size
+blocked [key=remote-reply-continuity-mega] [at=1794705431]: remote reply continuity broke for mega (prefix-changed) at offset 69 prefix c0e73fc414f5 retirements 0
+
+$ /local/home/marsjohn/.no-mistakes/worktrees/778ef3ccfd52/01M7EAQEN67PNJW937KWA8XWW7/bin/fm-procevent-remote-reply.sh registered mega
+[exit 1]
+
+$ append hand-written resolved line
+
+$ /local/home/marsjohn/.no-mistakes/worktrees/778ef3ccfd52/01M7EAQEN67PNJW937KWA8XWW7/bin/fm-procevent-remote-reply.sh registered mega
+[exit 1]
+
+$ /local/home/marsjohn/.no-mistakes/worktrees/778ef3ccfd52/01M7EAQEN67PNJW937KWA8XWW7/bin/fm-crew-state.sh mega
+state: blocked · source: remote-endpoint · remote reply channel for mega is not registered, so its replies are not being collected; recover with bin/fm-procevent-remote-reply.sh rebase mega · remote endpoint alive on localhost
+[exit 0]
+### Scenario C: pending capture -> crew-state names handle; rebase refuses
+
+$ /local/home/marsjohn/.no-mistakes/worktrees/778ef3ccfd52/01M7EAQEN67PNJW937KWA8XWW7/bin/fm-crew-state.sh mega
+state: blocked · source: remote-endpoint · remote reply channel for mega is not registered, so its replies are not being collected; recover with bin/fm-procevent-remote-reply.sh handle mega 999 /tmp/fm-lab.FXLJzZ/state/procevent-inbox/remote-reply-mega.999.result, then rebase mega · remote endpoint alive on localhost
+[exit 0]
+
+$ /local/home/marsjohn/.no-mistakes/worktrees/778ef3ccfd52/01M7EAQEN67PNJW937KWA8XWW7/bin/fm-procevent-remote-reply.sh rebase mega
+error: remote reply rebase refused with 1 unhandled captured result(s); handle them first
+[exit 1]
+(cursor unchanged by refused rebase)
+
+$ /local/home/marsjohn/.no-mistakes/worktrees/778ef3ccfd52/01M7EAQEN67PNJW937KWA8XWW7/bin/fm-procevent-remote-reply.sh registered mega
+[exit 1]
+### Scenario D: rebase --if-moved recovers; only new lines mirrored
+
+$ /local/home/marsjohn/.no-mistakes/worktrees/778ef3ccfd52/01M7EAQEN67PNJW937KWA8XWW7/bin/fm-procevent-remote-reply.sh rebase mega --if-moved
+retired: remote-reply-mega
+rebased: remote-reply-mega reason=prefix-changed
+[exit 0]
+
+$ /local/home/marsjohn/.no-mistakes/worktrees/778ef3ccfd52/01M7EAQEN67PNJW937KWA8XWW7/bin/fm-procevent-remote-reply.sh registered mega
+[exit 0]
+(new lines mirrored)
+
+$ cat $FM_HOME/state/mega.status
+working: first host is up
+needs-decision [key=q1]: pick a cache size
+blocked [key=remote-reply-continuity-mega] [at=1794705431]: remote reply continuity broke for mega (prefix-changed) at offset 69 prefix c0e73fc414f5 retirements 0
+resolved [key=remote-reply-continuity-mega]: looked fine
+blocked [key=remote-reply-continuity-mega]: reopened
+resolved [key=remote-reply-continuity-mega] [at=1794705435]: remote reply channel for mega rebased onto its current log (prefix-changed)
+note: rebuilt on a new host
+working: caught up after the move
+(count of already-mirrored line before=1 after=1)
+
+$ /local/home/marsjohn/.no-mistakes/worktrees/778ef3ccfd52/01M7EAQEN67PNJW937KWA8XWW7/bin/fm-crew-state.sh mega
+state: parked · source: status-log · pick a cache size · remote endpoint alive on localhost
+[exit 0]
+
+$ ssh transport log
+      2 ssh localhost fm-remote-delta-read.sh state/parent-replies.status 0 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 5 
+      2 ssh localhost fm-remote-delta-read.sh state/parent-replies.status 69 c0e73fc414f5a6270b44c62f9d309566d069aa1cd3c82e1e78af5a3871f5d5c6 0 
+      1 ssh localhost fm-remote-delta-read.sh state/parent-replies.status 69 c0e73fc414f5a6270b44c62f9d309566d069aa1cd3c82e1e78af5a3871f5d5c6 5 
