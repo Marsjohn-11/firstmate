@@ -1,0 +1,16 @@
+=== [base 427056c4] drain 1 (fresh history) ===
+history lines presented: 300
+--- persisted cursor identities before reboot ---
+/tmp/fm-lab.JEcJCI/state/.task1.open-decisions-cursor:ident=strong:35:8643435:2026-11-16 01:45:39.333884839 +0000
+task1	strong:35:8643435:2026-11-16 01:45:39.333884839 +0000
+real stat: dev=35 ino=8643435
+--- after simulated renumbering (35 -> 38) ---
+/tmp/fm-lab.JEcJCI/state/.task1.open-decisions-cursor:ident=strong:38:8643435:2026-11-16 01:45:39.333884839 +0000
+=== [base 427056c4] drain 2 (after renumbering) ===
+replayed history lines: 300
+task1 note: first line after the reboot
+task1 [key=release] needs-decision: choose target
+drain seconds: 4.52
+fold cursor: offset=6870 file size=6870
+=== [base 427056c4] drain 3 (file replaced, new inode 8643685) ===
+history lines re-presented: 300

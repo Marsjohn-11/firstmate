@@ -1,0 +1,8 @@
+[fix] daemon, device renumbered 35->38: rc=0 marker=kept
+[fix] daemon, different inode (adversarial): rc=1 marker=removed
+[fix] watcher, device renumbered 35->38: rc=0 marker=kept
+[fix] watcher, different inode (adversarial): rc=1 marker=removed
+[base] daemon, device renumbered 35->38: rc=1 marker=REMOVED
+[base] daemon, different inode (adversarial): rc=1 marker=removed
+[base] watcher, device renumbered 35->38: rc=1 marker=REMOVED
+[base] watcher, different inode (adversarial): rc=1 marker=removed

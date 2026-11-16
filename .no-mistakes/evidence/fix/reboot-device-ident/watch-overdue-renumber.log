@@ -1,0 +1,6 @@
+1..2
+date: invalid date ‘@’
+ok - an overdue marker survives a device renumbering and still clears for a different inode
+date: invalid date ‘@’
+ok - a fresh overdue marker survives reconciliation and closes when the worker resumes
+FM_TEST_COMPLETE
