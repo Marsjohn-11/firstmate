@@ -1,0 +1,15 @@
+ok - only a remote mate home resolves its own parent channel for exclusion
+ok - fm_parent_channel_outbound_status resolves only the remote route
+ok - a remote mate's folds omit its channel and keep a genuine task
+ok - the cursor-backed incremental fold omits a remote mate's channel
+ok - the channel's resolution and note lines stay off the remote unread surface
+ok - a parent-replies.status in a main home still folds
+ok - a parent-replies.status in a local mate still folds
+ok - scan_signals skips a remote mate's channel and still reports its tasks
+ok - record hygiene reports and archives orphans but leaves a remote mate's parent channel in place
+ok - the heartbeat backstop skips a remote mate's channel and keeps its tasks
+ok - scan_signals keeps parent-replies.status outside remote mate homes
+ok - the daemon's catch-all scan skips a remote mate's channel and keeps its tasks
+ok - the daemon's catch-all scan keeps parent-replies.status outside remote mate homes
+ok - the real drain presents no channel content from a remote mate home
+ok - stale channel records from an older watcher are dropped, not presented

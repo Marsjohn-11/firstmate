@@ -1,0 +1,29 @@
+## lab home with 71 multi-line status files (70 workers + 1 open decision)
+untiered drain #1 (presents everything): 24992ms
+untiered drain #2: 66168ms
+untiered drain #3: 74626ms
+  colddec lines in untiered output: 1
+
+## enable config/status-scan-tiers (hot-seconds=600), age files 2h
+session-start full scan: 64421ms
+colddec [key=pick] needs-decision: choose the cold option
+
+## ordinary drains inside the sweep interval
+tiered drain #1: 4228ms
+STATUS SCAN: skipped 71 cold status file(s) on this wake; a drain scans every file at least every 600 s, and on a heartbeat wake or session start.
+tiered drain #2: 5865ms
+STATUS SCAN: skipped 71 cold status file(s) on this wake; a drain scans every file at least every 600 s, and on a heartbeat wake or session start.
+
+## one worker appends a line (hot) while the rest stay cold
+t5 note: new progress
+STATUS SCAN: skipped 70 cold status file(s) on this wake; a drain scans every file at least every 600 s, and on a heartbeat wake or session start.
+
+## FM_HEARTBEAT=60 with sweep recorded 120s ago -> timed full sweep
+colddec [key=pick] needs-decision: choose the cold option
+## next drain after that sweep
+colddec [key=pick] needs-decision: choose the cold option
+
+## adversarial: tiering on, single-line status file (manifest offset stays 0)
+solo [key=solo] needs-decision: single line decision
+STATUS SCAN: skipped 70 cold status file(s) on this wake; a drain scans every file at least every 600 s, and on a heartbeat wake or session start.
+solo	0	0

@@ -1,0 +1,10 @@
+ok - the batched snapshot is byte-identical to the per-file reader, row for row
+ok - the cursor path from parameter expansion matches dirname and basename
+ok - without config/status-scan-tiers every drain scans every file and --full-status-scan changes nothing
+ok - a cold file's old open decision is skipped on ordinary wakes and presented on heartbeat and session start
+ok - a cold file that gains a line is hot on the next drain, whatever its age
+ok - with no heartbeat wake a cold open decision is presented again once FM_HEARTBEAT seconds pass since the last full scan, and not before
+ok - a task that a presented signal wake names is scanned even when cold
+ok - a malformed config keeps hot-seconds=3600
+ok - with 10 hot files a tiered drain starts 491 processes for 71 or 81 files (full scan: 219 for 2 files, 315 for 6)
+bash tests/fm-status-scan-tiers.test.sh  53.72s user 54.53s system 71% cpu 2:30.68 total
