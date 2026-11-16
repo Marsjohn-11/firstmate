@@ -1,0 +1,5 @@
+1..7
+ok - with no config file, failure wakes and the fleet view are unchanged
+ok - the first failure of a source wakes at once
+ok - repeats inside the window are counted without a wake, and recovery wakes once with the count
+not ok - repeat_after_window_wakes: not ok - the runner for after-src never released its claim

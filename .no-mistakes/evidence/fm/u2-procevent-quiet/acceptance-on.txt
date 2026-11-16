@@ -1,0 +1,70 @@
+[on] episode 1: failing launches so far=3  failed-wakes=1 recovered-wakes=0
+  repair: reconciled: published=0 started=1 stopped=0 uncertain=0 failed=0
+[on] episode 2: failing launches so far=6  failed-wakes=1 recovered-wakes=1
+  repair: reconciled: published=1 started=1 stopped=0 uncertain=0 failed=0
+[on] episode 3: failing launches so far=9  failed-wakes=1 recovered-wakes=1
+  repair: reconciled: published=2 started=1 stopped=0 uncertain=0 failed=0
+[on] episode 4: failing launches so far=12  failed-wakes=1 recovered-wakes=1
+--- fleet view (while failing) ---
+## Quiet Process-Event Failures
+| Source | State | Failures Counted | Counted In Window | Since | Last Failure | Reason |
+| --- | --- | --- | --- | --- | --- | --- |
+| flaky | failing | 3 | 11 | 2026-11-16T00:24:55Z | 2026-11-16T00:25:37Z | registration argv is unreadable: flaky |
+final repair: reconciled: published=3 started=1 stopped=0 uncertain=0 failed=0
+[on] TOTAL: failing launches=12 failed-wakes=1 recovered-wakes=1
+--- wake queue payloads ---
+procevent:flaky:launch-failed:35-8420444-2726427497 | check: process-event source flaky is registered but its launch did not prove it took the source's claim within FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS, so nothing is confirmed to be collecting from it; reconcile reports that as failed= and keeps launching it every supervision cycle. If it stays that way, check the source command and the adapter binary the registration names, and run an attached bin/fm-procevent.sh start flaky to reproduce a refusal on its stderr - the detached launch discards it, and a hand-run reconcile only counts it as failed=. A later cycle that finds the source owned ends this episode on its own, so a runner that was merely slow to claim needs nothing from you.
+procevent:flaky:launch-recovered:2868827300 | check: process-event source flaky started again after 2 further failed launches that were counted without a wake since its failure wake at 2026-11-16T00:24:55Z (the runner refused before claiming: registration argv is unreadable: flaky); config/procevent-failure-wakes sets that policy. Nothing needs doing unless it fails again. A failure of the same kind before 2026-11-16T01:24:55Z stays quiet and is counted in the fleet view.
+procevent:flaky:1 | check: procevent lavish flaky 1
+procevent:flaky:1 | check: procevent lavish flaky 1
+procevent:flaky:1 | check: procevent lavish flaky 1
+procevent:flaky:1 | check: procevent lavish flaky 1
+procevent:flaky:1 | check: procevent lavish flaky 1
+procevent:flaky:2 | check: procevent lavish flaky 2
+procevent:flaky:1 | check: procevent lavish flaky 1
+procevent:flaky:1 | check: procevent lavish flaky 1
+procevent:flaky:2 | check: procevent lavish flaky 2
+procevent:flaky:1 | check: procevent lavish flaky 1
+procevent:flaky:2 | check: procevent lavish flaky 2
+procevent:flaky:1 | check: procevent lavish flaky 1
+procevent:flaky:2 | check: procevent lavish flaky 2
+procevent:flaky:1 | check: procevent lavish flaky 1
+procevent:flaky:2 | check: procevent lavish flaky 2
+procevent:flaky:3 | check: procevent lavish flaky 3
+procevent:flaky:1 | check: procevent lavish flaky 1
+procevent:flaky:2 | check: procevent lavish flaky 2
+procevent:flaky:1 | check: procevent lavish flaky 1
+procevent:flaky:2 | check: procevent lavish flaky 2
+procevent:flaky:3 | check: procevent lavish flaky 3
+procevent:flaky:1 | check: procevent lavish flaky 1
+procevent:flaky:2 | check: procevent lavish flaky 2
+procevent:flaky:3 | check: procevent lavish flaky 3
+procevent:flaky:1 | check: procevent lavish flaky 1
+procevent:flaky:2 | check: procevent lavish flaky 2
+procevent:flaky:3 | check: procevent lavish flaky 3
+procevent:flaky:1 | check: procevent lavish flaky 1
+procevent:flaky:2 | check: procevent lavish flaky 2
+procevent:flaky:3 | check: procevent lavish flaky 3
+procevent:flaky:4 | check: procevent lavish flaky 4
+procevent:flaky:1 | check: procevent lavish flaky 1
+procevent:flaky:2 | check: procevent lavish flaky 2
+procevent:flaky:3 | check: procevent lavish flaky 3
+--- watcher headline ---
+check: process-event result captured: procevent:flaky:1 procevent:flaky:2 procevent:flaky:3 procevent:flaky:4; process-event source failed to start: procevent:flaky:launch-failed:35-8420444-2726427497; process-event source started again: procevent:flaky:launch-recovered:2868827300
+--- fleet view (after recovery) ---
+## Quiet Process-Event Failures
+| Source | State | Failures Counted | Counted In Window | Since | Last Failure | Reason |
+| --- | --- | --- | --- | --- | --- | --- |
+| flaky | recovered | 0 | 11 | 2026-11-16T00:24:55Z | 2026-11-16T00:25:37Z | registration argv is unreadable: flaky |
+--- quiet log ---
+2026-11-16T00:24:57Z flaky counted launch-refused-2566640615: the runner refused before claiming: registration argv is unreadable: flaky
+2026-11-16T00:24:59Z flaky counted launch-refused-2566640615: the runner refused before claiming: registration argv is unreadable: flaky
+2026-11-16T00:25:03Z flaky counted launch-refused-2566640615: the runner refused before claiming: registration argv is unreadable: flaky
+2026-11-16T00:25:05Z flaky counted launch-refused-2566640615: the runner refused before claiming: registration argv is unreadable: flaky
+2026-11-16T00:25:07Z flaky counted launch-refused-2566640615: the runner refused before claiming: registration argv is unreadable: flaky
+2026-11-16T00:25:13Z flaky counted launch-refused-2566640615: the runner refused before claiming: registration argv is unreadable: flaky
+2026-11-16T00:25:16Z flaky counted launch-refused-2566640615: the runner refused before claiming: registration argv is unreadable: flaky
+2026-11-16T00:25:19Z flaky counted launch-refused-2566640615: the runner refused before claiming: registration argv is unreadable: flaky
+2026-11-16T00:25:29Z flaky counted launch-refused-2566640615: the runner refused before claiming: registration argv is unreadable: flaky
+2026-11-16T00:25:33Z flaky counted launch-refused-2566640615: the runner refused before claiming: registration argv is unreadable: flaky
+2026-11-16T00:25:37Z flaky counted launch-refused-2566640615: the runner refused before claiming: registration argv is unreadable: flaky

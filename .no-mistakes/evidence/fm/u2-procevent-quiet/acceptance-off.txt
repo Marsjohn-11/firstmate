@@ -1,0 +1,52 @@
+[off] episode 1: failing launches so far=3  failed-wakes=1 recovered-wakes=0
+  repair: reconciled: published=0 started=1 stopped=0 uncertain=0 failed=0
+[off] episode 2: failing launches so far=6  failed-wakes=2 recovered-wakes=0
+  repair: reconciled: published=1 started=1 stopped=0 uncertain=0 failed=0
+[off] episode 3: failing launches so far=9  failed-wakes=3 recovered-wakes=0
+  repair: reconciled: published=2 started=1 stopped=0 uncertain=0 failed=0
+[off] episode 4: failing launches so far=12  failed-wakes=4 recovered-wakes=0
+--- fleet view (while failing) ---
+final repair: reconciled: published=3 started=1 stopped=0 uncertain=0 failed=0
+[off] TOTAL: failing launches=12 failed-wakes=4 recovered-wakes=0
+--- wake queue payloads ---
+procevent:flaky:launch-failed:35-8420445-238507292 | check: process-event source flaky is registered but its launch did not prove it took the source's claim within FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS, so nothing is confirmed to be collecting from it; reconcile reports that as failed= and keeps launching it every supervision cycle. If it stays that way, check the source command and the adapter binary the registration names, and run an attached bin/fm-procevent.sh start flaky to reproduce a refusal on its stderr - the detached launch discards it, and a hand-run reconcile only counts it as failed=. A later cycle that finds the source owned ends this episode on its own, so a runner that was merely slow to claim needs nothing from you.
+procevent:flaky:1 | check: procevent lavish flaky 1
+procevent:flaky:1 | check: procevent lavish flaky 1
+procevent:flaky:launch-failed:35-8420445-516812948 | check: process-event source flaky is registered but its launch did not prove it took the source's claim within FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS, so nothing is confirmed to be collecting from it; reconcile reports that as failed= and keeps launching it every supervision cycle. If it stays that way, check the source command and the adapter binary the registration names, and run an attached bin/fm-procevent.sh start flaky to reproduce a refusal on its stderr - the detached launch discards it, and a hand-run reconcile only counts it as failed=. A later cycle that finds the source owned ends this episode on its own, so a runner that was merely slow to claim needs nothing from you.
+procevent:flaky:1 | check: procevent lavish flaky 1
+procevent:flaky:1 | check: procevent lavish flaky 1
+procevent:flaky:1 | check: procevent lavish flaky 1
+procevent:flaky:2 | check: procevent lavish flaky 2
+procevent:flaky:1 | check: procevent lavish flaky 1
+procevent:flaky:1 | check: procevent lavish flaky 1
+procevent:flaky:2 | check: procevent lavish flaky 2
+procevent:flaky:launch-failed:35-8420445-125611637 | check: process-event source flaky is registered but its launch did not prove it took the source's claim within FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS, so nothing is confirmed to be collecting from it; reconcile reports that as failed= and keeps launching it every supervision cycle. If it stays that way, check the source command and the adapter binary the registration names, and run an attached bin/fm-procevent.sh start flaky to reproduce a refusal on its stderr - the detached launch discards it, and a hand-run reconcile only counts it as failed=. A later cycle that finds the source owned ends this episode on its own, so a runner that was merely slow to claim needs nothing from you.
+procevent:flaky:1 | check: procevent lavish flaky 1
+procevent:flaky:2 | check: procevent lavish flaky 2
+procevent:flaky:1 | check: procevent lavish flaky 1
+procevent:flaky:2 | check: procevent lavish flaky 2
+procevent:flaky:1 | check: procevent lavish flaky 1
+procevent:flaky:2 | check: procevent lavish flaky 2
+procevent:flaky:3 | check: procevent lavish flaky 3
+procevent:flaky:1 | check: procevent lavish flaky 1
+procevent:flaky:2 | check: procevent lavish flaky 2
+procevent:flaky:1 | check: procevent lavish flaky 1
+procevent:flaky:2 | check: procevent lavish flaky 2
+procevent:flaky:3 | check: procevent lavish flaky 3
+procevent:flaky:launch-failed:35-8420445-19132570 | check: process-event source flaky is registered but its launch did not prove it took the source's claim within FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS, so nothing is confirmed to be collecting from it; reconcile reports that as failed= and keeps launching it every supervision cycle. If it stays that way, check the source command and the adapter binary the registration names, and run an attached bin/fm-procevent.sh start flaky to reproduce a refusal on its stderr - the detached launch discards it, and a hand-run reconcile only counts it as failed=. A later cycle that finds the source owned ends this episode on its own, so a runner that was merely slow to claim needs nothing from you.
+procevent:flaky:1 | check: procevent lavish flaky 1
+procevent:flaky:2 | check: procevent lavish flaky 2
+procevent:flaky:3 | check: procevent lavish flaky 3
+procevent:flaky:1 | check: procevent lavish flaky 1
+procevent:flaky:2 | check: procevent lavish flaky 2
+procevent:flaky:3 | check: procevent lavish flaky 3
+procevent:flaky:1 | check: procevent lavish flaky 1
+procevent:flaky:2 | check: procevent lavish flaky 2
+procevent:flaky:3 | check: procevent lavish flaky 3
+procevent:flaky:4 | check: procevent lavish flaky 4
+procevent:flaky:1 | check: procevent lavish flaky 1
+procevent:flaky:2 | check: procevent lavish flaky 2
+procevent:flaky:3 | check: procevent lavish flaky 3
+--- watcher headline ---
+check: process-event result captured: procevent:flaky:1 procevent:flaky:2 procevent:flaky:3 procevent:flaky:4; process-event source failed to start: procevent:flaky:launch-failed:35-8420445-238507292 procevent:flaky:launch-failed:35-8420445-516812948 procevent:flaky:launch-failed:35-8420445-125611637 procevent:flaky:launch-failed:35-8420445-19132570
+--- fleet view (after recovery) ---

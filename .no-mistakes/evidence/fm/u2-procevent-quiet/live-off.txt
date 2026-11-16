@@ -1,0 +1,57 @@
+registered: live-src (lavish)
+== failing episode 1
+reconciled: published=0 started=0 stopped=0 uncertain=0 failed=1
+reconciled: published=0 started=0 stopped=0 uncertain=0 failed=1
+launch-failed wakes=1 launch-recovered wakes=0
+== recover 1
+reconciled: published=0 started=1 stopped=0 uncertain=0 failed=0
+launch-failed wakes=1 launch-recovered wakes=0
+== failing episode 2
+reconciled: published=1 started=0 stopped=0 uncertain=0 failed=1
+reconciled: published=1 started=0 stopped=0 uncertain=0 failed=1
+launch-failed wakes=2 launch-recovered wakes=0
+== recover 2
+reconciled: published=1 started=1 stopped=0 uncertain=0 failed=0
+launch-failed wakes=2 launch-recovered wakes=0
+== failing episode 3
+reconciled: published=2 started=0 stopped=0 uncertain=0 failed=1
+reconciled: published=2 started=0 stopped=0 uncertain=0 failed=1
+launch-failed wakes=3 launch-recovered wakes=0
+== recover 3
+reconciled: published=2 started=1 stopped=0 uncertain=0 failed=0
+launch-failed wakes=3 launch-recovered wakes=0
+== final failing episode (no recovery)
+reconciled: published=3 started=0 stopped=0 uncertain=0 failed=1
+reconciled: published=3 started=0 stopped=0 uncertain=0 failed=1
+launch-failed wakes=4 launch-recovered wakes=0
+== wake queue payloads
+procevent:live-src:launch-failed:35-8106282-1084916699 :: check: process-event source live-src is registered but its launch did not prove it took the source's claim within FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS, so nothing is confirmed to be collecting from it; reconcile reports that as failed= and keeps launching it every supervision cycle. If it stays that way, check the source command and the adapter binary the registration names, and run an attached bin/fm-procevent.sh start live-src to reproduce a refusal on its stderr - the detached launch discards it, and a hand-run reconcile only counts it as failed=. A later cycle that finds the source owned ends this episode on its own, so a runner that was merely slow to claim needs nothing from you.
+procevent:live-src:1 :: check: procevent lavish live-src 1
+procevent:live-src:1 :: check: procevent lavish live-src 1
+procevent:live-src:launch-failed:35-8106282-209413437 :: check: process-event source live-src is registered but its launch did not prove it took the source's claim within FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS, so nothing is confirmed to be collecting from it; reconcile reports that as failed= and keeps launching it every supervision cycle. If it stays that way, check the source command and the adapter binary the registration names, and run an attached bin/fm-procevent.sh start live-src to reproduce a refusal on its stderr - the detached launch discards it, and a hand-run reconcile only counts it as failed=. A later cycle that finds the source owned ends this episode on its own, so a runner that was merely slow to claim needs nothing from you.
+procevent:live-src:1 :: check: procevent lavish live-src 1
+procevent:live-src:1 :: check: procevent lavish live-src 1
+procevent:live-src:2 :: check: procevent lavish live-src 2
+procevent:live-src:1 :: check: procevent lavish live-src 1
+procevent:live-src:1 :: check: procevent lavish live-src 1
+procevent:live-src:2 :: check: procevent lavish live-src 2
+procevent:live-src:launch-failed:35-8106282-194937516 :: check: process-event source live-src is registered but its launch did not prove it took the source's claim within FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS, so nothing is confirmed to be collecting from it; reconcile reports that as failed= and keeps launching it every supervision cycle. If it stays that way, check the source command and the adapter binary the registration names, and run an attached bin/fm-procevent.sh start live-src to reproduce a refusal on its stderr - the detached launch discards it, and a hand-run reconcile only counts it as failed=. A later cycle that finds the source owned ends this episode on its own, so a runner that was merely slow to claim needs nothing from you.
+procevent:live-src:1 :: check: procevent lavish live-src 1
+procevent:live-src:2 :: check: procevent lavish live-src 2
+procevent:live-src:1 :: check: procevent lavish live-src 1
+procevent:live-src:2 :: check: procevent lavish live-src 2
+procevent:live-src:3 :: check: procevent lavish live-src 3
+procevent:live-src:1 :: check: procevent lavish live-src 1
+procevent:live-src:2 :: check: procevent lavish live-src 2
+procevent:live-src:1 :: check: procevent lavish live-src 1
+procevent:live-src:2 :: check: procevent lavish live-src 2
+procevent:live-src:3 :: check: procevent lavish live-src 3
+procevent:live-src:launch-failed:35-8106282-1753125267 :: check: process-event source live-src is registered but its launch did not prove it took the source's claim within FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS, so nothing is confirmed to be collecting from it; reconcile reports that as failed= and keeps launching it every supervision cycle. If it stays that way, check the source command and the adapter binary the registration names, and run an attached bin/fm-procevent.sh start live-src to reproduce a refusal on its stderr - the detached launch discards it, and a hand-run reconcile only counts it as failed=. A later cycle that finds the source owned ends this episode on its own, so a runner that was merely slow to claim needs nothing from you.
+procevent:live-src:1 :: check: procevent lavish live-src 1
+procevent:live-src:2 :: check: procevent lavish live-src 2
+procevent:live-src:3 :: check: procevent lavish live-src 3
+== watcher headline
+check: process-event result captured: procevent:live-src:1 procevent:live-src:2 procevent:live-src:3; process-event source failed to start: procevent:live-src:launch-failed:35-8106282-1084916699 procevent:live-src:launch-failed:35-8106282-209413437 procevent:live-src:launch-failed:35-8106282-194937516 procevent:live-src:launch-failed:35-8106282-1753125267
+== fleet view (quiet section)
+== quiet log
+exit=0

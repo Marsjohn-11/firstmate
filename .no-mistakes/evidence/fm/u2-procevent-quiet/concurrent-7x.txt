@@ -1,0 +1,10 @@
+ 00:25:59 up 1 day,  1:18,  0 users,  load average: 33.22, 31.68, 39.67
+copy 1 ok
+copy 2 ok
+copy 3 ok
+copy 4 ok
+copy 5 ok
+copy 6 ok
+copy 7 ok
+concurrent pass 7/7 (while the sequential loop also ran)
+ 00:27:10 up 1 day,  1:20,  0 users,  load average: 61.30, 42.08, 42.76

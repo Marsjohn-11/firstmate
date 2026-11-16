@@ -1,0 +1,9 @@
+1..7
+ok - with no config file, failure wakes and the fleet view are unchanged
+ok - the first failure of a source wakes at once
+ok - repeats inside the window are counted without a wake, and recovery wakes once with the count
+ok - a failure after the window wakes again
+ok - a failure with a different reason wakes at once inside the window
+ok - recovered-wake=off sends no recovery wake and still holds repeats back
+ok - a malformed config keeps the defaults
+FM_TEST_COMPLETE
